@@ -50,7 +50,11 @@ require_repo() {
 }
 
 detect_profile() {
+  # Most specific manifest first. A repository with two of these - a Tauri app,
+  # say - is genuinely ambiguous: pass --profile and it wins.
   if [ -f pubspec.yaml ]; then echo flutter
+  elif [ -f Cargo.toml ]; then echo rust
+  elif [ -f go.mod ]; then echo go
   elif [ -f pnpm-workspace.yaml ]; then echo pnpm-turbo
   elif [ -f package.json ]; then echo node
   elif [ -f pyproject.toml ] || [ -f setup.py ]; then echo python

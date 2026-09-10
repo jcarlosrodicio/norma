@@ -304,6 +304,40 @@ assert_has "with its own content intact" "$(cat AGENTS.md)" "My own harness note
 done_repo
 
 echo ""
+echo "the stack profiles"
+
+# Every profile must be valid sh and satisfy the contract the gate enforces at
+# startup, or `install` hands the project a config that refuses to run.
+for prof in "$HOME_DIR"/profiles/*.sh; do
+  pname=$(basename "$prof" .sh)
+  if sh -n "$prof" 2>/dev/null; then ok "$pname is valid sh"; else no "$pname is valid sh" "sh -n failed"; fi
+  pmissing=""
+  for fn in HARNESS_CODE_PATHS harness_gates harness_test_selected harness_test_all; do
+    grep -q "^$fn" "$prof" || pmissing="$pmissing $fn"
+  done
+  if [ -z "$pmissing" ]; then ok "$pname satisfies the config contract"; else no "$pname satisfies the config contract" "missing:$pmissing"; fi
+done
+
+new_repo
+printf 'module example.com/thing\n\ngo 1.24\n' > go.mod
+OUT=$("$NORMA" install --dry-run)
+assert_has "detects go from go.mod" "$OUT" "profile: go"
+done_repo
+
+new_repo
+printf '[package]\nname = "thing"\n' > Cargo.toml
+OUT=$("$NORMA" install --dry-run)
+assert_has "detects rust from Cargo.toml" "$OUT" "profile: rust"
+done_repo
+
+new_repo
+printf '[package]\nname = "thing"\n' > Cargo.toml
+echo '{}' > package.json
+OUT=$("$NORMA" install --dry-run --profile node)
+assert_has "an explicit --profile wins over detection" "$OUT" "profile: node"
+done_repo
+
+echo ""
 echo "norma upgrade"
 
 new_repo

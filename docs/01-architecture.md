@@ -106,9 +106,17 @@ explicitly rather than pretending otherwise.
 
 ### `profiles/*.sh` - stack adapters
 
-Prefab `config.sh` files: `flutter`, `node`, `pnpm-turbo`, `python`. `install`
-detects the stack from `pubspec.yaml`, `pnpm-workspace.yaml`, `package.json` or
-`pyproject.toml`, or takes `--profile`. A profile is a starting point, not a
+Prefab `config.sh` files: `flutter`, `go`, `node`, `pnpm-turbo`, `python`,
+`rust`. `install` detects the stack from `pubspec.yaml`, `Cargo.toml`, `go.mod`,
+`pnpm-workspace.yaml`, `package.json` or `pyproject.toml`, most specific first,
+and `--profile` wins over detection - which matters for a repository carrying two
+manifests, a Tauri app say.
+
+Two profiles carry a caveat in their own comments, because the contract cannot
+express it: Go's code often sits at the repository root, where the
+directory-prefix check of `HARNESS_CODE_PATHS` cannot see it; and `cargo test`
+filters by test *name* rather than path, so a named selection is a filter and the
+report has to say what it actually selected. A profile is a starting point, not a
 constraint: it lands as the project's own file and is never overwritten.
 
 ### `skills/` - the canonical library
@@ -149,11 +157,23 @@ boundary checker for a repository that already had a better one.
 rule and the document is only its explanation. This is why the enforcement is a
 git hook and not a paragraph asking the agent to behave.
 
-## Open question: self-hosting
+**Self-hosting: decided, yes.** `norma` installs its own harness. The gate parses
+every shell file and runs the whole suite; the hook is real, so a branch per
+change applies here too. Before this, the loop imposed on three repositories ran
+here on nothing but discipline - and discipline is exactly what the harness exists
+to replace.
 
-`norma` does not install its own harness. Doing so would mean a `config.sh` whose
-gates are `sh -n` plus `test/run.sh`, a vendored `pre-commit`, and therefore
-branch-per-change discipline in this repository too - which is the honest thing
-for the tool that imposes it on others. It has not been done because the friction
-has not been weighed against the benefit yet. Decide it deliberately, and record
-the decision here.
+Two adaptations the contract could not express on its own:
+
+- **The suite is indivisible.** `harness_test_selected` runs everything whatever
+  you name, and says so rather than pretending to filter. The selection still
+  reaches the stamp, because a reviewer reads it to know what you thought you were
+  covering.
+- **The skills are symlinked, not vendored.** `.agents/skills/<name>` points at
+  `../../skills/<name>`: this repository is their source, and a copy inside it
+  would be a second version that drifts. The link stays inside the repository, so
+  `doctor` is satisfied and a clone resolves it.
+
+**shellcheck is not in the gates**, deliberately. It is not installed here, and
+wiring in a linter nobody has means the gate changes behaviour the day somebody
+installs it. Adopting it means paying its findings in the same change.

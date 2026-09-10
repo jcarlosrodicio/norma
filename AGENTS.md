@@ -50,21 +50,41 @@ VERSION            the vendored-content version, stamped into each project
   late, which was the worst gap in this repository.
 - **`test/run.sh` passes before you commit**, and its count goes in the commit
   message. It is fast - a couple of seconds - so there is no excuse.
-- **Bump `VERSION`** when vendored content changes, so `doctor` can tell a
-  consumer it is behind.
+- **Bump `VERSION`** when vendored content changes - `core/`, `skills/`,
+  `profiles/`, `templates/` - so `doctor` can tell a consumer it is behind.
+- **`--docs-only` is for `docs/`, `README.md` and `AGENTS.md`.** Everything else
+  here is shipped or tested, and the gate refuses.
 - **English** for code, comments, commit messages, skills and templates. These
   documents are in English too.
 
-## The loop applies here too
+## The loop applies here, enforced
 
-The procedure this repository installs elsewhere governs work here:
-[`skills/run-task/SKILL.md`](skills/run-task/SKILL.md). The skills live in
-`skills/` rather than `.agents/skills/` because this repository is their source.
+The full procedure for any change is
+[`skills/run-task/SKILL.md`](skills/run-task/SKILL.md) - the same one this
+repository installs elsewhere, chaining orient, enrich, branch, plan, implement,
+verify, review, document and hand over, and stopping at the three points where a
+human decides. `.agents/skills/run-task/SKILL.md` resolves to it too, so an agent
+that only knows the vendored path finds it.
 
-`norma` does **not** install its own harness yet: there is no
-`scripts/harness/verify` and no `.githooks/` here, so the gate is `test/run.sh`
-run by hand and the stop-before-delivery rule is on you. Self-hosting is an open
-question - see the end of `docs/01-architecture.md`.
+`norma` installs its own harness, so the gate and the hook are real here:
+
+```
+scripts/harness/verify <what you were verifying>
+scripts/harness/verify --docs-only     # docs/, README.md, AGENTS.md only
+```
+
+`.githooks/pre-commit` refuses `master`, a missing or stale stamp, and code
+committed against a docs-only stamp - so a branch per change is the rule here as
+it is everywhere else. After a fresh clone: `git config core.hooksPath .githooks`.
+
+The binding checklist is [`docs/harness/mandatory-steps.md`](docs/harness/mandatory-steps.md),
+and [`docs/harness/architecture-rules.md`](docs/harness/architecture-rules.md) is
+the adoption map - which, honestly, adopts neither shared reference and says why.
+
+`.agents/skills/<name>` symlinks to `../../skills/<name>` rather than being a
+copy: this repository is the source of those skills, so vendoring them into
+itself would duplicate content that could then drift. The links stay inside the
+repository, which is what `doctor` requires.
 
 ## Consumers
 

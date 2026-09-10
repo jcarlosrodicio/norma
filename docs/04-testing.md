@@ -1,10 +1,12 @@
 # 04 · Testing
 
 ```sh
-test/run.sh
+scripts/harness/verify <what you were verifying>   # the gate: parse + the suite
+test/run.sh                                        # the suite alone, while iterating
 ```
 
-One suite, currently 72 tests, a couple of seconds. It covers the gate's real
+One suite, currently 87 tests, a couple of seconds. The gate runs it whole - it
+is indivisible, so there is nothing to select - after parsing every shell file. It covers the gate's real
 behaviour, the config contract, the hook's four refusals, and `install`,
 `upgrade` and `doctor`.
 
