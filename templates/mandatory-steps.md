@@ -102,6 +102,36 @@ including the failure path. Capture what you observed in the report.
 
 Skip only when the change cannot surface at runtime, and say why.
 
+### When the change migrates a data store (MANDATORY, no exceptions)
+
+An in-memory or throwaway store is not the store. A migration verified only
+against an embedded engine, a WASM build or a container the test framework
+creates and destroys has been verified against a *fresh, empty* schema - which is
+the one case that never happens in production.
+
+So bring up the real thing and drive the change through it. If the project ships a
+container definition for its own dependencies, that is what it is for:
+
+```
+docker compose -f <compose file> up -d      # or the project's own script
+<the migrate command>
+<the command, endpoint or screen that exercises the change>
+```
+
+Three things to check, and record them in the report:
+
+1. **Apply it twice.** The second run must be a no-op, not an error and not a
+   duplicate.
+2. **Migrate a store that already has data**, not one you just created. A fresh
+   schema proves nothing about a populated one, and a column that cannot be added
+   to existing rows is exactly the failure this step exists to catch.
+3. **Name the engine and version you ran against.** "It worked locally" without
+   saying what "locally" was is not evidence - especially when the tests ran on a
+   different engine than production uses.
+
+TODO(harness): the project's real commands for the three steps above, or a
+statement that this project has no migrated store and why.
+
 ## Step 6 - Report
 
 Write the verification report into the change folder: commands executed, results,
