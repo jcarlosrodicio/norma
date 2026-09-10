@@ -106,8 +106,10 @@ inject_agents_block() {
     step "+ AGENTS.md"
     return 0
   fi
-  if ! grep -qF "$BEGIN_MARK" AGENTS.md && grep -q '^## Harness' AGENTS.md; then
-    step "= AGENTS.md (kept, yours: it already has a Harness section)"
+  # If the file already documents the harness - under any heading - it is the
+  # project's, and appending a generic block would only duplicate it.
+  if ! grep -qF "$BEGIN_MARK" AGENTS.md && { grep -q '^## Harness' AGENTS.md || grep -q 'scripts/harness/verify' AGENTS.md; }; then
+    step "= AGENTS.md (kept, yours: it already documents the harness)"
     return 0
   fi
   tmp=$(mktemp)
@@ -311,6 +313,12 @@ cmd_doctor() {
     [ -n "$hits" ] && { printf '%s\n' "$hits" | sed 's/^/  found /'; found=1; }
   done
   [ "$found" -eq 0 ] && step "nothing detected - if nothing enforces your layers, every rule depends on the agent behaving"
+
+  for cfg in eslint.config.js .eslintrc .eslintrc.json .prettierignore analysis_options.yaml ruff.toml pyproject.toml; do
+    if [ -f "$cfg" ] && ! grep -q '\.agents' "$cfg"; then
+      warn "$cfg does not exclude .agents - vendored skills ship third-party files (a script, a dotfile) that a linter or formatter will flag as yours"
+    fi
+  done
 
   say ""
   say "machine (user-level, not per project)"
