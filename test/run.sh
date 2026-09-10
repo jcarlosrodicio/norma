@@ -158,6 +158,53 @@ gate --docs-only
 assert_eq "a config without HARNESS_CODE_PATHS is a hard failure" "$RC" 2
 done_repo
 
+# ---------------------------------------------------------- the hook ----------
+echo ""
+echo "the pre-commit hook"
+
+new_repo
+mkdir -p .githooks && cp "$HOME_DIR/core/pre-commit" .githooks/pre-commit
+chmod +x .githooks/pre-commit
+git switch -q -c feature-branch
+mkdir -p .harness src
+printf '2026-01-01 10:00:00 | feature-branch | spec/thing.test.ts another/one\n' > .harness/verified
+touch -t 202601011000 .harness/verified
+echo 'x' > src/late.ts
+git add src/late.ts
+set +e
+OUT=$(.githooks/pre-commit 2>&1); RC=$?
+set -e
+assert_eq "refuses a commit whose stamp predates the staged files" "$RC" 1
+assert_has "and hands back the previous selection, ready to paste" "$OUT" "scripts/harness/verify spec/thing.test.ts another/one"
+assert_no "so no placeholder is left for somebody to remember" "$OUT" "<the tests"
+done_repo
+
+new_repo
+mkdir -p .githooks && cp "$HOME_DIR/core/pre-commit" .githooks/pre-commit
+chmod +x .githooks/pre-commit
+git switch -q -c feature-branch
+mkdir -p .harness src
+printf '2026-01-01 10:00:00 | feature-branch | docs-only\n' > .harness/verified
+touch -t 202601011000 .harness/verified
+echo 'x' > src/late.ts
+git add src/late.ts
+set +e
+OUT=$(.githooks/pre-commit 2>&1); RC=$?
+set -e
+assert_eq "still refuses when the stale run was docs-only" "$RC" 1
+assert_has "and then asks for a real test selection" "$OUT" "<the tests that touch this task>"
+done_repo
+
+new_repo
+mkdir -p .githooks && cp "$HOME_DIR/core/pre-commit" .githooks/pre-commit
+chmod +x .githooks/pre-commit
+set +e
+OUT=$(.githooks/pre-commit 2>&1); RC=$?
+set -e
+assert_eq "refuses on the default branch" "$RC" 1
+assert_has "naming the branch it refused" "$OUT" "master"
+done_repo
+
 # ---------------------------------------------------------- the installer ----
 echo ""
 echo "norma install"

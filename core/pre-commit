@@ -29,8 +29,17 @@ for f in $(git diff --cached --name-only --diff-filter=ACM); do
   if [ -z "$NEWEST" ] || [ "$ROOT/$f" -nt "$NEWEST" ]; then NEWEST="$ROOT/$f"; fi
 done
 if [ -n "$NEWEST" ] && [ "$NEWEST" -nt "$STAMP" ]; then
+  # The stamp records the selection of the run that is now stale, so hand back a
+  # command that can be pasted instead of a placeholder somebody has to remember.
+  LAST=$(cut -d'|' -f3- "$STAMP" | sed 's/^ *//;s/ *$//')
+  case "$LAST" in
+    ''|docs-only|--docs-only) HINT="scripts/harness/verify <the tests that touch this task>" ;;
+    *) HINT="scripts/harness/verify $LAST" ;;
+  esac
   fail "Staged files changed after the last verification ($(basename "$NEWEST")).
-  Re-run:  scripts/harness/verify <the tests that touch this task>"
+  You edited code after verifying it, so the stamp no longer covers what you are
+  committing. Re-run the gate:
+  $HINT"
 fi
 
 printf 'harness: verified %s\n' "$(head -1 "$STAMP")"
