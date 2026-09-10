@@ -49,15 +49,30 @@ require_repo() {
   cd "$REPO"
 }
 
+# true when the glob matches at least one existing path
+has() { for f in $1; do [ -e "$f" ] && return 0; done; return 1; }
+
 detect_profile() {
-  # Most specific manifest first. A repository with two of these - a Tauri app,
-  # say - is genuinely ambiguous: pass --profile and it wins.
+  # Most specific manifest first, and a manifest that only one stack ever writes
+  # before one several stacks share. A repository carrying two of them - a Tauri
+  # app, a .NET service with a JS frontend - is genuinely ambiguous: pass
+  # --profile and it wins.
   if [ -f pubspec.yaml ]; then echo flutter
   elif [ -f Cargo.toml ]; then echo rust
   elif [ -f go.mod ]; then echo go
+  elif [ -f mix.exs ]; then echo elixir
+  elif [ -f Package.swift ]; then echo swift
+  elif [ -f pom.xml ]; then echo java-maven
+  elif [ -f build.gradle ] || [ -f build.gradle.kts ]; then echo gradle
+  elif has '*.sln' || has '*.csproj'; then echo dotnet
+  elif [ -f artisan ]; then echo laravel
+  elif [ -f Gemfile ]; then echo ruby
+  elif [ -f manage.py ]; then echo django
+  elif has 'next.config.*'; then echo next
   elif [ -f pnpm-workspace.yaml ]; then echo pnpm-turbo
   elif [ -f package.json ]; then echo node
   elif [ -f pyproject.toml ] || [ -f setup.py ]; then echo python
+  elif has '*.tf'; then echo terraform
   else echo ""
   fi
 }

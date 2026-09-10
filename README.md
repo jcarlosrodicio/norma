@@ -15,8 +15,27 @@ norma install              # do it
 norma doctor               # what is still missing, and what you must fill in
 ```
 
-`install` detects the stack (`pubspec.yaml`, `pnpm-workspace.yaml`, `package.json`,
-`pyproject.toml`) or takes `--profile flutter|pnpm-turbo|node|python`.
+`install` detects the stack from its manifest, or takes `--profile`. Sixteen are
+shipped:
+
+| | |
+|---|---|
+| **JS/TS** | `node` · `pnpm-turbo` · `next` |
+| **Mobile** | `flutter` · `swift` |
+| **Systems** | `go` · `rust` |
+| **JVM** | `java-maven` · `gradle` (Java/Kotlin/Android) |
+| **Python** | `python` · `django` |
+| **Web frameworks** | `laravel` · `ruby` (Rails) · `elixir` (Phoenix) |
+| **Other** | `dotnet` · `terraform` |
+
+**A profile is a starting point, not tested support.** Each one is verified as
+valid POSIX sh that satisfies the config contract - there is a test per profile -
+but the commands inside were not run against a real toolchain of that stack. It
+lands as `scripts/harness/config.sh`, which the project owns from that moment:
+read it, make it true for your repository, and delete what does not apply. The
+comments flag the traps worth knowing - that `cargo test` filters by name rather
+than path, that Gradle wants `testDebugUnitTest` on Android, that Go code at the
+repository root is invisible to the code-path check.
 
 ## Finishing it: `/harness-setup`
 

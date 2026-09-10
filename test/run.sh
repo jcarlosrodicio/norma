@@ -318,17 +318,26 @@ for prof in "$HOME_DIR"/profiles/*.sh; do
   if [ -z "$pmissing" ]; then ok "$pname satisfies the config contract"; else no "$pname satisfies the config contract" "missing:$pmissing"; fi
 done
 
-new_repo
-printf 'module example.com/thing\n\ngo 1.24\n' > go.mod
-OUT=$("$NORMA" install --dry-run)
-assert_has "detects go from go.mod" "$OUT" "profile: go"
-done_repo
+# Every name detection can emit must have a profile behind it, or install dies
+# on a repository it claimed to recognise.
+for dname in $(sed -n '/^detect_profile()/,/^}/p' "$HOME_DIR/bin/norma" | sed -n 's/.*then echo \([a-z0-9-]\{1,\}\)$/\1/p'); do
+  assert_file "detection can emit '$dname', and it has a profile" "$HOME_DIR/profiles/$dname.sh"
+done
 
-new_repo
-printf '[package]\nname = "thing"\n' > Cargo.toml
-OUT=$("$NORMA" install --dry-run)
-assert_has "detects rust from Cargo.toml" "$OUT" "profile: rust"
-done_repo
+# One marker per repository, so each row exercises its own branch of the ladder.
+for pair in pubspec.yaml:flutter Cargo.toml:rust go.mod:go mix.exs:elixir \
+            Package.swift:swift pom.xml:java-maven build.gradle.kts:gradle \
+            thing.csproj:dotnet artisan:laravel Gemfile:ruby manage.py:django \
+            next.config.mjs:next pnpm-workspace.yaml:pnpm-turbo package.json:node \
+            pyproject.toml:python main.tf:terraform; do
+  marker=${pair%%:*}
+  expect=${pair##*:}
+  new_repo
+  : > "$marker"
+  OUT=$("$NORMA" install --dry-run)
+  assert_has "detects $expect from $marker" "$OUT" "profile: $expect"
+  done_repo
+done
 
 new_repo
 printf '[package]\nname = "thing"\n' > Cargo.toml

@@ -106,17 +106,32 @@ explicitly rather than pretending otherwise.
 
 ### `profiles/*.sh` - stack adapters
 
-Prefab `config.sh` files: `flutter`, `go`, `node`, `pnpm-turbo`, `python`,
-`rust`. `install` detects the stack from `pubspec.yaml`, `Cargo.toml`, `go.mod`,
-`pnpm-workspace.yaml`, `package.json` or `pyproject.toml`, most specific first,
-and `--profile` wins over detection - which matters for a repository carrying two
-manifests, a Tauri app say.
+Sixteen prefab `config.sh` files: `django`, `dotnet`, `elixir`, `flutter`, `go`,
+`gradle`, `java-maven`, `laravel`, `next`, `node`, `pnpm-turbo`, `python`, `ruby`,
+`rust`, `swift`, `terraform`.
 
-Two profiles carry a caveat in their own comments, because the contract cannot
-express it: Go's code often sits at the repository root, where the
-directory-prefix check of `HARNESS_CODE_PATHS` cannot see it; and `cargo test`
-filters by test *name* rather than path, so a named selection is a filter and the
-report has to say what it actually selected. A profile is a starting point, not a
+Detection walks the manifests most specific first - a file only one stack ever
+writes (`mix.exs`, `Package.swift`, `pom.xml`, `artisan`) before one several share
+(`package.json`) - and `--profile` wins, which is what a repository carrying two
+manifests needs: a Tauri app, a .NET service with a JS frontend. Two tests keep
+this honest: every name detection can emit must have a profile file behind it,
+and every profile must be valid sh satisfying the contract the gate checks at
+startup - otherwise `install` hands a project a config that refuses to run.
+
+**What a profile is not: tested support.** The commands inside were never run
+against a real toolchain of that stack, and this repository has no way to run
+them. What is verified is the shape, not the behaviour. A profile is therefore a
+draft of the project's own `config.sh`, and the project owns it from the first
+write.
+
+The interesting content of a profile is often its comments, because they carry
+what the contract cannot express: that `cargo test`, `dotnet test`, Gradle and
+`swift test` filter by test *name* rather than by path, so a named selection is a
+filter and the report has to say what it actually selected; that Android's task is
+`testDebugUnitTest`; that Django's runner takes dotted labels; that Go code at the
+repository root is invisible to the directory-prefix check of
+`HARNESS_CODE_PATHS`; that a Terraform plan against a real workspace needs
+credentials and therefore belongs in runtime verification rather than in a gate. A profile is a starting point, not a
 constraint: it lands as the project's own file and is never overwritten.
 
 ### `skills/` - the canonical library
