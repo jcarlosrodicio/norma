@@ -100,6 +100,15 @@ stack adapter. They live here, once, because the gate is the same file everywher
 before this repository existed the same eight tests were duplicated across three
 projects in two languages.
 
+## Working on norma itself
+
+[`AGENTS.md`](AGENTS.md) is the index for that, and it is what an agent should read
+first: the ownership boundary in [`docs/01-architecture.md`](docs/01-architecture.md),
+the flows and every refusal in [`docs/02-flows.md`](docs/02-flows.md), the skill
+library in [`docs/03-skills.md`](docs/03-skills.md), and the suite in
+[`docs/04-testing.md`](docs/04-testing.md). `CLAUDE.md` is a symlink to `AGENTS.md`,
+because Claude Code autoloads only the latter.
+
 ## Not per project
 
 Some things are user-level and `install` deliberately does not touch them; `doctor`
