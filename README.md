@@ -18,6 +18,22 @@ harness doctor               # what is still missing, and what you must fill in
 `install` detects the stack (`pubspec.yaml`, `pnpm-workspace.yaml`, `package.json`,
 `pyproject.toml`) or takes `--profile flutter|pnpm-turbo|node|python`.
 
+## Finishing it: `/harness-setup`
+
+`install` leaves templates full of `TODO(harness)` on purpose - those are the
+decisions it cannot infer. The `harness-setup` skill fills them **by interviewing
+you**: it reads the repository first (scripts, CI, whatever already enforces your
+architecture, the branch and roadmap conventions), comes back with proposals rather
+than a blank form, asks in four rounds, and then writes `config.sh`,
+`mandatory-steps.md` and `architecture-rules.md` from your answers. It also installs
+the harness first if it is not there yet.
+
+It is vendored into every project as `.agents/skills/harness-setup/SKILL.md`, so any
+agent can follow it by path; in Claude Code it is `/harness-setup`. Anything you do
+not answer stays in the document as an explicit open question - it never guesses a
+convention, because a guessed convention that everybody then follows is worse than
+an admitted gap.
+
 ## Who owns what
 
 This is the whole design. Get it wrong and either upgrades destroy your decisions,

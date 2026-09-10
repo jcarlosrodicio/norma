@@ -14,6 +14,10 @@ documents win over both.
 > TODO(harness): this file was generated from a template. Replace every TODO with
 > what is true for this repository, and delete this note. A generic loop that does
 > not name your real commands, layers and conventions is a loop nobody follows.
+>
+> An agent can do this with you: point it at
+> `.agents/skills/harness-setup/SKILL.md` (in Claude Code, `/harness-setup`). It
+> reads the repository first and only asks what it cannot infer.
 
 ## Step 0 - Feature branch (always first)
 

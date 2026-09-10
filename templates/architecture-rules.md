@@ -7,6 +7,9 @@ which do not, and why. Read it together with the reference, before the first edi
 > your decisions or which sections you adopt - only you can. Fill this in and delete
 > this note. An empty adoption map means the shared reference applies wholesale,
 > which is almost never what you want.
+>
+> An agent can do this with you: point it at
+> `.agents/skills/harness-setup/SKILL.md` (in Claude Code, `/harness-setup`).
 
 ## Which reference
 

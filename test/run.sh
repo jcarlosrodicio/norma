@@ -164,11 +164,13 @@ echo "harness install"
 
 new_repo
 mkdir -p src && echo '{}' > package.json
-"$HARNESS" install --profile node >/dev/null
+OUT=$("$HARNESS" install --profile node)
+assert_has "install points at the setup interview" "$OUT" "harness-setup/SKILL.md"
 assert_file "vendors the gate" scripts/harness/verify
 assert_file "writes a config from the profile" scripts/harness/config.sh
 assert_file "vendors the hook" .githooks/pre-commit
 assert_file "vendors run-task as a real directory" .agents/skills/run-task/SKILL.md
+assert_file "vendors the setup interview" .agents/skills/harness-setup/SKILL.md
 assert_file "and the architecture reference" .agents/skills/architecture-guidelines/references/backend.md
 assert_file "creates the loop template" docs/harness/mandatory-steps.md
 assert_file "creates the adoption map template" docs/harness/architecture-rules.md

@@ -26,7 +26,7 @@ SELF=$(resolve "$0")
 HOME_DIR=$(cd "$(dirname "$SELF")/.." && pwd)
 VERSION=$(cat "$HOME_DIR/VERSION")
 
-VENDORED_SKILLS="run-task enrich-task adversarial-review commit update-docs code-auditing writing-skills using-git-worktrees architecture-guidelines"
+VENDORED_SKILLS="run-task harness-setup enrich-task adversarial-review commit update-docs code-auditing writing-skills using-git-worktrees architecture-guidelines"
 BEGIN_MARK="<!-- harness:begin -->"
 END_MARK="<!-- harness:end -->"
 
@@ -194,7 +194,12 @@ cmd_install() {
   fi
 
   say ""
-  say "Next, and nobody can do it for you:"
+  say "Next: an agent can finish this with you. Point it at"
+  say "  .agents/skills/harness-setup/SKILL.md"
+  say "(in Claude Code: /harness-setup). It detects the stack, asks you only what it"
+  say "cannot read, and fills in config.sh, mandatory-steps.md and architecture-rules.md."
+  say ""
+  say "By hand instead:"
   say "  1. scripts/harness/config.sh - make the gates and test commands real."
   say "  2. docs/harness/mandatory-steps.md and architecture-rules.md - replace every TODO."
   say "  3. harness doctor - it will tell you what is still missing."
@@ -276,7 +281,7 @@ cmd_doctor() {
 
   for f in docs/harness/mandatory-steps.md docs/harness/architecture-rules.md; do
     if [ -f "$f" ]; then
-      if grep -q 'TODO(harness)' "$f"; then warn "$f still has TODO(harness) - it is a template, not a decision"; else step "ok  $f"; fi
+      if grep -q 'TODO(harness)' "$f"; then warn "$f still has TODO(harness) - a template, not a decision yet: follow .agents/skills/harness-setup/SKILL.md"; else step "ok  $f"; fi
     else
       bad "$f missing" "run 'harness install'"
     fi
