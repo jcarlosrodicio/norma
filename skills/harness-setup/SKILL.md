@@ -6,7 +6,7 @@ version: 1.0.0
 
 # harness-setup
 
-`harness install` puts the mechanical half in place: the gate, the hook, the skills,
+`norma install` puts the mechanical half in place: the gate, the hook, the skills,
 and templates full of `TODO(harness)` markers. Those markers are the half that
 encodes decisions - your layers, your commands, your conventions - and no installer
 can infer them. This procedure fills them by asking.
@@ -33,15 +33,15 @@ invocable as `/harness-setup`; any other agent reads this file.
 ## 0. Locate the harness
 
 ```
-harness doctor
+norma doctor
 ```
 
 - Command not found: the harness repository is not installed on this machine. Ask
   the human for its location, then tell them the two commands (clone it, and
-  `ln -s <repo>/bin/harness ~/.local/bin/harness`). Do not clone anything yourself
+  `ln -s <repo>/bin/norma ~/.local/bin/norma`). Do not clone anything yourself
   without being asked.
-- It reports no harness in this repository: run `harness install --dry-run`, show
-  the human what it would do, and run `harness install` once they agree.
+- It reports no harness in this repository: run `norma install --dry-run`, show
+  the human what it would do, and run `norma install` once they agree.
 - It reports TODOs or missing pieces: that list is your worklist.
 
 ## 1. Read the repository before asking anything
@@ -146,7 +146,7 @@ drop it, and do not answer it yourself.
 Prove the harness works rather than asserting it:
 
 ```
-harness doctor
+norma doctor
 scripts/harness/verify --docs-only
 ```
 

@@ -1,4 +1,4 @@
-# harness
+# norma
 
 The task harness, extracted so it can be installed into any repository. One loop,
 one verification gate, one set of skills - identical whichever agent is driving,
@@ -6,13 +6,13 @@ because everything is referenced **by file path** and enforced by **git**, not b
 any single agent's hook system.
 
 ```sh
-git clone <this repo> ~/Nasito/Desarrollo/harness
-ln -s ~/Nasito/Desarrollo/harness/bin/harness ~/.local/bin/harness
+git clone <this repo> ~/Nasito/Desarrollo/norma
+ln -s ~/Nasito/Desarrollo/norma/bin/norma ~/.local/bin/norma
 
 cd ~/some/project
-harness install --dry-run    # see what it would do
-harness install              # do it
-harness doctor               # what is still missing, and what you must fill in
+norma install --dry-run    # see what it would do
+norma install              # do it
+norma doctor               # what is still missing, and what you must fill in
 ```
 
 `install` detects the stack (`pubspec.yaml`, `pnpm-workspace.yaml`, `package.json`,
@@ -85,7 +85,7 @@ Claude Code through repository-relative symlinks in `.claude/skills/`. A symlink
 another machine or in CI. `doctor` fails on any symlink that escapes the repository.
 
 The cost of vendoring is that improvements do not arrive on their own: run
-`harness upgrade`, which compares against `scripts/harness/VERSION` and reports any
+`norma upgrade`, which compares against `scripts/harness/VERSION` and reports any
 owned file you edited locally instead of clobbering it.
 
 ## Tests

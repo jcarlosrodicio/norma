@@ -1,6 +1,6 @@
 ## Harness
 
-<!-- Managed by the harness installer. Edit the harness upstream, not this block. -->
+<!-- Managed by the norma installer. Edit the harness upstream, not this block. -->
 
 - **Full procedure for any implementation task:**
   [`.agents/skills/run-task/SKILL.md`](.agents/skills/run-task/SKILL.md). It chains

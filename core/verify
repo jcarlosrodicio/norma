@@ -33,7 +33,7 @@ USAGE
 run() { if command -v rtk >/dev/null 2>&1; then rtk "$@"; else "$@"; fi; }
 
 if [ ! -r "$CONFIG" ]; then
-  echo "harness: missing $CONFIG - run 'harness install' or 'harness doctor'" >&2
+  echo "harness: missing $CONFIG - run 'norma install' or 'norma doctor'" >&2
   exit 2
 fi
 . "$CONFIG"

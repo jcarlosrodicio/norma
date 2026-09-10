@@ -1,10 +1,10 @@
 #!/bin/sh
-# harness - install and maintain the agent-agnostic task harness in a repository.
+# norma - install and maintain the agent-agnostic task harness in a repository.
 #
-#   harness install [--profile <name>] [--dry-run]   set it up in this repository
-#   harness upgrade [--dry-run] [--force]            re-vendor what the harness owns
-#   harness doctor                                   report what is missing or drifted
-#   harness version
+#   norma install [--profile <name>] [--dry-run]   set it up in this repository
+#   norma upgrade [--dry-run] [--force]            re-vendor what the harness owns
+#   norma doctor                                   report what is missing or drifted
+#   norma version
 #
 # The harness OWNS the mechanical files and replaces them on upgrade:
 #   scripts/harness/verify   .githooks/pre-commit   .agents/skills/<vendored>
@@ -162,7 +162,7 @@ cmd_install() {
   [ -n "$PROFILE" ] || die "could not detect the stack; pass --profile (available: $(ls "$HOME_DIR/profiles" | sed 's/\.sh$//' | paste -sd', ' -))"
   [ -f "$HOME_DIR/profiles/$PROFILE.sh" ] || die "unknown profile '$PROFILE'"
 
-  say "harness $VERSION -> $REPO (profile: $PROFILE)${DRY:+}"
+  say "norma $VERSION -> $REPO (profile: $PROFILE)${DRY:+}"
   [ "$DRY" -eq 1 ] && say "  (dry run: nothing is written)"
 
   install_owned "$HOME_DIR/core/verify" scripts/harness/verify 755
@@ -202,15 +202,15 @@ cmd_install() {
   say "By hand instead:"
   say "  1. scripts/harness/config.sh - make the gates and test commands real."
   say "  2. docs/harness/mandatory-steps.md and architecture-rules.md - replace every TODO."
-  say "  3. harness doctor - it will tell you what is still missing."
+  say "  3. norma doctor - it will tell you what is still missing."
 }
 
 cmd_upgrade() {
   MODE=upgrade
   require_repo
-  [ -f scripts/harness/config.sh ] || die "no harness here yet - run 'harness install'"
+  [ -f scripts/harness/config.sh ] || die "no harness here yet - run 'norma install'"
   was=$( [ -f scripts/harness/VERSION ] && cat scripts/harness/VERSION || echo unknown )
-  say "harness $was -> $VERSION in $REPO"
+  say "norma $was -> $VERSION in $REPO"
   install_owned "$HOME_DIR/core/verify" scripts/harness/verify 755
   install_owned "$HOME_DIR/core/pre-commit" .githooks/pre-commit 755
   vendor_skills
@@ -223,24 +223,24 @@ check() { if [ "$1" = 0 ]; then step "ok  $2"; else bad "$2 - $3"; fi; }
 
 cmd_doctor() {
   require_repo
-  say "harness doctor - $REPO"
+  say "norma doctor - $REPO"
   say ""
   say "repository"
 
   [ -f scripts/harness/verify ] && st=0 || st=1
-  check $st "scripts/harness/verify present" "run 'harness install'"
+  check $st "scripts/harness/verify present" "run 'norma install'"
 
   if [ -f scripts/harness/verify ]; then
     same "$HOME_DIR/core/verify" scripts/harness/verify && st=0 || st=1
     if [ $st -ne 0 ]; then
       v=$( [ -f scripts/harness/VERSION ] && cat scripts/harness/VERSION || echo unknown )
       if [ "$v" != "$VERSION" ]; then
-        warn "verify is from harness $v, upstream is $VERSION - run 'harness upgrade'"
+        warn "verify is from norma $v, upstream is $VERSION - run 'norma upgrade'"
       else
         warn "verify differs from upstream at the same version - it was edited locally"
       fi
     else
-      step "ok  verify matches harness $VERSION"
+      step "ok  verify matches norma $VERSION"
     fi
   fi
 
@@ -253,11 +253,11 @@ cmd_doctor() {
     [ -z "$missing" ] && step "ok  config.sh defines the contract" || bad "config.sh is missing:$missing" "see profiles/ in the harness repo"
     if grep -q 'TODO' scripts/harness/config.sh; then warn "config.sh still contains TODO"; fi
   else
-    bad "scripts/harness/config.sh missing" "run 'harness install'"
+    bad "scripts/harness/config.sh missing" "run 'norma install'"
   fi
 
   [ -x .githooks/pre-commit ] && st=0 || st=1
-  check $st ".githooks/pre-commit present and executable" "run 'harness install'"
+  check $st ".githooks/pre-commit present and executable" "run 'norma install'"
 
   [ "$(git config --get core.hooksPath 2>/dev/null)" = ".githooks" ] && st=0 || st=1
   check $st "core.hooksPath points at .githooks" "run: git config core.hooksPath .githooks"
@@ -276,14 +276,14 @@ cmd_doctor() {
     grep -q 'run-task' AGENTS.md && step "ok  AGENTS.md points at run-task" || bad "AGENTS.md never mentions run-task" "an agent has no entry point to the loop"
     grep -q 'scripts/harness/verify' AGENTS.md && step "ok  AGENTS.md points at the gate" || bad "AGENTS.md never mentions scripts/harness/verify" "an agent will not know how to verify"
   else
-    bad "AGENTS.md missing" "run 'harness install'"
+    bad "AGENTS.md missing" "run 'norma install'"
   fi
 
   for f in docs/harness/mandatory-steps.md docs/harness/architecture-rules.md; do
     if [ -f "$f" ]; then
       if grep -q 'TODO(harness)' "$f"; then warn "$f still has TODO(harness) - a template, not a decision yet: follow .agents/skills/harness-setup/SKILL.md"; else step "ok  $f"; fi
     else
-      bad "$f missing" "run 'harness install'"
+      bad "$f missing" "run 'norma install'"
     fi
   done
 
@@ -358,7 +358,7 @@ case $cmd in
   install) cmd_install ;;
   upgrade) cmd_upgrade ;;
   doctor)  cmd_doctor ;;
-  version) say "harness $VERSION" ;;
+  version) say "norma $VERSION" ;;
   help|--help|-h) sed -n '2,14p' "$SELF" | sed 's/^# \{0,1\}//' ;;
   *) die "unknown command: $cmd (try: install, upgrade, doctor, version)" ;;
 esac

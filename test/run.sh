@@ -9,7 +9,7 @@
 set -e
 
 HOME_DIR=$(cd "$(dirname "$0")/.." && pwd)
-HARNESS=$HOME_DIR/bin/harness
+NORMA=$HOME_DIR/bin/norma
 pass=0
 fail=0
 
@@ -142,7 +142,7 @@ mkdir -p scripts/harness
 cp "$HOME_DIR/core/verify" scripts/harness/verify
 gate --docs-only
 assert_eq "no config.sh is a hard failure" "$RC" 2
-assert_has "and it says how to fix it" "$OUT" "harness install"
+assert_has "and it says how to fix it" "$OUT" "norma install"
 done_repo
 
 new_repo; with_gate
@@ -160,11 +160,11 @@ done_repo
 
 # ---------------------------------------------------------- the installer ----
 echo ""
-echo "harness install"
+echo "norma install"
 
 new_repo
 mkdir -p src && echo '{}' > package.json
-OUT=$("$HARNESS" install --profile node)
+OUT=$("$NORMA" install --profile node)
 assert_has "install points at the setup interview" "$OUT" "harness-setup/SKILL.md"
 assert_file "vendors the gate" scripts/harness/verify
 assert_file "writes a config from the profile" scripts/harness/config.sh
@@ -185,16 +185,16 @@ git add -A >/dev/null 2>&1
 # --no-verify on purpose: this test is about the installer, and the hook it just
 # installed correctly refuses a commit on the default branch without a stamp.
 git commit -qm harness --no-verify
-"$HARNESS" install --profile node >/dev/null
+"$NORMA" install --profile node >/dev/null
 assert_eq "installing twice changes nothing" "$(git status --porcelain | wc -l | tr -d ' ')" "0"
 done_repo
 
 new_repo
 echo '{}' > package.json
-"$HARNESS" install --profile node >/dev/null
+"$NORMA" install --profile node >/dev/null
 echo "# MINE" > scripts/harness/config.sh
 echo "# MY LOOP" > docs/harness/mandatory-steps.md
-"$HARNESS" install --profile node >/dev/null
+"$NORMA" install --profile node >/dev/null
 assert_eq "an existing config.sh is never overwritten" "$(cat scripts/harness/config.sh)" "# MINE"
 assert_eq "nor are the project's own documents" "$(cat docs/harness/mandatory-steps.md)" "# MY LOOP"
 done_repo
@@ -202,53 +202,53 @@ done_repo
 new_repo
 echo '{}' > package.json
 printf '# My rules\n\nSomething mine above.\n' > AGENTS.md
-"$HARNESS" install --profile node >/dev/null
+"$NORMA" install --profile node >/dev/null
 assert_has "existing AGENTS.md content is preserved" "$(cat AGENTS.md)" "Something mine above."
 assert_has "and the block is appended" "$(cat AGENTS.md)" "Verification gate"
 before=$(cat AGENTS.md)
-"$HARNESS" install --profile node >/dev/null
+"$NORMA" install --profile node >/dev/null
 assert_eq "re-injecting the block is idempotent" "$(cat AGENTS.md)" "$before"
 done_repo
 
 new_repo
 echo '{}' > package.json
 printf '# Mine\n\n## Harness\n\nMy own harness notes, with run-task and scripts/harness/verify.\n' > AGENTS.md
-"$HARNESS" install --profile node >/dev/null
+"$NORMA" install --profile node >/dev/null
 assert_eq "an existing Harness section is left alone" "$(grep -c '^## Harness' AGENTS.md)" "1"
 assert_has "with its own content intact" "$(cat AGENTS.md)" "My own harness notes"
 done_repo
 
 echo ""
-echo "harness upgrade"
+echo "norma upgrade"
 
 new_repo
 echo '{}' > package.json
-"$HARNESS" install --profile node >/dev/null
+"$NORMA" install --profile node >/dev/null
 echo "# MINE" > scripts/harness/config.sh
 echo "broken" > scripts/harness/verify
 printf '# Mine\n\n## Harness\n\nMy notes: run-task, scripts/harness/verify.\n' > AGENTS.md
-"$HARNESS" upgrade --force >/dev/null 2>&1
+"$NORMA" upgrade --force >/dev/null 2>&1
 assert_eq "upgrade restores the gate it owns" "$(head -1 scripts/harness/verify)" "#!/bin/sh"
 assert_eq "and leaves config.sh alone" "$(cat scripts/harness/config.sh)" "# MINE"
 assert_has "and never touches AGENTS.md" "$(cat AGENTS.md)" "My notes"
 done_repo
 
 echo ""
-echo "harness doctor"
+echo "norma doctor"
 
 new_repo
 set +e
-OUT=$("$HARNESS" doctor 2>&1); RC=$?
+OUT=$("$NORMA" doctor 2>&1); RC=$?
 set -e
 assert_eq "fails on a repository without a harness" "$RC" 1
-assert_has "and says what is missing" "$OUT" "harness install"
+assert_has "and says what is missing" "$OUT" "norma install"
 done_repo
 
 new_repo
 echo '{}' > package.json
-"$HARNESS" install --profile node >/dev/null
+"$NORMA" install --profile node >/dev/null
 set +e
-OUT=$("$HARNESS" doctor 2>&1); RC=$?
+OUT=$("$NORMA" doctor 2>&1); RC=$?
 set -e
 assert_eq "passes on a fresh install" "$RC" 0
 assert_has "warning about the templates it cannot fill" "$OUT" "TODO(harness)"
@@ -256,10 +256,10 @@ done_repo
 
 new_repo
 echo '{}' > package.json
-"$HARNESS" install --profile node >/dev/null
+"$NORMA" install --profile node >/dev/null
 ln -sfn "$HOME/somewhere/skill" .claude/skills/escaping
 set +e
-OUT=$("$HARNESS" doctor 2>&1); RC=$?
+OUT=$("$NORMA" doctor 2>&1); RC=$?
 set -e
 assert_eq "catches a symlink that escapes the repository" "$RC" 1
 assert_has "explaining why it matters" "$OUT" "another machine"
