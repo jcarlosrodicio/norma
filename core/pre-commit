@@ -1,0 +1,36 @@
+#!/bin/sh
+# Harness gate. Agent-agnostic by design: every agent and every human commits
+# through git, so this runs regardless of which tool produced the change.
+# Restore after a fresh clone with:  git config core.hooksPath .githooks
+set -e
+
+ROOT=$(git rev-parse --show-toplevel)
+BRANCH=$(git branch --show-current)
+STAMP="$ROOT/.harness/verified"
+
+fail() { printf '\n\033[1;31mharness: commit blocked\033[0m\n%s\n\n' "$1" >&2; exit 1; }
+
+# 1. never commit straight to the default branch
+case "$BRANCH" in
+  master|main)
+    fail "You are on '$BRANCH'. Work on a feature branch named after the roadmap phase.
+  git switch -c phase-NN-slug" ;;
+esac
+
+# 2. the change must have been verified
+[ -f "$STAMP" ] || fail "No verification on record for this change.
+  Run:  scripts/harness/verify <the tests that touch this task>
+  It runs the static gates plus those tests and records the result."
+
+# 3. the verification must be newer than everything being committed
+NEWEST=""
+for f in $(git diff --cached --name-only --diff-filter=ACM); do
+  [ -f "$ROOT/$f" ] || continue
+  if [ -z "$NEWEST" ] || [ "$ROOT/$f" -nt "$NEWEST" ]; then NEWEST="$ROOT/$f"; fi
+done
+if [ -n "$NEWEST" ] && [ "$NEWEST" -nt "$STAMP" ]; then
+  fail "Staged files changed after the last verification ($(basename "$NEWEST")).
+  Re-run:  scripts/harness/verify <the tests that touch this task>"
+fi
+
+printf 'harness: verified %s\n' "$(head -1 "$STAMP")"

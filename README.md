@@ -1,0 +1,94 @@
+# harness
+
+The task harness, extracted so it can be installed into any repository. One loop,
+one verification gate, one set of skills - identical whichever agent is driving,
+because everything is referenced **by file path** and enforced by **git**, not by
+any single agent's hook system.
+
+```sh
+git clone <this repo> ~/Nasito/Desarrollo/harness
+ln -s ~/Nasito/Desarrollo/harness/bin/harness ~/.local/bin/harness
+
+cd ~/some/project
+harness install --dry-run    # see what it would do
+harness install              # do it
+harness doctor               # what is still missing, and what you must fill in
+```
+
+`install` detects the stack (`pubspec.yaml`, `pnpm-workspace.yaml`, `package.json`,
+`pyproject.toml`) or takes `--profile flutter|pnpm-turbo|node|python`.
+
+## Who owns what
+
+This is the whole design. Get it wrong and either upgrades destroy your decisions,
+or your projects drift apart.
+
+| The harness owns it - replaced on `upgrade` | The project owns it - never touched |
+|---|---|
+| `scripts/harness/verify` | `scripts/harness/config.sh` |
+| `.githooks/pre-commit` | `docs/harness/mandatory-steps.md` |
+| `.agents/skills/<vendored>` | `docs/harness/architecture-rules.md` |
+| `scripts/harness/VERSION` | `openspec/config.yaml` |
+| | `AGENTS.md` |
+
+The gate is **byte-identical in every project**. Everything stack-specific lives in
+`config.sh`, which the gate sources - so there is no generated file to drift, and
+nothing to re-generate when the harness changes.
+
+Templates are written **once** and then belong to you. `mandatory-steps.md` and
+`architecture-rules.md` arrive full of `TODO(harness)` markers on purpose: the
+installer cannot know your layers, your phases or which shared rules you adopt.
+`doctor` keeps reminding you while they are unfilled.
+
+## The config.sh contract
+
+```sh
+HARNESS_CODE_PATHS="lib test"      # a --docs-only run refuses on a change here
+
+harness_gates() {                  # static gates: fast, and they fail loudly
+  echo "harness: static gates"
+  run fvm flutter analyze
+}
+
+harness_test_selected() { run fvm flutter test "$@"; }   # ONLY these targets
+harness_test_all() { run fvm flutter test; }             # --full
+```
+
+`run` routes through [rtk](https://github.com/rtk-ai/rtk) when installed, cutting
+the output that reaches an agent's context, and calls the command directly when not.
+
+**Wire what the repository already enforces into `harness_gates`** - a dependency
+linter, a boundary check, an architecture test suite. Do not add a second mechanism
+that competes with it; `doctor` lists what it finds so you don't.
+
+## Vendored, not linked
+
+Skills are copied into `.agents/skills/<name>/` as real directories, and exposed to
+Claude Code through repository-relative symlinks in `.claude/skills/`. A symlink into
+`$HOME` looks tidier and is a trap: it is committed, and then it does not resolve on
+another machine or in CI. `doctor` fails on any symlink that escapes the repository.
+
+The cost of vendoring is that improvements do not arrive on their own: run
+`harness upgrade`, which compares against `scripts/harness/VERSION` and reports any
+owned file you edited locally instead of clobbering it.
+
+## Tests
+
+```sh
+test/run.sh
+```
+
+56 tests over the gate's real behaviour - its refusals above all - and over
+`install`, `upgrade` and `doctor`, each in a throwaway git repository with a stub
+stack adapter. They live here, once, because the gate is the same file everywhere:
+before this repository existed the same eight tests were duplicated across three
+projects in two languages.
+
+## Not per project
+
+Some things are user-level and `install` deliberately does not touch them; `doctor`
+reports on them:
+
+- **OpenSpec's workflow set** lives in `~/.config/openspec/config.json`. It is global
+  configuration, not per project.
+- `tgrep`, `rtk` and `codegraph` are tools on your `PATH`.

@@ -1,0 +1,33 @@
+schema: spec-driven
+
+context: |
+  TODO(harness): the technical context an agent needs before planning - stack,
+  layers, where the source of truth lives, how work is organised.
+  Mandatory per-task loop: `docs/harness/mandatory-steps.md`.
+  Architecture criteria: `docs/harness/architecture-rules.md` (adoption map) over
+  the shared reference in `.agents/skills/architecture-guidelines/`.
+
+rules:
+  tasks:
+    - "Step 0 must always be creating the feature branch."
+    - "Every task list must include, in order, the mandatory steps from docs/harness/mandatory-steps.md - tests before implementation, static gates, the test suite, runtime verification, the verification report, adversarial review and the documentation update."
+    - "The agent executes verification itself and never delegates a test run to the user."
+    - "Run only the tests involved in the task; the full suite is CI's job on the pull request. State which tests were selected and why."
+    - "Keep each task small enough to complete in one step, and mark it in tasks.md when done so an interrupted session can resume."
+    - "Conform to docs/harness/architecture-rules.md and the shared reference it points at. State any deliberate deviation and its reason in the verification report; a silent one is a defect."
+  proposal:
+    - "State explicitly what is out of scope."
+    - "List what existing code is reused before proposing anything new."
+    - "Name the layer each new piece of code belongs to, and any architecture rule the change deliberately breaks."
+    - "End with the open questions the request left ambiguous instead of guessing."
+
+operations:
+  apply:
+    guidance:
+      - "Follow docs/harness/mandatory-steps.md exactly; it is not advisory."
+      - "Read docs/harness/architecture-rules.md before the first edit, and imitate the canonical example already in the repository. Where a rule is enforced by a tool, the tool is the rule."
+      - "Verification gate: run scripts/harness/verify with the test targets involved in the task. It refuses to run without a target, and .githooks/pre-commit refuses the commit without a fresh stamp."
+      - "Stop before committing, pushing or opening a pull request; the human reviews first."
+  archive:
+    guidance:
+      - "Do not archive until adversarial review has run and documentation is updated."
