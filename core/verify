@@ -62,7 +62,16 @@ stamp() {
 # runs the static gates and refuses the moment it sees a code file.
 if [ "$1" = "--docs-only" ]; then
   PATTERN=$(printf '%s\n' $HARNESS_CODE_PATHS | sed 's|/*$||' | paste -sd'|' -)
-  CODE=$( { git diff --name-only HEAD; git ls-files --others --exclude-standard; } | sort -u | grep -E "^($PATTERN)/" || true )
+  # Judge the commit being prepared. With something staged, that IS the change
+  # about to land, so an unrelated dirty tree - another session's work in
+  # progress, say - does not block a documentation commit. With nothing staged
+  # there is no commit yet, so judge the whole change.
+  if git diff --cached --quiet; then
+    CHANGED=$( { git diff --name-only HEAD; git ls-files --others --exclude-standard; } | sort -u )
+  else
+    CHANGED=$(git diff --cached --name-only)
+  fi
+  CODE=$(printf '%s\n' "$CHANGED" | grep -E "^($PATTERN)/" || true)
   if [ -n "$CODE" ]; then
     printf 'harness: --docs-only refused. These files are code:\n' >&2
     printf '%s\n' "$CODE" | sed 's/^/  /' >&2

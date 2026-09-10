@@ -133,6 +133,26 @@ assert_has "--full announces itself so the report justifies it" "$OUT" "FULL SUI
 assert_has "and runs the whole suite" "$OUT" "STUB all"
 done_repo
 
+new_repo; with_gate
+mkdir -p docs src
+echo '# d' > docs/note.md
+echo 'x' > src/wip.ts
+git add docs/note.md
+gate --docs-only
+assert_eq "--docs-only judges the staged change, not an unrelated dirty tree" "$RC" 0
+assert_has "and says so" "$OUT" "docs-only change"
+done_repo
+
+new_repo; with_gate
+mkdir -p docs src
+echo '# d' > docs/note.md
+echo 'x' > src/wip.ts
+git add docs/note.md src/wip.ts
+gate --docs-only
+assert_eq "but refuses the moment the code itself is staged" "$RC" 2
+assert_has "naming it" "$OUT" "src/wip.ts"
+done_repo
+
 # ------------------------------------------------------- the gate contract ----
 echo ""
 echo "the config.sh contract"
@@ -193,6 +213,24 @@ OUT=$(.githooks/pre-commit 2>&1); RC=$?
 set -e
 assert_eq "still refuses when the stale run was docs-only" "$RC" 1
 assert_has "and then asks for a real test selection" "$OUT" "<the tests that touch this task>"
+done_repo
+
+new_repo
+mkdir -p .githooks scripts/harness && cp "$HOME_DIR/core/pre-commit" .githooks/pre-commit
+chmod +x .githooks/pre-commit
+cp "$HOME_DIR/test/fixtures/config.sh" scripts/harness/config.sh
+git switch -q -c feature-branch
+mkdir -p .harness src
+echo 'x' > src/late.ts
+git add src/late.ts
+printf '2027-01-01 10:00:00 | feature-branch | docs-only\n' > .harness/verified
+touch -t 202701011000 .harness/verified
+set +e
+OUT=$(.githooks/pre-commit 2>&1); RC=$?
+set -e
+assert_eq "refuses code committed against a docs-only stamp" "$RC" 1
+assert_has "explaining that it vouches for no test" "$OUT" "vouches for no test"
+assert_has "and naming the code being smuggled" "$OUT" "src/late.ts"
 done_repo
 
 new_repo

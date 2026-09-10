@@ -65,13 +65,24 @@ must be able to tell whether you picked the right subset.
 `--docs-only` exists because a change that touches no code cannot name the tests
 involved in it, which would leave documentation, configuration and harness work
 unable to pass the gate at all. It runs the static gates and **refuses the moment it
-sees a code file** in the change, so it cannot be used to skip tests.
+sees a code file**, so it cannot be used to skip tests. It judges the *staged*
+change when something is staged - so a documentation commit is still possible in a
+tree that carries unrelated work in progress - and the pre-commit hook refuses code
+committed against a docs-only stamp, so the narrower scope is not a way in.
 
 Run **only the tests involved in this task**, not the whole suite. The full suite
 runs in CI on the pull request; repeating it locally on every task wastes time and
 tokens for no new information. Involved means: the tests for the code you changed,
 the tests for its direct callers, and any test that asserts a contract or invariant
-you touched. When in doubt about a specific test, run it - the rule trims the suite,
+you touched.
+
+**That last clause is where selections go wrong**, because those tests do not import
+your code and grep will not lead you to them. Concretely: adding a database
+migration involves the test that enumerates the schema's tables and counts the
+migrations; changing a published contract involves its snapshot test; adding a file
+anywhere involves the guardrails that scan the whole tree for forbidden patterns.
+Name them even though nothing in your diff mentions them - otherwise CI finds them
+for you, which is the expensive way to learn it. When in doubt about a specific test, run it - the rule trims the suite,
 it does not trim coverage of the change. `--full` is for genuinely cross-cutting
 changes only, and you justify it in the report.
 

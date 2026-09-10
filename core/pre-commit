@@ -22,6 +22,9 @@ esac
   Run:  scripts/harness/verify <the tests that touch this task>
   It runs the static gates plus those tests and records the result."
 
+# what the stale run selected, so the refusals below can name it
+LAST=$(cut -d'|' -f3- "$STAMP" | sed 's/^ *//;s/ *$//')
+
 # 3. the verification must be newer than everything being committed
 NEWEST=""
 for f in $(git diff --cached --name-only --diff-filter=ACM); do
@@ -31,7 +34,6 @@ done
 if [ -n "$NEWEST" ] && [ "$NEWEST" -nt "$STAMP" ]; then
   # The stamp records the selection of the run that is now stale, so hand back a
   # command that can be pasted instead of a placeholder somebody has to remember.
-  LAST=$(cut -d'|' -f3- "$STAMP" | sed 's/^ *//;s/ *$//')
   case "$LAST" in
     ''|docs-only|--docs-only) HINT="scripts/harness/verify <the tests that touch this task>" ;;
     *) HINT="scripts/harness/verify $LAST" ;;
@@ -40,6 +42,23 @@ if [ -n "$NEWEST" ] && [ "$NEWEST" -nt "$STAMP" ]; then
   You edited code after verifying it, so the stamp no longer covers what you are
   committing. Re-run the gate:
   $HINT"
+fi
+
+# 4. a docs-only verification vouches for no code at all. Rule 3 cannot catch
+# code that was edited BEFORE that run - its mtime is older than the stamp - so
+# staged code plus a docs-only stamp is refused outright.
+if [ "$LAST" = docs-only ] && [ -r "$ROOT/scripts/harness/config.sh" ]; then
+  CODE_PATHS=$(sed -n 's/^HARNESS_CODE_PATHS="\(.*\)"$/\1/p' "$ROOT/scripts/harness/config.sh")
+  if [ -n "$CODE_PATHS" ]; then
+    PATTERN=$(printf '%s\n' $CODE_PATHS | sed 's|/*$||' | paste -sd'|' -)
+    STAGED_CODE=$(git diff --cached --name-only | grep -E "^($PATTERN)/" || true)
+    if [ -n "$STAGED_CODE" ]; then
+      fail "The last verification was --docs-only, and you are committing code:
+$(printf '%s\n' "$STAGED_CODE" | sed 's/^/    /')
+  A docs-only run vouches for no test at all. Name the tests instead:
+  scripts/harness/verify <test target>..."
+    fi
+  fi
 fi
 
 printf 'harness: verified %s\n' "$(head -1 "$STAMP")"
