@@ -177,6 +177,26 @@ Cadence, versioning, and who the first real user is.
 
 ---
 
+## `README.md`
+
+For the human who lands on the repository - which is also the first thing a code
+host shows. Short, and never a second copy of `00-product.md`.
+
+```md
+# <project>
+
+One or two sentences: what it does and for whom.
+
+## Running it
+The commands that actually work today. Nothing aspirational.
+
+## Where things are
+`docs/00-product.md` what it is · `docs/01-architecture.md` how it is built ·
+`docs/roadmap.md` what is built next · `AGENTS.md` if you are an agent.
+```
+
+---
+
 ## `AGENTS.md` - the project half
 
 The installer appends its own harness block below this, between markers, and

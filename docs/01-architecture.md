@@ -17,8 +17,14 @@ carry an obligation.
 ## Scope
 
 **In scope.** The mechanical half of a harness: the gate, the git hook, the skill
-library, prefab stack adapters, document templates, and the CLI that installs,
-upgrades and diagnoses them.
+library, prefab stack adapters, document templates, and the CLI that starts,
+installs, upgrades and diagnoses them.
+
+That CLI covers a project's whole life in one direction: `start` before there is a
+repository, `install` once there is, `upgrade` as norma moves, `doctor` whenever
+something feels off. The first of those writes no harness at all - it writes the
+note that sends an agent to `start-project`, because a project that does not exist
+yet needs a conversation before it needs a gate.
 
 **Out of scope, deliberately.**
 

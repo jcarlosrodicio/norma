@@ -204,6 +204,9 @@ Follow `references/documents.md`, which carries the skeleton of each one. Write 
 
 - `docs/00-product.md`, `docs/01-architecture.md`, `docs/02-design.md` (skipped
   explicitly if there is no interface), `docs/03-delivery.md`.
+- `README.md` - short, for the human who lands on the repository: what this is, how to
+  run it, and where the rest lives. It is not a second copy of `00-product.md`; when
+  they disagree, someone has already wasted an afternoon.
 - `AGENTS.md` with the **project's own index** - see below. The installer will add its
   harness block underneath, and the two halves are both needed.
 - `docs/roadmap.md` and, after checkpoint 2, one card per phase in `docs/roadmap/`.

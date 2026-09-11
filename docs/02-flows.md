@@ -9,6 +9,13 @@ no harness, creates the directory if it is not there, and writes one file: an
 build - every agent reads `AGENTS.md` (or `CLAUDE.md`) on the way in, so nothing has
 to be typed or pasted.
 
+It has been exercised end to end twice - a web application and a CLI - from the
+empty directory to a repository with its documents, its roadmap, the harness
+installed and `doctor` clean. What that found is in `start-project` itself: the
+founding commit below, and the fact that the note must be **overwritten** rather
+than appended to, or the first thing anyone reads about the project is an
+instruction to start it.
+
 It refuses when `AGENTS.md` already exists: that is a project that has started, and
 its route is `install` plus `harness-setup`. The note is temporary and carries
 `<!-- norma:start -->` markers so the procedure can recognise and replace it with
