@@ -5,11 +5,11 @@ scripts/harness/verify <what you were verifying>   # the gate: parse + the suite
 test/run.sh                                        # the suite alone, while iterating
 ```
 
-One suite, currently 162 tests, a couple of seconds. The gate runs it whole - it
+One suite, currently 173 tests, a couple of seconds. The gate runs it whole - it
 is indivisible, so there is nothing to select - after parsing every shell file. It covers the gate's real
 behaviour, the config contract, the hook's four refusals, every stack profile and
-the detection that chooses one, the shape of the skill library, and `install`,
-`upgrade` and `doctor`.
+the detection that chooses one, the shape of the skill library, and `start`,
+`install`, `upgrade` and `doctor`.
 
 It lives here, once, because the gate is the same file in every project. Before
 this repository existed, the same eight tests were duplicated across three

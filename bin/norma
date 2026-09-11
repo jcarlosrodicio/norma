@@ -1,14 +1,15 @@
 #!/bin/sh
 # norma - install and maintain the agent-agnostic task harness in a repository.
 #
+#   norma start [<directory>]                      begin a project that does not exist yet
 #   norma install [--profile <name>] [--dry-run]   set it up in this repository
 #   norma upgrade [--dry-run] [--force]            re-vendor what the harness owns
 #   norma doctor                                   report what is missing or drifted
 #   norma home                                     print the installation directory
 #   norma version
 #
-# Starting a project from nothing? Point an agent at
-#   $(norma home)/skills/start-project/SKILL.md
+# `start` leaves a note any agent reads on opening the directory, so all you have
+# to say is what you want to build.
 #
 # The harness OWNS the mechanical files and replaces them on upgrade:
 #   scripts/harness/verify   .githooks/pre-commit   .agents/skills/<vendored>
@@ -228,6 +229,41 @@ cmd_install() {
   say "  3. norma doctor - it will tell you what is still missing."
 }
 
+cmd_start() {
+  dir=${1:-.}
+  if [ "$dir" != "." ]; then
+    mkdir -p "$dir" || die "could not create $dir"
+    cd "$dir"
+  fi
+  [ -e AGENTS.md ] && die "AGENTS.md is already here, so this project has started. For one that already has code: 'norma install', then .agents/skills/harness-setup/SKILL.md"
+
+  cat > AGENTS.md <<EOF
+# A project that has not started yet
+
+<!-- norma:start -->
+**Before writing any code, follow this procedure:**
+
+    $HOME_DIR/skills/start-project/SKILL.md
+
+Read that file and follow it. It is a conversation with the human about what they
+want to build, and it ends by writing this project's documents, its roadmap of
+phases and the harness that enforces the loop.
+
+Until you have followed it: do not choose a stack, do not create files, do not
+write code. The point of the procedure is that those decisions come from the
+conversation rather than from a guess.
+
+This file is temporary - that procedure replaces it with the project's own index.
+<!-- norma:end -->
+EOF
+  step "+ AGENTS.md"
+  if [ ! -e CLAUDE.md ]; then ln -sfn AGENTS.md CLAUDE.md; step "+ CLAUDE.md -> AGENTS.md"; fi
+
+  say ""
+  say "Open your agent in $(pwd) and tell it what you want to build."
+  say "It reads AGENTS.md on the way in and finds the procedure there."
+}
+
 cmd_upgrade() {
   MODE=upgrade
   require_repo
@@ -367,22 +403,25 @@ cmd_doctor() {
 MODE=install
 cmd=${1:-help}
 [ $# -gt 0 ] && shift
+ARG1=""
 while [ $# -gt 0 ]; do
   case $1 in
     --profile) PROFILE=$2; shift 2 ;;
     --profile=*) PROFILE=${1#*=}; shift ;;
     --dry-run) DRY=1; shift ;;
     --force) FORCE=1; shift ;;
-    *) die "unknown option: $1" ;;
+    -*) die "unknown option: $1" ;;
+    *) [ -z "$ARG1" ] || die "unexpected argument: $1"; ARG1=$1; shift ;;
   esac
 done
 
 case $cmd in
+  start)   cmd_start "$ARG1" ;;
   install) cmd_install ;;
   upgrade) cmd_upgrade ;;
   doctor)  cmd_doctor ;;
   home)    say "$HOME_DIR" ;;
   version) say "norma $VERSION" ;;
-  help|--help|-h) sed -n '2,18p' "$SELF" | sed 's/^# \{0,1\}//' ;;
-  *) die "unknown command: $cmd (try: install, upgrade, doctor, home, version)" ;;
+  help|--help|-h) sed -n '2,19p' "$SELF" | sed 's/^# \{0,1\}//' ;;
+  *) die "unknown command: $cmd (try: start, install, upgrade, doctor, home, version)" ;;
 esac

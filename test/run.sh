@@ -370,6 +370,30 @@ assert_eq "so the commit right after it is refused" "$RC" 1
 done_repo
 
 echo ""
+echo "norma start"
+
+# `start` is the front door of a project that does not exist: it runs outside a
+# repository, and its only job is to leave a note every agent reads on the way in.
+NS=$(mktemp -d)
+OUT=$(cd "$NS" && "$NORMA" start nuevo 2>&1)
+assert_file "start creates the directory it is given" "$NS/nuevo/AGENTS.md"
+assert_eq "and points CLAUDE.md at the note" "$(readlink "$NS/nuevo/CLAUDE.md")" "AGENTS.md"
+assert_has "the note carries the procedure's absolute path" "$(cat "$NS/nuevo/AGENTS.md")" \
+  "$HOME_DIR/skills/start-project/SKILL.md"
+assert_has "and the human is told what to do next" "$OUT" "tell it what you want to build"
+set +e
+OUT=$(cd "$NS/nuevo" && "$NORMA" start 2>&1); RC=$?
+set -e
+assert_eq "it refuses where a project has already started" "$RC" 2
+assert_has "and says what to use instead" "$OUT" "harness-setup"
+rm -rf "$NS"
+
+NS=$(mktemp -d)
+(cd "$NS" && "$NORMA" start >/dev/null)
+assert_file "with no argument it uses the current directory" "$NS/AGENTS.md"
+rm -rf "$NS"
+
+echo ""
 echo "the skill library"
 
 # A skill directory whose frontmatter name does not match it is invisible: the
@@ -397,8 +421,8 @@ NR=$(mktemp -d)
 assert_eq "norma home prints the installation directory, outside any repository" \
   "$(cd "$NR" && "$NORMA" home)" "$HOME_DIR"
 rm -rf "$NR"
-assert_has "help points at start-project for a project that does not exist yet" \
-  "$("$NORMA" help)" "start-project/SKILL.md"
+assert_has "help offers the front door for a project that does not exist yet" \
+  "$("$NORMA" help)" "norma start"
 
 echo ""
 echo "norma upgrade"

@@ -29,8 +29,9 @@ feature. A skill earns its place by being invoked, not by existing.
 
 `start-project` runs **before the project exists**: there is no repository, no
 `.agents/`, and nothing to vendor into. It is reached through the installation
-instead - `$(norma home)/skills/start-project/SKILL.md` - and that is what
-`norma home` is for.
+instead - `$(norma home)/skills/start-project/SKILL.md` - which is what
+`norma home` is for, and what `norma start` writes into the empty directory so the
+human never has to type it.
 
 Leaving it out of `VENDORED_SKILLS` is a decision, not an oversight, and the test
 suite asserts that `install` does not ship it. Once it has finished, the project

@@ -1,5 +1,19 @@
 # 02 · Flows
 
+## `norma start [<directory>]`
+
+The front door of a project that does not exist yet. It needs no repository and
+no harness, creates the directory if it is not there, and writes one file: an
+`AGENTS.md` holding the absolute path of `skills/start-project/SKILL.md`, plus the
+`CLAUDE.md` symlink. Then the human opens an agent there and says what they want to
+build - every agent reads `AGENTS.md` (or `CLAUDE.md`) on the way in, so nothing has
+to be typed or pasted.
+
+It refuses when `AGENTS.md` already exists: that is a project that has started, and
+its route is `install` plus `harness-setup`. The note is temporary and carries
+`<!-- norma:start -->` markers so the procedure can recognise and replace it with
+the project's real index.
+
 ## `norma install [--profile <name>] [--dry-run]`
 
 Run inside the target repository. `--dry-run` prints the plan and writes nothing;

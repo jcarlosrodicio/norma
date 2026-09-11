@@ -14,6 +14,8 @@ norma install --dry-run    # see what it would do
 norma install              # do it
 norma doctor               # what is still missing, and what you must fill in
 norma home                 # where norma itself lives
+
+norma start mi-proyecto    # ...or begin one that does not exist yet
 ```
 
 `install` detects the stack from its manifest, or takes `--profile`. Sixteen are
@@ -38,7 +40,16 @@ comments flag the traps worth knowing - that `cargo test` filters by name rather
 than path, that Gradle wants `testDebugUnitTest` on Android, that Go code at the
 repository root is invisible to the code-path check.
 
-## Starting from nothing: `/start-project`
+## Starting from nothing: `norma start`
+
+```sh
+norma start mi-proyecto     # crea el directorio y deja la nota
+cd mi-proyecto              # abre tu agente aquí y dile qué quieres construir
+```
+
+That is the whole entry point. `start` writes an `AGENTS.md` pointing at the
+procedure below, and every agent reads that file on the way in - so there is
+nothing to paste, and no path to remember.
 
 For a project that does not exist yet, the harness is the **last** step, not the
 first. `start-project` is the interview that comes before it: what this is and for
@@ -63,9 +74,14 @@ project - so it is found through the installation, by any agent, by path:
 $(norma home)/skills/start-project/SKILL.md
 ```
 
-That path is the whole interface: no skill system, no slash commands, no tools
-beyond a shell. If your agent has a skill directory, link it there and it gets a
-name as well; nothing depends on that.
+`norma start` is that path written into a file the agent already reads; the path
+itself still works on its own. No skill system, no slash commands, no tools beyond
+a shell. If your agent has a skill directory, link it there and it gets a name as
+well - nothing depends on that:
+
+```sh
+ln -s "$(norma home)/skills/start-project" ~/.claude/skills/start-project
+```
 
 If the agent running it cannot see images, it says so up front and switches the
 design conversation to links and descriptions, and the brief records that it was
@@ -148,7 +164,7 @@ owned file you edited locally instead of clobbering it.
 test/run.sh
 ```
 
-162 tests over the gate's real behaviour - its refusals above all - over every
+173 tests over the gate's real behaviour - its refusals above all - over every
 profile and the detection that picks one, over the shape of the skill library, and
 over `install`, `upgrade` and `doctor`, each in a throwaway git repository with a
 stub stack adapter. They live here, once, because the gate is the same file everywhere:

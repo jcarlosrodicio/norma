@@ -17,7 +17,15 @@ once you have understood; they are not a form to fill in.
 ## How this is run
 
 This is the one skill that runs **outside** a project, because the project does not
-exist yet. It lives in the norma installation:
+exist yet. It lives in the norma installation, and there are two ways it reaches you.
+
+Usually the human ran `norma start <directory>` before opening you, and the `AGENTS.md`
+sitting in the directory - between `<!-- norma:start -->` markers - is what pointed you
+here. **That file is a note, not the project's index**: when you write the real
+`AGENTS.md`, replace it whole. If it is still there when the founding commit is made,
+the first thing anyone reads about this project is an instruction to start it.
+
+Otherwise the path is the interface:
 
 ```
 norma home                                    # prints the installation directory
@@ -290,6 +298,9 @@ be right to fail. The first real gate run happens at the end of phase 0 - which 
 "the gate runs green" is an acceptance criterion of phase 0's card.
 
 ### `AGENTS.md` has two halves
+
+If `norma start` created this directory, the file already holds its bootstrap note.
+Overwrite it - do not append below it.
 
 The installer writes the harness half. **You write the project half, above it**: what
 this is, the four documents in reading order, where the roadmap lives, and which phase is
