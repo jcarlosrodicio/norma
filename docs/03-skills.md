@@ -38,8 +38,14 @@ has a roadmap and a harness, and the skill that matters from then on is
 `run-task`. A copy of the founding interview sitting in `.agents/skills/` would
 only be one more thing an agent can misfire on.
 
+It is written as a **conversation with a checklist behind it**, not as rounds: what
+is fixed is what it must end up knowing before a phase table can exist, and the
+route there belongs to the human. That is also why it names no agent - a shell and
+the ability to write files is all it assumes.
+
 It ends by installing the harness and handing over to `harness-setup`, carrying
-the answers it already has. The two must not re-interview the human: rounds 3 and
+the answers it already has, and it makes the founding commit the way
+[`02-flows.md`](02-flows.md) describes. The two must not re-interview the human: rounds 3 and
 4 of `start-project` cover most of rounds 1 and 2 of `harness-setup`.
 
 ## The description field is the whole trigger

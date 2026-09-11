@@ -177,6 +177,42 @@ Cadence, versioning, and who the first real user is.
 
 ---
 
+## `AGENTS.md` - the project half
+
+The installer appends its own harness block below this, between markers, and
+re-running it never touches what you wrote. Without this half, an agent opening
+the repository finds a perfect description of how to verify a change and no idea
+what the project is.
+
+```md
+# <Project>
+
+One sentence. This is the first thing any agent working here reads: it points at
+the document that owns each topic instead of repeating it.
+
+## Required reading before touching anything
+1. `docs/00-product.md` - what this is and for whom. The **out of scope** list
+   lives there.
+2. `docs/01-architecture.md` - stack, domain, layers, and which way dependencies
+   may point.
+3. `docs/02-design.md` - the design brief, before writing a single screen. Name
+   the constraints that are requirements rather than preferences.
+4. `docs/03-delivery.md` - environments, CI, secrets, and what verifying a change
+   includes here.
+
+## Where the work is
+`docs/roadmap.md` is the phase index: size, dependencies, what runs in parallel,
+status. Each phase has its card in `docs/roadmap/phase-NN-*.md`. A task that does
+not come from a phase card is a task to discuss before starting.
+
+**Current phase: N.** Branch per phase: `phase-NN-<slug>`.
+
+Where the code and these documents disagree, the documents win and the
+disagreement is a finding to report.
+```
+
+---
+
 ## `docs/roadmap.md` - the index
 
 ```md
@@ -219,6 +255,11 @@ waiting for>**.
 
 Written **after** the human has reviewed the index. Forty cards written before that
 conversation are forty cards to rewrite.
+
+Phase 0 carries one acceptance criterion the others inherit rather than repeat:
+**the gate runs green**. It is the first moment in the project's life when
+`scripts/harness/verify` can actually execute the commands in `config.sh`, because
+phase 0 is what puts the toolchain there.
 
 ```md
 # Phase NN · <name>
@@ -265,6 +306,11 @@ What a reader of this card would reasonably assume is included, and is not.
 
 ## Risks
 And what you would do instead if each one lands.
+
+## Security pass
+Only when the phase touches authentication, credentials, payments or personal
+data: say so here, so the review stage knows it also follows
+`.agents/skills/code-auditing/SKILL.md`.
 
 ## Result
 What can be done after this phase that could not be done before.

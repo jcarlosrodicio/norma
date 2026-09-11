@@ -349,6 +349,26 @@ OUT=$("$NORMA" install --dry-run --profile node)
 assert_has "an explicit --profile wins over detection" "$OUT" "profile: node"
 done_repo
 
+# The founding commit of a new project predates its toolchain: there is nothing
+# the gate could run yet, so it is made with the hook overridden for that one
+# command. That only works while install arms the hook through core.hooksPath
+# rather than by writing into .git/hooks - and it must leave it armed.
+new_repo
+echo '{}' > package.json
+"$NORMA" install --profile node >/dev/null
+git add -A >/dev/null 2>&1
+git -c core.hooksPath=.git/hooks commit -qm founding
+assert_eq "a founding commit lands with the hook overridden once" "$(git log --oneline | wc -l | tr -d ' ')" "2"
+assert_eq "and the hook is still armed afterwards" "$(git config --get core.hooksPath)" ".githooks"
+assert_nofile "install never writes into .git/hooks" .git/hooks/pre-commit
+echo change >> README.md
+git add README.md
+set +e
+git commit -qm second >/dev/null 2>&1; RC=$?
+set -e
+assert_eq "so the commit right after it is refused" "$RC" 1
+done_repo
+
 echo ""
 echo "the skill library"
 

@@ -89,6 +89,25 @@ orient → enrich → branch → plan → implement → verify → review → do
 `docs/harness/mandatory-steps.md` in each project is the binding checklist, with
 that project's real commands.
 
+## The one commit that precedes the rules
+
+A project created by `start-project` cannot satisfy the hook on its first commit:
+the gates in `config.sh` name a toolchain that phase 0 has not installed yet, so
+`verify` cannot pass and there is no stamp to be had. The founding commit -
+documents plus the harness, together - is therefore made with the hook overridden
+for that single command:
+
+```sh
+git -c core.hooksPath=.git/hooks commit -m "..."
+```
+
+Not `--no-verify`, and not by unsetting `core.hooksPath`: both leave a repository
+that is silently unarmed afterwards, which is the failure the hook exists to
+prevent. The override applies to one command, nothing has to be re-armed, and the
+next commit is already refused. The suite asserts all of that, including that
+`install` arms through `core.hooksPath` rather than by writing into `.git/hooks` -
+the day that changed, the documented bootstrap would break.
+
 ## Every refusal, and why it exists
 
 ### The gate

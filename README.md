@@ -50,18 +50,27 @@ honest parallel column, milestones and a status column. Then it creates the
 repository, installs the harness and hands over to `harness-setup` carrying the
 answers it already has.
 
-It is the one skill that is **not** vendored into projects - it runs before there
-is a project - so it is found through the installation:
+It is a **conversation, not a questionnaire**: what it fixes is the set of things
+it must end up knowing - the point, the shape, the materials, the way out, the face
+- and the route there is the human's. It plays back more than it asks, digs only
+where an answer would change a phase, and marks out loud which decisions were
+theirs and which were defaults it took.
+
+It is the one skill **not vendored** into projects - it runs before there is a
+project - so it is found through the installation, by any agent, by path:
 
 ```sh
 $(norma home)/skills/start-project/SKILL.md
-ln -s "$(norma home)/skills/start-project" ~/.claude/skills/start-project   # /start-project
 ```
 
-If the agent running it cannot see images, the skill makes it say so up front and
-switch the design round to links and descriptions, and the brief records that it
-was gathered without vision. A design brief written from a screenshot nobody looked
-at is worse than one that admits what it is.
+That path is the whole interface: no skill system, no slash commands, no tools
+beyond a shell. If your agent has a skill directory, link it there and it gets a
+name as well; nothing depends on that.
+
+If the agent running it cannot see images, it says so up front and switches the
+design conversation to links and descriptions, and the brief records that it was
+gathered without vision. A brief written from a screenshot nobody looked at is
+worse than one that admits what it is.
 
 ## Finishing it: `/harness-setup`
 
