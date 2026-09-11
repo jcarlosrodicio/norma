@@ -69,6 +69,13 @@ Follow `.agents/skills/openspec-apply-change/SKILL.md`, respecting every step in
 `docs/harness/mandatory-steps.md`: tests before implementation, the project's layer
 boundaries, and the mandatory verification steps in their stated order.
 
+**`.env.example` is yours to write; `.env` is the human's.** When you add a variable,
+update the example in the same change - an example that lags the code is how the next
+person gets a broken setup on their first try. Never write the real `.env`: it holds
+live credentials, it is not in the repository, and overwriting it costs them
+something you cannot restore. The same asymmetry holds for any local-only
+configuration the repository ships an example of.
+
 Write code that conforms to the architecture criteria you read in stage 0. Where a
 rule is enforced by a tool - a dependency linter, a boundary check - the tool is the
 rule. Where you must deviate, say so in the report with its reason; a silent
