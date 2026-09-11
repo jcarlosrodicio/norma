@@ -13,6 +13,7 @@ cd ~/some/project
 norma install --dry-run    # see what it would do
 norma install              # do it
 norma doctor               # what is still missing, and what you must fill in
+norma home                 # where norma itself lives
 ```
 
 `install` detects the stack from its manifest, or takes `--profile`. Sixteen are
@@ -36,6 +37,31 @@ read it, make it true for your repository, and delete what does not apply. The
 comments flag the traps worth knowing - that `cargo test` filters by name rather
 than path, that Gradle wants `testDebugUnitTest` on Android, that Go code at the
 repository root is invisible to the code-path check.
+
+## Starting from nothing: `/start-project`
+
+For a project that does not exist yet, the harness is the **last** step, not the
+first. `start-project` is the interview that comes before it: what this is and for
+whom, the domain, the stack and the boundaries, how it ships, and - for anything
+with an interface - a design brief, so the first screen is not invented by whoever
+happens to build it. Out of that it writes the founding documents and a roadmap of
+**vertical slices of at most a day each**, with sizes, explicit dependencies, an
+honest parallel column, milestones and a status column. Then it creates the
+repository, installs the harness and hands over to `harness-setup` carrying the
+answers it already has.
+
+It is the one skill that is **not** vendored into projects - it runs before there
+is a project - so it is found through the installation:
+
+```sh
+$(norma home)/skills/start-project/SKILL.md
+ln -s "$(norma home)/skills/start-project" ~/.claude/skills/start-project   # /start-project
+```
+
+If the agent running it cannot see images, the skill makes it say so up front and
+switch the design round to links and descriptions, and the brief records that it
+was gathered without vision. A design brief written from a screenshot nobody looked
+at is worse than one that admits what it is.
 
 ## Finishing it: `/harness-setup`
 
@@ -113,9 +139,10 @@ owned file you edited locally instead of clobbering it.
 test/run.sh
 ```
 
-56 tests over the gate's real behaviour - its refusals above all - and over
-`install`, `upgrade` and `doctor`, each in a throwaway git repository with a stub
-stack adapter. They live here, once, because the gate is the same file everywhere:
+162 tests over the gate's real behaviour - its refusals above all - over every
+profile and the detection that picks one, over the shape of the skill library, and
+over `install`, `upgrade` and `doctor`, each in a throwaway git repository with a
+stub stack adapter. They live here, once, because the gate is the same file everywhere:
 before this repository existed the same eight tests were duplicated across three
 projects in two languages.
 

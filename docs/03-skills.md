@@ -18,11 +18,29 @@ path** so any agent can follow it without a skill system of its own.
 | `update-docs` | Mandatory before delivery. Documentation that lags the code poisons every later session. |
 | `commit` | Atomic commits, explicit paths, message written from the actual diff. Never `git add -A`. |
 | `using-git-worktrees` | Isolated workspaces when work must not disturb the current tree. |
+| `start-project` | The interview that turns "I want to build X" into documents, a roadmap of phases and an installed harness. **Not vendored** - see below. |
 | `writing-skills` | How to write a skill. Third-party; the source of `render-graphs.js` and the reason linters must exclude `.agents`. |
 
-Ten skills, and that is close to the ceiling. The workshop this harness came from
+Ten vendored, plus one that is not. That is the ceiling. The workshop this harness came from
 is explicit about it: thirty skills and seventeen agents is a symptom, not a
 feature. A skill earns its place by being invoked, not by existing.
+
+## The one skill that is not vendored
+
+`start-project` runs **before the project exists**: there is no repository, no
+`.agents/`, and nothing to vendor into. It is reached through the installation
+instead - `$(norma home)/skills/start-project/SKILL.md` - and that is what
+`norma home` is for.
+
+Leaving it out of `VENDORED_SKILLS` is a decision, not an oversight, and the test
+suite asserts that `install` does not ship it. Once it has finished, the project
+has a roadmap and a harness, and the skill that matters from then on is
+`run-task`. A copy of the founding interview sitting in `.agents/skills/` would
+only be one more thing an agent can misfire on.
+
+It ends by installing the harness and handing over to `harness-setup`, carrying
+the answers it already has. The two must not re-interview the human: rounds 3 and
+4 of `start-project` cover most of rounds 1 and 2 of `harness-setup`.
 
 ## The description field is the whole trigger
 
@@ -37,7 +55,9 @@ before adding or renaming anything.
 1. Write or edit it under `skills/<name>/SKILL.md`.
 2. If it is a new skill, add its directory name to `VENDORED_SKILLS` in
    `bin/norma`. Nothing installs it otherwise, and the count check in `doctor`
-   reads the same list.
+   reads the same list. Leaving it out is legitimate only for a skill that runs
+   outside a project at all - `start-project` is the only one so far - and then
+   say so in this document, because otherwise it reads as a missing line.
 3. Reference other instructions **by path** (`.agents/skills/<name>/SKILL.md`),
    never by an agent's shortcut. A path is what makes it portable; mention the
    shortcut only as an aside, the way `run-task` does.

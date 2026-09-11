@@ -5,9 +5,10 @@ scripts/harness/verify <what you were verifying>   # the gate: parse + the suite
 test/run.sh                                        # the suite alone, while iterating
 ```
 
-One suite, currently 87 tests, a couple of seconds. The gate runs it whole - it
+One suite, currently 162 tests, a couple of seconds. The gate runs it whole - it
 is indivisible, so there is nothing to select - after parsing every shell file. It covers the gate's real
-behaviour, the config contract, the hook's four refusals, and `install`,
+behaviour, the config contract, the hook's four refusals, every stack profile and
+the detection that chooses one, the shape of the skill library, and `install`,
 `upgrade` and `doctor`.
 
 It lives here, once, because the gate is the same file in every project. Before
@@ -50,6 +51,7 @@ Helpers:
 ## Adding a test
 
 Put it in the section that owns the behaviour - the gate, the config contract, the
-hook, the installer - keep the name a sentence about behaviour, and run the suite.
+hook, the stack profiles, the skill library, the installer - keep the name a
+sentence about behaviour, and run the suite.
 Every change to `core/` or `bin/` arrives with one; the count goes in the commit
 message.

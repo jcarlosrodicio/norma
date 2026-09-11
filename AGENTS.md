@@ -27,7 +27,7 @@ disagree, the documentation wins and the disagreement is a finding to report.
 ## Project shape
 
 ```
-bin/norma          the CLI: install | upgrade | doctor | version. POSIX sh, no deps
+bin/norma          the CLI: install | upgrade | doctor | home | version. POSIX sh
 core/verify        the verification gate, vendored into projects unchanged
 core/pre-commit    the git hook that makes the gate binding
 profiles/*.sh      prefab config.sh per stack: flutter, node, pnpm-turbo, python

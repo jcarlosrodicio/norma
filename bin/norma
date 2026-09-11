@@ -4,7 +4,11 @@
 #   norma install [--profile <name>] [--dry-run]   set it up in this repository
 #   norma upgrade [--dry-run] [--force]            re-vendor what the harness owns
 #   norma doctor                                   report what is missing or drifted
+#   norma home                                     print the installation directory
 #   norma version
+#
+# Starting a project from nothing? Point an agent at
+#   $(norma home)/skills/start-project/SKILL.md
 #
 # The harness OWNS the mechanical files and replaces them on upgrade:
 #   scripts/harness/verify   .githooks/pre-commit   .agents/skills/<vendored>
@@ -377,7 +381,8 @@ case $cmd in
   install) cmd_install ;;
   upgrade) cmd_upgrade ;;
   doctor)  cmd_doctor ;;
+  home)    say "$HOME_DIR" ;;
   version) say "norma $VERSION" ;;
-  help|--help|-h) sed -n '2,14p' "$SELF" | sed 's/^# \{0,1\}//' ;;
-  *) die "unknown command: $cmd (try: install, upgrade, doctor, version)" ;;
+  help|--help|-h) sed -n '2,18p' "$SELF" | sed 's/^# \{0,1\}//' ;;
+  *) die "unknown command: $cmd (try: install, upgrade, doctor, home, version)" ;;
 esac

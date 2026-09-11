@@ -50,6 +50,13 @@ progress.** Three specific traps:
 So: check `git status` and the current branch first, use explicit paths - never
 `git add -A` - and if the tree is not yours, wait. Propagation is never urgent.
 
+## `norma home`
+
+Prints the installation directory and requires nothing - no repository, no
+harness. It exists for the one skill that runs before the project does:
+`$(norma home)/skills/start-project/SKILL.md`. Everything else is reached through
+the vendored copy inside the repository.
+
 ## `norma doctor`
 
 Changes nothing; exits non-zero when something is blocking. It reports:

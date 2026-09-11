@@ -153,6 +153,13 @@ real bug in a consumer repository before the copy rule existed. `doctor` fails o
 any symlink that escapes the repository. The cost is that improvements need
 `harness upgrade`, which is what `VERSION` is for.
 
+**One skill is deliberately not vendored.** `start-project` runs before the
+repository exists, so there is nowhere to vendor it to; it is reached through
+`$(norma home)/skills/start-project/SKILL.md`. Adding it to `VENDORED_SKILLS`
+would ship the founding interview into every project that has already been
+founded. The test suite asserts its absence from an install, so the omission
+cannot be silently "fixed".
+
 **A generic gate that sources a config, rather than a generated gate.** The three
 consumer repositories had hand-written gates differing in exactly four values.
 Generating a file per project would have re-created the same drift with extra

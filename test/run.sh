@@ -257,6 +257,9 @@ assert_file "vendors the hook" .githooks/pre-commit
 assert_file "vendors run-task as a real directory" .agents/skills/run-task/SKILL.md
 assert_file "vendors the setup interview" .agents/skills/harness-setup/SKILL.md
 assert_file "and the architecture reference" .agents/skills/architecture-guidelines/references/backend.md
+# start-project is the one skill that is not vendored: it runs before the
+# project exists, and once it has finished run-task is the skill that matters.
+assert_nofile "does not vendor start-project" .agents/skills/start-project
 assert_file "creates the loop template" docs/harness/mandatory-steps.md
 assert_file "creates the adoption map template" docs/harness/architecture-rules.md
 assert_file "creates AGENTS.md" AGENTS.md
@@ -345,6 +348,37 @@ echo '{}' > package.json
 OUT=$("$NORMA" install --dry-run --profile node)
 assert_has "an explicit --profile wins over detection" "$OUT" "profile: node"
 done_repo
+
+echo ""
+echo "the skill library"
+
+# A skill directory whose frontmatter name does not match it is invisible: the
+# name is what an agent matches a request against, not the path it was found at.
+for sk in "$HOME_DIR"/skills/*/; do
+  sname=$(basename "$sk")
+  if [ -f "$sk/SKILL.md" ]; then
+    assert_eq "$sname declares its own name" "$(sed -n 's/^name: *//p' "$sk/SKILL.md" | head -1)" "$sname"
+  else
+    no "$sname has a SKILL.md" "missing"
+  fi
+done
+
+# Everything VENDORED_SKILLS names must exist, or install ships fewer skills than
+# doctor counts from the same list.
+for vs in $(sed -n 's/^VENDORED_SKILLS="\(.*\)"$/\1/p' "$HOME_DIR/bin/norma"); do
+  assert_file "VENDORED_SKILLS names '$vs', and it is there" "$HOME_DIR/skills/$vs/SKILL.md"
+done
+
+# start-project is reached through `norma home`, because there is no repository
+# to vendor it into yet - so that path has to work from anywhere.
+assert_file "start-project ships with its document skeletons" \
+  "$HOME_DIR/skills/start-project/references/documents.md"
+NR=$(mktemp -d)
+assert_eq "norma home prints the installation directory, outside any repository" \
+  "$(cd "$NR" && "$NORMA" home)" "$HOME_DIR"
+rm -rf "$NR"
+assert_has "help points at start-project for a project that does not exist yet" \
+  "$("$NORMA" help)" "start-project/SKILL.md"
 
 echo ""
 echo "norma upgrade"
