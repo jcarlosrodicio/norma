@@ -190,14 +190,56 @@ inject_agents_block() {
   step "~ AGENTS.md (harness block)"
 }
 
+# True only inside norma's own repository. Both sides are resolved to a physical
+# path: the CLI reaches its home through `cd ..` while git reports the real one,
+# and on macOS a temporary directory alone is enough to make the two spellings
+# differ.
+is_self_host() {
+  [ "$(cd "$REPO" && pwd -P)" = "$(cd "$HOME_DIR" && pwd -P)" ]
+}
+
 vendor_skills() {
+  # norma installs its own harness, and that is the one repository where a
+  # vendored copy would be wrong: `skills/` here IS the source, so a copy under
+  # .agents/ is a second version of it that drifts from the first edit onwards.
+  # There, vendoring means linking - `.agents/skills/<name>` -> `../../skills/<name>`,
+  # which stays inside the repository and so survives a clone, which is the only
+  # thing the copy rule was ever protecting.
+  #
+  # It links rather than merely tolerating links, because otherwise self-hosting
+  # is maintained by hand: a skill added upstream needs its two symlinks created,
+  # and that is the whole reason to run upgrade in this repository at all.
+  SELF=0
+  if is_self_host; then SELF=1; fi
   for s in $VENDORED_SKILLS; do
     src=$HOME_DIR/skills/$s
     [ -d "$src" ] || continue
     dst=.agents/skills/$s
     # A symlink is replaced even when it resolves to identical content: one that
     # escapes the repository does not survive a clone on another machine.
-    if [ ! -L "$dst" ] && [ -d "$dst" ] && diff -rq "$src" "$dst" >/dev/null 2>&1; then :
+    if [ "$SELF" -eq 1 ]; then
+      into=../../skills/$s
+      point=0
+      if [ -L "$dst" ]; then
+        if [ "$(readlink "$dst")" != "$into" ]; then point=1; fi
+      elif [ ! -e "$dst" ]; then
+        point=1
+      else
+        # Not deleted: whatever is there is somebody's, and the message says what
+        # is wrong with it rather than guessing what they meant.
+        warn "$dst is a real directory in norma's own repository - a second copy of skills/$s, which is what the link exists to prevent. Remove it and run this again."
+      fi
+      if [ "$point" -eq 1 ]; then
+        if [ "$DRY" -eq 1 ]; then
+          step "would link $dst -> $into (self-hosted: skills/ is the source)"
+        else
+          mkdir -p .agents/skills
+          rm -f "$dst"
+          ln -sfn "$into" "$dst"
+          step "+ $dst -> $into (self-hosted: skills/ is the source)"
+        fi
+      fi
+    elif [ ! -L "$dst" ] && [ -d "$dst" ] && diff -rq "$src" "$dst" >/dev/null 2>&1; then :
     elif [ "$DRY" -eq 1 ]; then
       step "would vendor $dst"
     else

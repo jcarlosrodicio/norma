@@ -528,6 +528,39 @@ for broken in "begin-with-no-end" "end-that-does-not-match-to-the-byte"; do
   done_repo
 done
 
+# norma installs its own harness, and that is the one repository where a vendored
+# copy is wrong: skills/ there IS the source, so a copy under .agents/ is a second
+# version of it. Before this, an upgrade run in norma's own tree silently turned
+# all eleven links into copies - undoing a decision docs/01-architecture.md calls
+# load-bearing, and doing it where no consumer would ever notice.
+NH=$(mktemp -d)
+cp -R "$HOME_DIR/bin" "$HOME_DIR/core" "$HOME_DIR/skills" "$HOME_DIR/profiles" \
+      "$HOME_DIR/templates" "$HOME_DIR/VERSION" "$NH/"
+(cd "$NH" && git init -q && git config user.email t@example.com && git config user.name Test \
+   && echo '{}' > package.json && "$NH/bin/norma" install --profile node) >/dev/null 2>&1
+assert_eq "in norma's own repository a skill is a link into skills/, not a copy" \
+  "$(readlink "$NH/.agents/skills/run-task")" "../../skills/run-task"
+assert_eq "and Claude Code still reaches it the same way as anywhere else" \
+  "$(readlink "$NH/.claude/skills/run-task")" "../../.agents/skills/run-task"
+
+# The reason to run upgrade there at all: a skill added upstream needs its links.
+rm -f "$NH/.agents/skills/commit" "$NH/.claude/skills/commit"
+(cd "$NH" && "$NH/bin/norma" upgrade) >/dev/null 2>&1
+assert_eq "upgrade creates the links a newly added skill needs" \
+  "$(readlink "$NH/.agents/skills/commit")" "../../skills/commit"
+
+ln -sfn ../../skills/renamed-upstream "$NH/.agents/skills/commit"
+(cd "$NH" && "$NH/bin/norma" upgrade) >/dev/null 2>&1
+assert_eq "and repairs one left pointing at a skill that moved" \
+  "$(readlink "$NH/.agents/skills/commit")" "../../skills/commit"
+
+rm -f "$NH/.agents/skills/commit"
+mkdir -p "$NH/.agents/skills/commit" && echo copy > "$NH/.agents/skills/commit/SKILL.md"
+OUT=$(cd "$NH" && "$NH/bin/norma" upgrade 2>&1)
+assert_has "but a real directory there is reported, not silently replaced" "$OUT" "second copy of skills/commit"
+assert_eq "and left where it is" "$(cat "$NH/.agents/skills/commit/SKILL.md")" "copy"
+rm -rf "$NH"
+
 # A dry run that prints half the plan is worse than none: the link is how an
 # agent reaches the skill, and it was never announced.
 new_repo

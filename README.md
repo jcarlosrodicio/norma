@@ -201,13 +201,20 @@ The cost of vendoring is that improvements do not arrive on their own: run
 `norma upgrade`, which compares against `scripts/harness/VERSION` and reports any
 owned file you edited locally instead of clobbering it.
 
+**With one exception, and it is norma itself.** This repository is where `skills/`
+lives, so a copy of it under `.agents/` would be a second version that drifts. The
+installer recognises its own home and links there instead - creating the links a
+newly added skill needs, repairing one that points at a skill that moved, and
+refusing to overwrite a real directory someone put in the way. Every other
+repository gets copies, which is what makes them survive a clone.
+
 ## Tests
 
 ```sh
 test/run.sh
 ```
 
-212 tests over the gate's real behaviour - its refusals above all - over every
+218 tests over the gate's real behaviour - its refusals above all - over every
 profile and the detection that picks one, over the shape of the skill library, and
 over `install`, `upgrade` and `doctor`, each in a throwaway git repository with a
 stub stack adapter. They live here, once, because the gate is the same file everywhere:

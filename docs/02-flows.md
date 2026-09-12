@@ -65,6 +65,12 @@ Three details that are each there for a reason:
   Everything outside the pair survives verbatim: the architecture notes above it,
   the release process below it, the project's own conventions. **Unless the pair
   is not a pair**, which is why that is now a refusal - see below.
+- **In norma's own repository, vendoring means linking.** `skills/` there is the
+  source, so a copy under `.agents/` would be a second version of it. The
+  installer detects that it is acting on its own home and creates, repairs and
+  leaves the symlinks alone accordingly - see the self-hosting note in
+  [`01-architecture.md`](01-architecture.md). Everywhere else, a copy is exactly
+  what you want, and nothing changes.
 - **`.claude/skills/<name>` is repaired, not merely created.** The old check asked
   whether something was there, never whether it pointed at the right place, so a
   link left dangling or aimed elsewhere survived every upgrade. A real directory at

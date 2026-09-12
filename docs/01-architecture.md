@@ -217,6 +217,19 @@ Two adaptations the contract could not express on its own:
   would be a second version that drifts. The link stays inside the repository, so
   `doctor` is satisfied and a clone resolves it.
 
+  **The installer knows this about itself**, rather than leaving it as a
+  convention nobody enforces. When the repository it is acting on *is* norma's own
+  home - both paths resolved physically, because the CLI reaches its home through
+  `cd ..` while git reports the real one - vendoring a skill means creating that
+  link, repairing one that points at a skill which moved, and refusing to replace
+  a real directory someone put there. It does not merely tolerate the links: it
+  creates them, because otherwise self-hosting is maintained by hand and every
+  skill added upstream needs two symlinks made by whoever remembers.
+
+  Until that existed, `norma upgrade` run in this tree silently turned all eleven
+  links into copies - undoing the decision above, in the one repository where no
+  consumer would ever notice, and leaving the stale stamp that made it visible.
+
 **shellcheck is not in the gates**, deliberately. It is not installed here, and
 wiring in a linter nobody has means the gate changes behaviour the day somebody
 installs it. Adopting it means paying its findings in the same change.
