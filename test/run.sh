@@ -567,6 +567,54 @@ assert_has "harness-setup asks how the project is exercised for real" \
 assert_has "including the account or fixture, and never a real credential" \
   "$(cat "$hs")" "Never a real credential"
 assert_has "and whether there is a store to migrate" "$(cat "$hs")" "already has data"
+# Evidence is the half deferred from the first version, and the shape matters more
+# than the existence: "take a screenshot" is wrong for a CLI, where the evidence is
+# the output and the exit code, and for an endpoint, where it is the response.
+assert_has "the skill says what evidence a surface actually needs" \
+  "$rv" "## 4. Capture what proves it"
+assert_has "a screen is a still per state that matters" "$rv" "one still per state"
+assert_has "a command is its real output and exit code" "$rv" "exit code"
+# Video was considered and dropped on purpose. Saying so stops it being re-added
+# as an obvious omission by whoever reads this next.
+assert_has "and video is refused with its reason, not silently absent" \
+  "$rv" "Not video"
+# Evidence in the repository is evidence nobody ever deletes, and the report is a
+# committed file, so it carries the filename and never this machine's paths.
+assert_has "evidence is kept outside the repository" "$rv" "never inside the repository"
+assert_has "and the committed report carries the name, not the path" \
+  "$rv" "not the path"
+# Unsupervised there is no hand-over message to put the paths in, so the evidence
+# has to travel in the pull request or it does not exist for the reviewer.
+assert_has "unsupervised, the evidence is attached to the pull request" \
+  "$auto" "--attach"
+assert_has "and an older gh that cannot attach is reported, not worked around" \
+  "$auto" "do not improvise"
+
+# One change can land on two surfaces at once - an endpoint and the screen that
+# calls it - and keying the evidence off the repository instead of the surface
+# gets that case wrong in exactly the repositories that have both.
+assert_has "evidence is per surface, and a change can have several" \
+  "$rv" "more than one surface"
+# The committed report carries names, not paths, and the preferred way to capture
+# is a subagent. Nothing said the subagent had to return the paths, so the one
+# piece of information the pull request needs could be dropped on the way back.
+assert_has "a delegated capture hands the paths back to the caller" \
+  "$rv" "hand the paths back"
+# Which forge a consumer is on is a project decision, and the first draft of this
+# wrote `gh` in as the only path - the very thing the assertion above forbids in
+# the sibling skill. A consumer on another forge got an instruction into a dead
+# end, with "do not improvise" closing the exit.
+assert_has "attaching evidence assumes no particular forge" \
+  "$auto" "not the harness's to assume"
+# gh rewrites the body reference only when it matches the attached path exactly;
+# a near-miss uploads the file and leaves a dead link in the merged body.
+assert_has "the body reference must match the attached path exactly" \
+  "$auto" "byte for byte"
+# The path is a machine path, and the pushed body may not keep one. It survives
+# only if the upload failed, which is precisely when it must be taken out.
+assert_has "and no machine path survives in the pushed body" \
+  "$auto" "no longer carries"
+
 # Adding a round renumbers the ones below it, and the "Write" section refers to
 # one of them BY NUMBER. That back-reference can point at the wrong round with
 # the whole suite still green - it did, until this test existed.

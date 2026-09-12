@@ -79,20 +79,52 @@ all three go in the report:
    saying what locally was is not evidence - least of all when the tests run on a
    different engine from the one production uses.
 
-## 4. Where to run it
+## 4. Capture what proves it
+
+Evidence is what you would have to put in front of somebody to convince them, in
+the cheapest form that carries it. That is decided by the surface, not by habit:
+
+- **A screen** - one still per state that matters. Before and after where the
+  change is visual; the empty state, the error state and the loaded one where
+  those are the change. Name files for what they show, not `screenshot-1.png`.
+- **A command** - its real output, verbatim, and the **exit code**. A terminal
+  screenshot of text is worse than the text: it cannot be searched, diffed or
+  quoted back.
+- **An endpoint** - the request you sent and the status and body that came back.
+- **A store** - the query and the rows, before and after where it matters.
+
+**One change can touch more than one surface** - an endpoint and the screen
+that calls it, a command and the rows it writes. Then it needs evidence for
+each: capture per surface, not one artifact per change.
+
+**Not video.** It was considered and dropped: it is heavy, a reviewer has to watch
+it in real time to find the second that matters, and it cannot be diffed or
+quoted. A sequence of stills carries almost everything a flow needs, and the
+report carries the rest in words. If a bug genuinely only exists in motion, say so
+and describe it - that is a finding, not a format problem.
+
+**Keep it outside the repository** - your scratch or temporary directory:
+**never inside the repository**, and never committed. A repository that collects
+a screenshot per change grows forever and nobody ever deletes one.
+
+## 5. Where to run it
 
 Screen dumps, long logs and page snapshots fill a context window fast, and the
 context you still need for the review and the documentation is the expensive one.
 
 - If your agent can launch a subagent or a fresh context, do this work there and
-  bring back the report. Preferred.
+  bring back the report **and the evidence paths**. The report deliberately
+  carries file names only, so a delegated run that returns just the report has
+  dropped the one thing the delivery needs: **hand the paths back** to the caller
+  explicitly. Preferred, with that caveat.
 - If it cannot, do it in session.
 
 Either way **say which of the two it was**, the same way the adversarial pass
-does. Keep artifacts on disk, outside the repository, and refer to them; do not
-paste them into the report.
+does. The evidence from the previous step is on disk precisely so it can be
+referred to rather than pasted: a report that inlines a page dump is a report
+nobody finishes reading.
 
-## 5. The report
+## 6. The report
 
 Write it where this project keeps its verification reports:
 `openspec/changes/<change>/reports/` where the project uses OpenSpec, and
@@ -104,6 +136,11 @@ It carries:
 
 - **What you ran** - the commands verbatim, the endpoint, the screen, the account
   or fixture you used.
+- **The evidence** - what each file shows, in words, and its file name:
+  **not the path**. This report is committed; an absolute path from this machine means
+  nothing to anyone else and is exactly what the no-machine-paths rule below
+  forbids. The paths themselves go in the hand-over message, or into the pull
+  request when there is one.
 - **What you observed** - including the failure path.
 - **Not covered** - what this run does not prove. The honest list, not the
   flattering one. A reviewer reads this to know where to look.
