@@ -144,13 +144,44 @@ and on a different model from the one that wrote the code. TODO(harness): name t
 areas that also require `.agents/skills/code-auditing/SKILL.md` - authentication,
 credentials, payments, personal data.
 
-## Step 8 - Update documentation (MANDATORY, always last before delivery)
+## Step 8 - Update documentation and close the change (MANDATORY, before delivery)
 
 Follow `.agents/skills/update-docs/SKILL.md`. TODO(harness): which documents own
 which topic, and where a new decision has to be registered.
+
+Then close the change, in **this** branch. Both halves travel in the same pull
+request as the code, because neither needs it merged to be true:
+
+1. **Close the phase where the roadmap describes it.** TODO(harness): name the
+   roadmap document and how a phase is marked done here. This is the update the
+   diff cannot lead you to - nothing in the code mentions the roadmap - so it is
+   the one that gets forgotten, and a phase left open after it shipped is how the
+   next session builds it twice.
+2. **Archive the OpenSpec change**, following
+   `.agents/skills/openspec-archive-change/SKILL.md`: it syncs the delta specs into
+   `openspec/specs/` and moves the change folder under `openspec/changes/archive/`.
+   Ordinary file operations, both of them.
+
+**Then run step 4 again.** Archiving rewrites and moves files, so the stamp is now
+older than the change and the hook will refuse the commit - correctly, because it
+cannot tell an archive from a code edit.
+
+Leaving either half for after the merge costs a second branch, a second review and
+a second gate run, and leaves the default branch carrying code whose specs were
+never applied. If the change genuinely cannot be archived yet, say so in the report
+and name what blocks it.
 
 ## Step 9 - Stop
 
 Do not commit, push, open a pull request, publish or deploy. The loop ends here and
 the human reviews. Only after explicit approval, follow
 `.agents/skills/commit/SKILL.md`.
+
+**One exception, and only when the human asked for it explicitly.** A phase handed
+over to run unsupervised follows `.agents/skills/auto-run-task/SKILL.md`, and that
+loop ends at an **open pull request** instead: the human's review point moves from
+before the commit to the pull request itself. Nothing above this step relaxes - the
+gate, the tests, the runtime verification, the adversarial review and the
+documentation are exactly the same, and that procedure additionally requires every
+decision taken without asking to be written down and linked from the pull request.
+Merging, deploying and publishing stay with the human in both modes.

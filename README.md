@@ -104,6 +104,37 @@ not answer stays in the document as an explicit open question - it never guesses
 convention, because a guessed convention that everybody then follows is worse than
 an admitted gap.
 
+## Running a whole phase unattended: `/auto-run-task`
+
+`run-task` is the loop, and it stops three times for you: after enriching, after
+planning, and before delivery. `auto-run-task` is the same loop for when you are not
+there to answer - you hand over a roadmap phase and leave.
+
+```
+orient → enrich → branch → plan → implement → verify → review → document → close → deliver
+         ^decide          ^self-review                                             ^commit, push, PR, CI
+```
+
+Each stop becomes something the agent does and **writes down**: the open questions
+are decided from the roadmap and the architecture documents, the plan is checked
+against the phase instead of shown to you, and the run ends at an **open pull
+request** with a green CI - never a merge, a deploy or a publish. Every decision it
+took instead of asking lands in `reports/autonomy.md`, linked from that pull request,
+so you review once, afterwards, and can stop at the first decision you disagree with.
+
+It stops anyway for seven reasons - among them a question that changes *what* gets
+built rather than how, anything destructive, anything needing a credential, and the
+same failure surviving two attempts. Then it commits, pushes, does **not** open the
+pull request, and asks you everything at once.
+
+Nothing about the gate relaxes: no `--no-verify`, no edit to `verify` or the hook to
+make a run pass, and no failing test silenced instead of fixed - with nobody
+watching, *make it green* is the failure mode this mode exists to refuse.
+
+A project that already had the harness needs one edit before using it: `Step 9` of
+its own `docs/harness/mandatory-steps.md` has to name the exception, or the binding
+checklist forbids the delivery. New installs get it from the template.
+
 ## Who owns what
 
 This is the whole design. Get it wrong and either upgrades destroy your decisions,
@@ -115,7 +146,19 @@ or your projects drift apart.
 | `.githooks/pre-commit` | `docs/harness/mandatory-steps.md` |
 | `.agents/skills/<vendored>` | `docs/harness/architecture-rules.md` |
 | `scripts/harness/VERSION` | `openspec/config.yaml` |
-| | `AGENTS.md` |
+| `AGENTS.md` between the harness markers | `AGENTS.md` outside them, or with no markers at all |
+
+**About that last row.** `<!-- harness:begin -->` / `<!-- harness:end -->` are how a
+project asks for the block to be kept current; `upgrade` then rewrites what is
+between them and **nothing else** - your architecture notes above it and your
+release process below it survive verbatim. No markers, no rewrite: the file is
+yours whole, which is what the three oldest consumers ended up with. Delete both
+markers any time to take the section back.
+
+The markers must be an exact matching pair, each alone on its line. They are not
+processed hopefully: a begin with no end, or an end with one trailing space, and
+`norma` refuses the whole file and tells you why - because the rewrite would
+otherwise delete everything below the marker.
 
 The gate is **byte-identical in every project**. Everything stack-specific lives in
 `config.sh`, which the gate sources - so there is no generated file to drift, and
@@ -158,13 +201,20 @@ The cost of vendoring is that improvements do not arrive on their own: run
 `norma upgrade`, which compares against `scripts/harness/VERSION` and reports any
 owned file you edited locally instead of clobbering it.
 
+**With one exception, and it is norma itself.** This repository is where `skills/`
+lives, so a copy of it under `.agents/` would be a second version that drifts. The
+installer recognises its own home and links there instead - creating the links a
+newly added skill needs, repairing one that points at a skill that moved, and
+refusing to overwrite a real directory someone put in the way. Every other
+repository gets copies, which is what makes them survive a clone.
+
 ## Tests
 
 ```sh
 test/run.sh
 ```
 
-173 tests over the gate's real behaviour - its refusals above all - over every
+231 tests over the gate's real behaviour - its refusals above all - over every
 profile and the detection that picks one, over the shape of the skill library, and
 over `install`, `upgrade` and `doctor`, each in a throwaway git repository with a
 stub stack adapter. They live here, once, because the gate is the same file everywhere:

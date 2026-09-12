@@ -66,6 +66,11 @@ verify, review, document and hand over, and stopping at the three points where a
 human decides. `.agents/skills/run-task/SKILL.md` resolves to it too, so an agent
 that only knows the vendored path finds it.
 
+[`skills/auto-run-task/SKILL.md`](skills/auto-run-task/SKILL.md) is the same loop
+for a phase handed over unsupervised: same stages, same gate, each stop replaced by
+a decision it records, ending at an open pull request. Use it only when the human
+asked for it, and read `docs/harness/mandatory-steps.md` step 9 first.
+
 `norma` installs its own harness, so the gate and the hook are real here:
 
 ```

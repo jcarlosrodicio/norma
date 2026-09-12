@@ -255,6 +255,9 @@ assert_file "vendors the gate" scripts/harness/verify
 assert_file "writes a config from the profile" scripts/harness/config.sh
 assert_file "vendors the hook" .githooks/pre-commit
 assert_file "vendors run-task as a real directory" .agents/skills/run-task/SKILL.md
+# auto-run-task is a delta over run-task: it delegates every stage to that file by
+# path, so shipping one without the other leaves a procedure pointing at nothing.
+assert_file "vendors the autonomous variant beside it" .agents/skills/auto-run-task/SKILL.md
 assert_file "vendors the setup interview" .agents/skills/harness-setup/SKILL.md
 assert_file "and the architecture reference" .agents/skills/architecture-guidelines/references/backend.md
 # start-project is the one skill that is not vendored: it runs before the
@@ -268,6 +271,10 @@ assert_eq "arms the hook path" "$(git config --get core.hooksPath)" ".githooks"
 assert_has "AGENTS.md carries the block" "$(cat AGENTS.md)" "harness:begin"
 assert_has "and points at the loop entry point" "$(cat AGENTS.md)" "run-task"
 assert_eq "the claude symlink stays inside the repo" "$(readlink .claude/skills/run-task)" "../../.agents/skills/run-task"
+assert_has "the loop template names the one exception to its final stop" \
+  "$(cat docs/harness/mandatory-steps.md)" "auto-run-task"
+assert_has "and the AGENTS.md block tells an agent when that variant applies" \
+  "$(cat AGENTS.md)" "auto-run-task"
 
 git add -A >/dev/null 2>&1
 # --no-verify on purpose: this test is about the installer, and the hook it just
@@ -413,6 +420,62 @@ for vs in $(sed -n 's/^VENDORED_SKILLS="\(.*\)"$/\1/p' "$HOME_DIR/bin/norma"); d
   assert_file "VENDORED_SKILLS names '$vs', and it is there" "$HOME_DIR/skills/$vs/SKILL.md"
 done
 
+# The loop used to end at "document", so closing the phase in the roadmap and
+# archiving the change happened in a second branch after the merge - a branch, a
+# review and a gate run each time, and a default branch carrying code whose delta
+# specs had never been applied.
+rt=$(cat "$HOME_DIR/skills/run-task/SKILL.md")
+assert_has "run-task closes the change before handing over" "$rt" "## 8. Close the change"
+assert_has "by archiving it, in this branch" "$rt" "openspec-archive-change/SKILL.md"
+assert_has "and by closing the phase where the roadmap describes it" "$rt" "roadmap"
+assert_has "then verifying again, because an archive rewrites files" "$rt" "re-run stage 5"
+assert_has "the loop's last stage is still the human's" "$rt" "## 9. Hand over"
+assert_has "update-docs names the roadmap, which no diff points at" \
+  "$(cat "$HOME_DIR/skills/update-docs/SKILL.md")" "roadmap entry"
+# Unsupervised, the archive has to travel inside the pull request: there is no
+# second branch because there is nobody to remember it.
+auto=$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")
+assert_has "auto-run-task delivers after closing, not instead of it" "$auto" "### Stage 9 - Deliver"
+# openspec-archive-change stops to ask three times, and unsupervised nobody
+# answers. "Archive without syncing" is the plausible wrong pick: it leaves the
+# specs describing a system that no longer exists, and looking finished.
+assert_has "and answers the prompts the archive stops on" "$auto" "### Stage 8 - Close the change"
+assert_has "syncing the delta specs rather than archiving past them" "$auto" "Archive without syncing"
+# Archiving MOVES the change folder, so the log the pull request links is no
+# longer where it was written - and a dead link to it is the same as no log.
+assert_has "and links the autonomy log where the archive left it" "$auto" "changes/archive/"
+assert_has "run-task says the reports move with the change" \
+  "$(cat "$HOME_DIR/skills/run-task/SKILL.md")" "moves the change folder"
+assert_has "the loop template makes closing the change binding too" \
+  "$(cat "$HOME_DIR/templates/mandatory-steps.md")" "close the change"
+
+# Skills reference each other by path. A path naming a skill nobody installs is a
+# dead end at the worst moment - `auto-run-task` is nothing but such references.
+# openspec-* are the exception: the openspec tool vendors those, not norma.
+refs=$(grep -rho '\.agents/skills/[a-z0-9-]*' "$HOME_DIR"/skills/ | sed 's|.*/||' | sort -u)
+vendored=$(sed -n 's/^VENDORED_SKILLS="\(.*\)"$/\1/p' "$HOME_DIR/bin/norma")
+for r in $refs; do
+  case $r in openspec-*|"") continue ;; esac
+  found=0
+  for v in $vendored; do [ "$v" = "$r" ] && found=1; done
+  if [ "$found" -eq 1 ]; then
+    ok "the '$r' a skill points at is a skill install ships"
+  else
+    no "the '$r' a skill points at is a skill install ships" "not in VENDORED_SKILLS"
+  fi
+done
+
+# The autonomous variant removes the three stops, so the two limits that keep an
+# unsupervised run reviewable have to be stated in it, explicitly.
+auto=$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")
+assert_has "auto-run-task delegates the stages to run-task instead of copying them" \
+  "$auto" ".agents/skills/run-task/SKILL.md"
+assert_has "auto-run-task ends at a pull request and never merges it" \
+  "$auto" "never merge the pull request"
+assert_has "auto-run-task refuses to bypass the hook" "$auto" "--no-verify"
+assert_has "auto-run-task records what it decided instead of asking" \
+  "$auto" "reports/autonomy.md"
+
 # start-project is reached through `norma home`, because there is no repository
 # to vendor it into yet - so that path has to work from anywhere.
 assert_file "start-project ships with its document skeletons" \
@@ -436,7 +499,135 @@ printf '# Mine\n\n## Harness\n\nMy notes: run-task, scripts/harness/verify.\n' >
 "$NORMA" upgrade --force >/dev/null 2>&1
 assert_eq "upgrade restores the gate it owns" "$(head -1 scripts/harness/verify)" "#!/bin/sh"
 assert_eq "and leaves config.sh alone" "$(cat scripts/harness/config.sh)" "# MINE"
-assert_has "and never touches AGENTS.md" "$(cat AGENTS.md)" "My notes"
+assert_has "and never touches an AGENTS.md that carries no markers" "$(cat AGENTS.md)" "My notes"
+assert_no "not even to append a block to it" "$(cat AGENTS.md)" "harness:begin"
+done_repo
+
+# The markers say "Managed by the norma installer". Before this, only `install`
+# ever rewrote the block, so the promise was false on every upgrade: a skill
+# added upstream reached Claude Code through .claude/skills and stayed invisible
+# to every agent that reads AGENTS.md by path.
+new_repo
+echo '{}' > package.json
+"$NORMA" install --profile node >/dev/null
+sed -i.bak 's/^- \*\*Full procedure/- STALE MARKER TEXT\n- **Full procedure/' AGENTS.md && rm -f AGENTS.md.bak
+assert_has "a marked block can go stale" "$(cat AGENTS.md)" "STALE MARKER TEXT"
+OUT=$("$NORMA" upgrade 2>&1)
+assert_no "upgrade refreshes the block the markers declare managed" "$(cat AGENTS.md)" "STALE MARKER TEXT"
+assert_has "and leaves the markers in place for the next one" "$(cat AGENTS.md)" "harness:begin"
+assert_has "saying so, because it is the one project file it may rewrite" "$OUT" "AGENTS.md"
+printf '# Only mine\n' > AGENTS.md
+"$NORMA" upgrade >/dev/null 2>&1
+assert_eq "and once the markers are gone it never comes back" "$(cat AGENTS.md)" "# Only mine"
+done_repo
+
+# What lies outside the markers is the project's, and this is the test that says
+# so: architecture notes, where-to-read-what, release process, house conventions.
+new_repo
+echo '{}' > package.json
+"$NORMA" install --profile node >/dev/null
+printf '# Mine\n\n## Architecture\nLayers: domain, data, presentation.\n\n%s\n## Harness\nSTALE\n%s\n\n## Release\nfastlane, see ops/release.md\n' \
+  '<!-- harness:begin -->' '<!-- harness:end -->' > AGENTS.md
+"$NORMA" upgrade >/dev/null 2>&1
+A=$(cat AGENTS.md)
+assert_has "what precedes the markers survives an upgrade" "$A" "Layers: domain, data, presentation."
+assert_has "and what follows them too" "$A" "fastlane, see ops/release.md"
+assert_no "only the block between them is replaced" "$A" "STALE"
+assert_has "with the current block in its place" "$A" "auto-run-task"
+done_repo
+
+# The awk copies up to the begin marker and resumes at the end marker. Unpaired,
+# it never resumes and deletes the rest of the file - which is why an unpaired
+# marker is refused outright instead of processed hopefully. One trailing space
+# on the end marker was enough to lose everything below it.
+for broken in "begin-with-no-end" "end-that-does-not-match-to-the-byte"; do
+  new_repo
+  echo '{}' > package.json
+  "$NORMA" install --profile node >/dev/null
+  if [ "$broken" = "begin-with-no-end" ]; then
+    printf '# Mine\n%s\nold\n\n## Release\nfastlane\n' '<!-- harness:begin -->' > AGENTS.md
+  else
+    printf '# Mine\n%s\nold\n%s \n\n## Release\nfastlane\n' '<!-- harness:begin -->' '<!-- harness:end -->' > AGENTS.md
+  fi
+  before=$(cat AGENTS.md)
+  OUT=$("$NORMA" upgrade 2>&1)
+  assert_has "refuses AGENTS.md with a $broken" "$OUT" "not a matching pair"
+  assert_eq "and leaves the file byte for byte" "$(cat AGENTS.md)" "$before"
+  assert_has "saying how to fix it" "$OUT" "exact to the byte"
+  done_repo
+done
+
+# norma installs its own harness, and that is the one repository where a vendored
+# copy is wrong: skills/ there IS the source, so a copy under .agents/ is a second
+# version of it. Before this, an upgrade run in norma's own tree silently turned
+# all eleven links into copies - undoing a decision docs/01-architecture.md calls
+# load-bearing, and doing it where no consumer would ever notice.
+NH=$(mktemp -d)
+cp -R "$HOME_DIR/bin" "$HOME_DIR/core" "$HOME_DIR/skills" "$HOME_DIR/profiles" \
+      "$HOME_DIR/templates" "$HOME_DIR/VERSION" "$NH/"
+(cd "$NH" && git init -q && git config user.email t@example.com && git config user.name Test \
+   && echo '{}' > package.json && "$NH/bin/norma" install --profile node) >/dev/null 2>&1
+assert_eq "in norma's own repository a skill is a link into skills/, not a copy" \
+  "$(readlink "$NH/.agents/skills/run-task")" "../../skills/run-task"
+assert_eq "and Claude Code still reaches it the same way as anywhere else" \
+  "$(readlink "$NH/.claude/skills/run-task")" "../../.agents/skills/run-task"
+
+# The reason to run upgrade there at all: a skill added upstream needs its links.
+rm -f "$NH/.agents/skills/commit" "$NH/.claude/skills/commit"
+(cd "$NH" && "$NH/bin/norma" upgrade) >/dev/null 2>&1
+assert_eq "upgrade creates the links a newly added skill needs" \
+  "$(readlink "$NH/.agents/skills/commit")" "../../skills/commit"
+
+ln -sfn ../../skills/renamed-upstream "$NH/.agents/skills/commit"
+(cd "$NH" && "$NH/bin/norma" upgrade) >/dev/null 2>&1
+assert_eq "and repairs one left pointing at a skill that moved" \
+  "$(readlink "$NH/.agents/skills/commit")" "../../skills/commit"
+
+rm -f "$NH/.agents/skills/commit"
+mkdir -p "$NH/.agents/skills/commit" && echo copy > "$NH/.agents/skills/commit/SKILL.md"
+OUT=$(cd "$NH" && "$NH/bin/norma" upgrade 2>&1)
+assert_has "but a real directory there is reported, not silently replaced" "$OUT" "second copy of skills/commit"
+assert_eq "and left where it is" "$(cat "$NH/.agents/skills/commit/SKILL.md")" "copy"
+rm -rf "$NH"
+
+# Paths alone would miss the tree this harness tells everyone to make: a worktree
+# or second checkout of norma, driven by the INSTALLED cli. The paths differ, the
+# repository is still norma, and copying would destroy its links just the same.
+NW=$(mktemp -d)
+cp -R "$HOME_DIR/bin" "$HOME_DIR/core" "$HOME_DIR/skills" "$HOME_DIR/profiles" \
+      "$HOME_DIR/templates" "$HOME_DIR/VERSION" "$NW/"
+(cd "$NW" && git init -q && git config user.email t@example.com && git config user.name Test \
+   && echo '{}' > package.json && "$NORMA" install --profile node) >/dev/null 2>&1
+assert_eq "another checkout of norma is still norma, whichever cli drives it" \
+  "$(readlink "$NW/.agents/skills/run-task")" "../../skills/run-task"
+rm -rf "$NW"
+
+# A dry run that prints half the plan is worse than none: the link is how an
+# agent reaches the skill, and it was never announced.
+new_repo
+echo '{}' > package.json
+"$NORMA" install --profile node >/dev/null
+rm -rf .agents/skills/commit .claude/skills/commit
+OUT=$("$NORMA" upgrade --dry-run 2>&1)
+assert_has "a dry run announces the skill it would vendor" "$OUT" "would vendor .agents/skills/commit"
+assert_has "and the link an agent would reach it through" "$OUT" "would link .claude/skills/commit"
+assert_nofile "and writes neither of them" .agents/skills/commit
+done_repo
+
+# Repairing, not just creating: a link pointing at the wrong place is exactly
+# what survives a rename upstream, and doctor can only report it.
+new_repo
+echo '{}' > package.json
+"$NORMA" install --profile node >/dev/null
+ln -sfn ../../.agents/skills/somewhere-else .claude/skills/commit
+"$NORMA" upgrade >/dev/null 2>&1
+assert_eq "upgrade repairs a link pointing at the wrong skill" \
+  "$(readlink .claude/skills/commit)" "../../.agents/skills/commit"
+rm -f .claude/skills/commit
+mkdir -p .claude/skills/commit && echo mine > .claude/skills/commit/SKILL.md
+"$NORMA" upgrade >/dev/null 2>&1
+assert_eq "but a real directory there is not the harness's to delete" \
+  "$(cat .claude/skills/commit/SKILL.md)" "mine"
 done_repo
 
 echo ""

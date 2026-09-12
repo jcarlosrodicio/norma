@@ -31,7 +31,7 @@ SELF=$(resolve "$0")
 HOME_DIR=$(cd "$(dirname "$SELF")/.." && pwd)
 VERSION=$(cat "$HOME_DIR/VERSION")
 
-VENDORED_SKILLS="run-task harness-setup enrich-task adversarial-review commit update-docs code-auditing writing-skills using-git-worktrees architecture-guidelines"
+VENDORED_SKILLS="run-task auto-run-task harness-setup enrich-task adversarial-review commit update-docs code-auditing writing-skills using-git-worktrees architecture-guidelines"
 BEGIN_MARK="<!-- harness:begin -->"
 END_MARK="<!-- harness:end -->"
 
@@ -123,6 +123,43 @@ ensure_line() {
 
 inject_agents_block() {
   block=$HOME_DIR/templates/agents-section.md
+  # The markers are the project's opt-in to this block being managed, and they
+  # are the only thing an upgrade acts on. A file that documents the harness in
+  # its own words, or one that never carried the block, is the project's: an
+  # upgrade leaves it exactly as it found it. Without this, a block that says
+  # "Managed by the norma installer" went stale forever, because only `install`
+  # ever rewrote it - so a new skill reached Claude Code through .claude/skills
+  # and stayed invisible to every agent that reads AGENTS.md by path.
+  if [ -f AGENTS.md ]; then
+    # Both markers, exactly once each, in order - or this touches nothing at all.
+    # The awk below copies up to the begin marker, inserts the block, and resumes
+    # at the end marker. With a begin and no end - or an end that does not match
+    # to the byte, where one trailing space is enough - it never resumes, and
+    # everything after the marker is gone: somebody's architecture notes, their
+    # release process, their conventions. A refusal they can read and fix beats a
+    # rewrite they discover in a diff.
+    nb=$(grep -cxF "$BEGIN_MARK" AGENTS.md || true)
+    ne=$(grep -cxF "$END_MARK" AGENTS.md || true)
+    paired=0
+    if [ "$nb" -eq 0 ] && [ "$ne" -eq 0 ]; then
+      paired=1
+    elif [ "$nb" -eq 1 ] && [ "$ne" -eq 1 ]; then
+      lb=$(grep -nxF "$BEGIN_MARK" AGENTS.md | cut -d: -f1)
+      le=$(grep -nxF "$END_MARK" AGENTS.md | cut -d: -f1)
+      if [ "$lb" -lt "$le" ]; then paired=1; fi
+    fi
+    if [ "$paired" -eq 0 ]; then
+      warn "AGENTS.md: harness markers are not a matching pair (begin x$nb, end x$ne) - leaving the whole file alone."
+      warn "  Each marker must be its own line, exact to the byte: '$BEGIN_MARK' then '$END_MARK'. Delete both to own the section outright."
+      return 0
+    fi
+  fi
+  if [ "$MODE" = upgrade ]; then
+    if [ ! -f AGENTS.md ] || ! grep -qF "$BEGIN_MARK" AGENTS.md; then
+      step "= AGENTS.md (kept, yours: no harness markers to refresh)"
+      return 0
+    fi
+  fi
   if [ ! -f AGENTS.md ]; then
     [ "$DRY" -eq 1 ] && { step "would create AGENTS.md"; return 0; }
     { printf '# Repository instructions for AI agents\n\n'
@@ -153,27 +190,97 @@ inject_agents_block() {
   step "~ AGENTS.md (harness block)"
 }
 
+# True inside norma's own repository. Two questions, because one is not enough.
+#
+# Paths, resolved physically: the CLI reaches its home through `cd ..` while git
+# reports the real one, and on macOS a temporary directory alone is enough to make
+# the two spellings differ.
+#
+# Then shape, which catches what paths cannot: a git worktree or a second checkout
+# of norma, driven by the installed CLI. The paths differ there and the repository
+# is still norma - and copying would destroy that tree's symlinks exactly as it
+# would here. Worktrees are how this harness tells everyone to work, so that is a
+# tree that gets made, not a hypothetical.
+is_self_host() {
+  if [ "$(cd "$REPO" && pwd -P)" = "$(cd "$HOME_DIR" && pwd -P)" ]; then return 0; fi
+  if [ -f "$REPO/bin/norma" ] && [ -f "$REPO/core/verify" ] && [ -d "$REPO/skills" ]; then return 0; fi
+  return 1
+}
+
 vendor_skills() {
+  # norma installs its own harness, and that is the one repository where a
+  # vendored copy would be wrong: `skills/` here IS the source, so a copy under
+  # .agents/ is a second version of it that drifts from the first edit onwards.
+  # There, vendoring means linking - `.agents/skills/<name>` -> `../../skills/<name>`,
+  # which stays inside the repository and so survives a clone, which is the only
+  # thing the copy rule was ever protecting.
+  #
+  # It links rather than merely tolerating links, because otherwise self-hosting
+  # is maintained by hand: a skill added upstream needs its two symlinks created,
+  # and that is the whole reason to run upgrade in this repository at all.
+  SELF=0
+  if is_self_host; then SELF=1; fi
   for s in $VENDORED_SKILLS; do
     src=$HOME_DIR/skills/$s
     [ -d "$src" ] || continue
     dst=.agents/skills/$s
     # A symlink is replaced even when it resolves to identical content: one that
     # escapes the repository does not survive a clone on another machine.
-    if [ ! -L "$dst" ] && [ -d "$dst" ] && diff -rq "$src" "$dst" >/dev/null 2>&1; then :
+    if [ "$SELF" -eq 1 ]; then
+      into=../../skills/$s
+      point=0
+      if [ -L "$dst" ]; then
+        if [ "$(readlink "$dst")" != "$into" ]; then point=1; fi
+      elif [ ! -e "$dst" ]; then
+        point=1
+      else
+        # Not deleted: whatever is there is somebody's, and the message says what
+        # is wrong with it rather than guessing what they meant.
+        warn "$dst is a real directory in norma's own repository - a second copy of skills/$s, which is what the link exists to prevent. Remove it and run this again."
+      fi
+      if [ "$point" -eq 1 ]; then
+        if [ "$DRY" -eq 1 ]; then
+          step "would link $dst -> $into (self-hosted: skills/ is the source)"
+        else
+          mkdir -p .agents/skills
+          rm -f "$dst"
+          ln -sfn "$into" "$dst"
+          step "+ $dst -> $into (self-hosted: skills/ is the source)"
+        fi
+      fi
+    elif [ ! -L "$dst" ] && [ -d "$dst" ] && diff -rq "$src" "$dst" >/dev/null 2>&1; then :
+    elif [ "$DRY" -eq 1 ]; then
+      step "would vendor $dst"
     else
-      [ "$DRY" -eq 1 ] && { step "would vendor $dst"; continue; }
       mkdir -p .agents/skills
       rm -rf "$dst"
       cp -R "$src" "$dst"
       step "+ $dst"
     fi
+    # The link is examined on every run, not only when the skill was just
+    # vendored. Two reasons, both paid for: a dry run that skipped this printed
+    # an incomplete plan - it announced the skill and never the link an agent
+    # actually reaches it through - and a link left pointing somewhere else was
+    # never repaired, because the old check only asked whether something was
+    # there, not whether it was right.
     link=.claude/skills/$s
-    if [ ! -e "$link" ] && [ ! -L "$link" ]; then
-      [ "$DRY" -eq 1 ] && { step "would link $link"; continue; }
-      mkdir -p .claude/skills
-      ln -sfn "../../.agents/skills/$s" "$link"
-      step "+ $link -> ../../.agents/skills/$s"
+    want=../../.agents/skills/$s
+    relink=0
+    if [ -L "$link" ]; then
+      if [ "$(readlink "$link")" != "$want" ]; then relink=1; fi
+    elif [ ! -e "$link" ]; then
+      relink=1
+    fi
+    # A real directory there is left alone: that is how openspec and other tools
+    # ship their own skills, and deleting them is not the harness's business.
+    if [ "$relink" -eq 1 ]; then
+      if [ "$DRY" -eq 1 ]; then
+        step "would link $link -> $want"
+      else
+        mkdir -p .claude/skills
+        ln -sfn "$want" "$link"
+        step "+ $link -> $want"
+      fi
     fi
   done
 }
@@ -273,9 +380,14 @@ cmd_upgrade() {
   install_owned "$HOME_DIR/core/verify" scripts/harness/verify 755
   install_owned "$HOME_DIR/core/pre-commit" .githooks/pre-commit 755
   vendor_skills
+  inject_agents_block
+  # The stamp goes LAST, and moving it is not a tidy-up: install_owned decides
+  # whether a locally edited file is kept by comparing this file against the
+  # upstream VERSION, so stamping first would answer its own question and
+  # clobber every local edit without a word.
   install_owned "$HOME_DIR/VERSION" scripts/harness/VERSION 644
   say ""
-  say "config.sh, docs/harness/*.md, openspec/config.yaml and AGENTS.md were not touched."
+  say "config.sh, docs/harness/*.md and openspec/config.yaml were not touched."
 }
 
 check() { if [ "$1" = 0 ]; then step "ok  $2"; else bad "$2 - $3"; fi; }

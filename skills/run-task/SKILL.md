@@ -1,6 +1,6 @@
 ---
 name: run-task
-description: Use to run a complete implementation task end to end - a roadmap phase item, a feature, a fix or a refactor - from a vague request to code that is verified and waiting for human review. Invoke it whenever the user asks for work to be built rather than just discussed, and follow it in order without skipping stages.
+description: Use to run a complete implementation task end to end - a roadmap phase item, a feature, a fix or a refactor - from a vague request to code that is verified and waiting for human review. Invoke it whenever the user asks for work to be built rather than just discussed, and follow it in order without skipping stages. It stops three times for the human; use auto-run-task instead when they hand over a whole phase and want it delivered to a pull request without being asked anything.
 version: 1.0.0
 ---
 
@@ -8,6 +8,12 @@ version: 1.0.0
 
 The whole loop in one procedure. Follow it **in order**. Every stage produces the
 input for the next, so skipping one leaves the following stage guessing.
+
+It stops three times for the human: after enriching, after planning, and before
+delivery. Those stops are the point of this procedure. When the human is not there
+to answer them - they handed over a phase and left - the procedure is
+`.agents/skills/auto-run-task/SKILL.md`, which runs these same stages and replaces
+each stop with a decision it records instead of a question it asks.
 
 ## Portability
 
@@ -122,14 +128,48 @@ is a finding you did not understand yet.
 Follow `.agents/skills/update-docs/SKILL.md`. Mandatory, and always before delivery.
 Documentation that lags the code poisons every future session.
 
-## 8. Hand over
+## 8. Close the change
+
+The work is finished; the record of it is not. Two things remain, and both belong
+in **this** change rather than in a branch after the merge:
+
+1. **Close the phase where the roadmap describes it.** Stage 7 covers the documents
+   the code invalidated; this is the one no diff can point you at, because nothing
+   in the code mentions the roadmap. The phase entry, its status column, the phase
+   document that still reads as pending - a roadmap that lags reality is how the
+   next session picks up work that is already built.
+2. **Archive the OpenSpec change.** Follow
+   `.agents/skills/openspec-archive-change/SKILL.md`. It syncs the delta specs into
+   `openspec/specs/` and moves the change folder under `openspec/changes/archive/`.
+   Both are ordinary file operations in this repository: **nothing about either
+   needs the pull request to be merged**, which is the assumption that used to push
+   them into a second branch.
+
+Archiving **moves the change folder**, reports and all, so everything you wrote
+into `openspec/changes/<change>/reports/` now lives under
+`openspec/changes/archive/<date>-<change>/`. Point at the new path in anything that
+links it, and do not go looking for the old one afterwards.
+
+Then **re-run stage 5**. Archiving moves and rewrites files, so the stamp is now
+older than the change and the hook will refuse the commit - correctly, since it
+cannot tell an archive from a code edit.
+
+Doing this afterwards instead costs a second branch, a second review and a second
+gate run, and leaves the default branch carrying code whose specs were never
+applied for as long as it takes somebody to remember. If the change genuinely
+cannot be archived yet - the spec sync depends on something still in flight - say
+so in the hand-over and name what is blocking it. That is a finding, not a routine
+deferral.
+
+## 9. Hand over
 
 **STOP HERE.** Report to the user:
 
 - what was built, in one paragraph;
 - the tests you selected and why, with the counts;
 - what the adversarial review found and what you did about it;
-- which documents you updated;
+- which documents you updated, and where the phase was closed;
+- that the change is archived and the specs synced, or what blocks it;
 - anything you left out, and why.
 
 Do not commit, push, open a pull request, publish, merge or deploy. When the user
