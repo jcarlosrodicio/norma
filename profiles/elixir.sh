@@ -2,7 +2,8 @@
 # the harness does not own: edit it freely, it is never overwritten by an upgrade.
 #
 # Contract:
-#   HARNESS_CODE_PATHS      space-separated top-level dirs that hold code. A
+#   HARNESS_CODE_PATHS      space-separated paths that hold code - a top-level
+#                           directory, or a single file at the root. A
 #                           --docs-only run refuses the moment it sees a change
 #                           under one of them.
 #   harness_gates()         static gates. Fast, and they must fail loudly.

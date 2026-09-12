@@ -50,8 +50,11 @@ fi
 if [ "$LAST" = docs-only ] && [ -r "$ROOT/scripts/harness/config.sh" ]; then
   CODE_PATHS=$(sed -n 's/^HARNESS_CODE_PATHS="\(.*\)"$/\1/p' "$ROOT/scripts/harness/config.sh")
   if [ -n "$CODE_PATHS" ]; then
-    PATTERN=$(printf '%s\n' $CODE_PATHS | sed 's|/*$||' | paste -sd'|' -)
-    STAGED_CODE=$(git diff --cached --name-only | grep -E "^($PATTERN)/" || true)
+    # Same reading as the gate: an entry is a directory prefix or an exact file,
+    # with every regex metacharacter escaped. The two must agree, or one of them
+    # vouches for a commit the other would have refused.
+    PATTERN=$(printf '%s\n' $CODE_PATHS | sed 's,/*$,,; s,[].^$*+?(){}|[\\],\\&,g' | paste -sd'|' -)
+    STAGED_CODE=$(git diff --cached --name-only | grep -E "^($PATTERN)(/|\$)" || true)
     if [ -n "$STAGED_CODE" ]; then
       fail "The last verification was --docs-only, and you are committing code:
 $(printf '%s\n' "$STAGED_CODE" | sed 's/^/    /')

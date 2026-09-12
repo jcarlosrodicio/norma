@@ -77,7 +77,7 @@ The contract the config must satisfy, checked at startup - the gate refuses to r
 if any part is missing:
 
 ```sh
-HARNESS_CODE_PATHS="lib test"                            # top-level dirs that hold code
+HARNESS_CODE_PATHS="lib test main.go"                     # paths that hold code: a dir, or a file at the root
 harness_gates()         { echo "..."; run <static gates>; }
 harness_test_selected() { run <runner> "$@"; }           # ONLY these targets
 harness_test_all()      { run <runner>; }                # --full
@@ -135,8 +135,8 @@ what the contract cannot express: that `cargo test`, `dotnet test`, Gradle and
 `swift test` filter by test *name* rather than by path, so a named selection is a
 filter and the report has to say what it actually selected; that Android's task is
 `testDebugUnitTest`; that Django's runner takes dotted labels; that Go code at the
-repository root is invisible to the directory-prefix check of
-`HARNESS_CODE_PATHS`; that a Terraform plan against a real workspace needs
+repository root has to be named as a file in `HARNESS_CODE_PATHS`, because a
+directory entry cannot reach it; that a Terraform plan against a real workspace needs
 credentials and therefore belongs in runtime verification rather than in a gate. A profile is a starting point, not a
 constraint: it lands as the project's own file and is never overwritten.
 

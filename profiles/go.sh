@@ -2,7 +2,8 @@
 # the harness does not own: edit it freely, it is never overwritten by an upgrade.
 #
 # Contract:
-#   HARNESS_CODE_PATHS      space-separated top-level dirs that hold code. A
+#   HARNESS_CODE_PATHS      space-separated paths that hold code - a top-level
+#                           directory, or a single file at the root. A
 #                           --docs-only run refuses the moment it sees a change
 #                           under one of them.
 #   harness_gates()         static gates. Fast, and they must fail loudly.
@@ -13,9 +14,9 @@
 # output that reaches an agent's context, and calls the command directly when not.
 
 
-# Go's directory-prefix check only sees code under a directory, so keep packages
-# under cmd/ internal/ pkg/ as the convention already asks. A `main.go` sitting at
-# the repository root would not be seen as code by --docs-only.
+# Keep packages under cmd/ internal/ pkg/ as the convention already asks. A
+# `main.go` sitting at the repository root is code too, and it is invisible to a
+# directory entry - name the file itself in the list when that happens.
 HARNESS_CODE_PATHS="cmd internal pkg"
 
 harness_gates() {

@@ -95,6 +95,59 @@ gate --docs-only
 assert_eq "--docs-only refuses every declared code path" "$RC" 2
 done_repo
 
+# HARNESS_CODE_PATHS was matched as a directory prefix only, so a code file living
+# at the repository root could never be one - the Go profile carried that as a
+# known wart, and a consumer's compose file walked into it: a change that can take
+# the whole lab down passed --docs-only without running a test.
+new_repo; with_gate
+printf 'HARNESS_CODE_PATHS="src spec compose.lab.yaml"\n' >> scripts/harness/config.sh
+echo 'services: {}' > compose.lab.yaml
+gate --docs-only
+assert_eq "a declared file at the root is code too" "$RC" 2
+assert_has "and it is named" "$OUT" "compose.lab.yaml"
+done_repo
+
+# The same entry must not start matching things that merely look like it: the dot
+# is a literal, not a wildcard.
+new_repo; with_gate
+printf 'HARNESS_CODE_PATHS="src spec compose.lab.yaml"\n' >> scripts/harness/config.sh
+echo 'x' > composeXlabYyaml
+gate --docs-only
+assert_eq "but a name that only resembles it is not" "$RC" 0
+done_repo
+
+# A directory entry keeps behaving as a prefix, which is what every profile ships.
+new_repo; with_gate
+mkdir -p srcery && echo 'x' > srcery/thing.ts
+gate --docs-only
+assert_eq "and a directory whose name merely starts with one is not code" "$RC" 0
+done_repo
+
+# An entry is a path, not a pattern, so every regex metacharacter in it is a
+# literal. Unescaped, `app+` failed both ways at once: the real app+/ was not
+# code, and an unrelated apppp/ was.
+new_repo; with_gate
+printf 'HARNESS_CODE_PATHS="app+"\n' >> scripts/harness/config.sh
+mkdir -p apppp && echo 'x' > apppp/thing.ts
+gate --docs-only
+assert_eq "a '+' in an entry is a literal, not a quantifier" "$RC" 0
+mkdir -p 'app+' && echo 'x' > 'app+/thing.ts'
+gate --docs-only
+assert_eq "and the directory it actually names is code" "$RC" 2
+assert_has "named as written" "$OUT" "app+/thing.ts"
+done_repo
+
+# Pinning the reading, because a review called it a regression and it is not: an
+# entry names a path that holds code, and a path is a file or a directory. Both
+# cannot exist at once, so a bare file of that name is only reachable when the
+# directory the entry meant is absent - a config pointing at nothing. Refusing
+# there is the safe direction: it costs a test run, it never lets code through.
+new_repo; with_gate
+echo 'not really code' > spec
+gate --docs-only
+assert_eq "a declared name that turns out to be a file is code as well" "$RC" 2
+done_repo
+
 new_repo; with_gate
 mkdir -p src && echo 'x' > src/staged.ts && git add src/staged.ts
 gate --docs-only
@@ -231,6 +284,28 @@ set -e
 assert_eq "refuses code committed against a docs-only stamp" "$RC" 1
 assert_has "explaining that it vouches for no test" "$OUT" "vouches for no test"
 assert_has "and naming the code being smuggled" "$OUT" "src/late.ts"
+done_repo
+
+# The hook reads the same HARNESS_CODE_PATHS as the gate and must read it the same
+# way. While only the gate understood a file at the root, a docs-only stamp still
+# let that file through the hook - the two disagreeing is worse than the original
+# hole, because one of them says the commit was checked.
+new_repo
+mkdir -p .githooks scripts/harness && cp "$HOME_DIR/core/pre-commit" .githooks/pre-commit
+chmod +x .githooks/pre-commit
+cp "$HOME_DIR/test/fixtures/config.sh" scripts/harness/config.sh
+printf 'HARNESS_CODE_PATHS="src spec compose.lab.yaml"\n' >> scripts/harness/config.sh
+git switch -q -c feature-branch
+mkdir -p .harness
+echo 'services: {}' > compose.lab.yaml
+git add compose.lab.yaml
+printf '2027-01-01 10:00:00 | feature-branch | docs-only\n' > .harness/verified
+touch -t 202701011000 .harness/verified
+set +e
+OUT=$(.githooks/pre-commit 2>&1); RC=$?
+set -e
+assert_eq "the hook refuses a declared root file against a docs-only stamp too" "$RC" 1
+assert_has "naming it" "$OUT" "compose.lab.yaml"
 done_repo
 
 new_repo
