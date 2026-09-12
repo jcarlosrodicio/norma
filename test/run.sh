@@ -420,6 +420,25 @@ for vs in $(sed -n 's/^VENDORED_SKILLS="\(.*\)"$/\1/p' "$HOME_DIR/bin/norma"); d
   assert_file "VENDORED_SKILLS names '$vs', and it is there" "$HOME_DIR/skills/$vs/SKILL.md"
 done
 
+# The loop used to end at "document", so closing the phase in the roadmap and
+# archiving the change happened in a second branch after the merge - a branch, a
+# review and a gate run each time, and a default branch carrying code whose delta
+# specs had never been applied.
+rt=$(cat "$HOME_DIR/skills/run-task/SKILL.md")
+assert_has "run-task closes the change before handing over" "$rt" "## 8. Close the change"
+assert_has "by archiving it, in this branch" "$rt" "openspec-archive-change/SKILL.md"
+assert_has "and by closing the phase where the roadmap describes it" "$rt" "roadmap"
+assert_has "then verifying again, because an archive rewrites files" "$rt" "re-run stage 5"
+assert_has "the loop's last stage is still the human's" "$rt" "## 9. Hand over"
+assert_has "update-docs names the roadmap, which no diff points at" \
+  "$(cat "$HOME_DIR/skills/update-docs/SKILL.md")" "roadmap entry"
+# Unsupervised, the archive has to travel inside the pull request: there is no
+# second branch because there is nobody to remember it.
+assert_has "auto-run-task delivers after closing, not instead of it" \
+  "$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")" "### Stage 9 - Deliver"
+assert_has "the loop template makes closing the change binding too" \
+  "$(cat "$HOME_DIR/templates/mandatory-steps.md")" "close the change"
+
 # Skills reference each other by path. A path naming a skill nobody installs is a
 # dead end at the worst moment - `auto-run-task` is nothing but such references.
 # openspec-* are the exception: the openspec tool vendors those, not norma.

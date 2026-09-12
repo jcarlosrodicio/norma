@@ -106,7 +106,9 @@ Do everything that does not depend on the answer **first**. Then:
 
 ## The stages, and what replaces each stop
 
-Follow `run-task` in order. Three stages differ.
+Follow `run-task` in order. Three stages differ - the two stops it removes, and
+the delivery it replaces the third with. Every other stage, stage 8 included, runs
+exactly as written there.
 
 ### Stage 1 - Enrich: triage instead of stop
 
@@ -139,10 +141,17 @@ Record the result of that check in the autonomy log. `tasks.md` remains the
 persistent state: mark entries as you finish them, so an interrupted run resumes
 instead of restarting.
 
-### Stage 8 - Deliver instead of hand over
+### Stage 9 - Deliver instead of hand over
 
 This is where the two skills differ most. `run-task` stops before the commit;
 this one carries the change to a pull request and leaves it there.
+
+Stage 8 - closing the phase in the roadmap and archiving the change - runs first
+and unchanged, so the archive and the synced specs travel **inside** this pull
+request. Unsupervised that is not a convenience, it is the difference between one
+delivery and a second branch nobody is there to remember. Its re-run of stage 5
+after the archive is not optional either: the hook refuses a commit whose stamp
+predates the files, and an archive rewrites files.
 
 **One phase, one branch, one pull request.** Commits are atomic inside it - one
 per coherent unit of `tasks.md`, following `.agents/skills/commit/SKILL.md`, with

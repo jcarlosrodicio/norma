@@ -20,7 +20,12 @@ optional, and it runs before the commit.
    - new dependency direction, boundary or composition change -> the architecture
      document and, if a rule was bent, an ADR;
    - new command, script or environment variable -> the development/setup guide;
-   - behaviour a future reader would find surprising -> the relevant spec or ADR.
+   - behaviour a future reader would find surprising -> the relevant spec or ADR;
+   - **a roadmap phase or milestone this change completes -> the roadmap entry, its
+     status column, and any phase document that still describes the work as
+     pending.** This is the update that gets forgotten, because it is the only one
+     the diff cannot lead you to: nothing in the code mentions the roadmap. A phase
+     left open after it shipped is how the next session builds it twice.
 3. Update those documents. Match the existing structure and heading style; do not
    restructure a document as a side effect.
 4. Add nothing that duplicates the code. Documentation carries intent, contracts

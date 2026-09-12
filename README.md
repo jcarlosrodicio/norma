@@ -111,8 +111,8 @@ planning, and before delivery. `auto-run-task` is the same loop for when you are
 there to answer - you hand over a roadmap phase and leave.
 
 ```
-orient → enrich → branch → plan → implement → verify → review → document → deliver
-         ^decide          ^self-review                                     ^commit, push, PR, CI
+orient → enrich → branch → plan → implement → verify → review → document → close → deliver
+         ^decide          ^self-review                                             ^commit, push, PR, CI
 ```
 
 Each stop becomes something the agent does and **writes down**: the open questions
@@ -214,7 +214,7 @@ repository gets copies, which is what makes them survive a clone.
 test/run.sh
 ```
 
-219 tests over the gate's real behaviour - its refusals above all - over every
+227 tests over the gate's real behaviour - its refusals above all - over every
 profile and the detection that picks one, over the shape of the skill library, and
 over `install`, `upgrade` and `doctor`, each in a throwaway git repository with a
 stub stack adapter. They live here, once, because the gate is the same file everywhere:

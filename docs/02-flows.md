@@ -152,12 +152,21 @@ Changes nothing; exits non-zero when something is blocking. It reports:
 the human: after enriching, after planning, and before delivery.
 
 ```
-orient → enrich → branch → plan → implement → verify → review → document → hand over
-         ^stop            ^stop                                            ^stop
+orient → enrich → branch → plan → implement → verify → review → document → close → hand over
+         ^stop            ^stop                                                    ^stop
 ```
 
 `docs/harness/mandatory-steps.md` in each project is the binding checklist, with
 that project's real commands.
+
+**`close` is the stage that was missing.** The loop used to end at `document`, so
+closing the phase in the roadmap and archiving the OpenSpec change happened - when
+it happened - in a second branch after the merge. Both are ordinary file
+operations that never needed the pull request merged, and splitting them cost a
+branch, a review and a gate run each time, while the default branch carried code
+whose delta specs had not been applied. The stage re-runs `verify` afterwards,
+because an archive rewrites files and the hook rightly refuses a stamp older than
+them.
 
 ### The same loop with nobody watching
 
@@ -166,8 +175,8 @@ whole phase and left. The stops do not disappear - each becomes something the ag
 does and records:
 
 ```
-orient → enrich → branch → plan → implement → verify → review → document → deliver
-         ^decide          ^self-review                                     ^commit, push, PR, CI
+orient → enrich → branch → plan → implement → verify → review → document → close → deliver
+         ^decide          ^self-review                                             ^commit, push, PR, CI
 ```
 
 Three things bound it, and none of them may be softened:
