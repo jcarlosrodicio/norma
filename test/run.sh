@@ -259,6 +259,9 @@ assert_file "vendors run-task as a real directory" .agents/skills/run-task/SKILL
 # path, so shipping one without the other leaves a procedure pointing at nothing.
 assert_file "vendors the autonomous variant beside it" .agents/skills/auto-run-task/SKILL.md
 assert_file "vendors the setup interview" .agents/skills/harness-setup/SKILL.md
+# The procedure behind step 5 of the loop. Vendored like the rest, because the
+# project owns the commands but not the method.
+assert_file "vendors the runtime verification procedure" .agents/skills/runtime-verification/SKILL.md
 assert_file "and the architecture reference" .agents/skills/architecture-guidelines/references/backend.md
 # start-project is the one skill that is not vendored: it runs before the
 # project exists, and once it has finished run-task is the skill that matters.
@@ -475,6 +478,92 @@ assert_has "auto-run-task ends at a pull request and never merges it" \
 assert_has "auto-run-task refuses to bypass the hook" "$auto" "--no-verify"
 assert_has "auto-run-task records what it decided instead of asking" \
   "$auto" "reports/autonomy.md"
+
+# Runtime verification was the one stage of the loop with no procedure behind it:
+# run-task said "do the runtime verification the project requires" in a single
+# line, and everything else lived in a template the PROJECT owns - so it never
+# received an upgrade, and three consumers each drifted their own way.
+rv=$(cat "$HOME_DIR/skills/runtime-verification/SKILL.md")
+assert_has "runtime-verification decides the surface before touching anything" \
+  "$rv" "Decide the surface first"
+assert_has "and exercises the failure path, not only the happy one" "$rv" "failure path"
+assert_has "it says what it did NOT cover" "$rv" "Not covered"
+assert_has "and closes on an explicit verdict, like the adversarial pass" "$rv" "Verdict"
+# Two values are not enough. A run blocked for want of a credential or a daemon
+# is not a failed one, and an agent with only pass/fail to choose from reports the
+# blocked case as "does not" - which sends the reviewer hunting a defect that was
+# never there. Seen happening, which is why this is asserted.
+assert_has "including the third outcome, a run that could not be verified at all" \
+  "$rv" "could not be verified"
+# An undeclared project is the common case on the first upgrade, and a skill that
+# refuses until somebody edits a file norma does not own is a framework fighting
+# the project. It reports the gap instead.
+assert_has "an undeclared project is a finding, not a reason to skip" \
+  "$rv" "TODO(harness)"
+# The report has no single home: a project with OpenSpec keeps it in the change
+# folder, and THIS repository has no openspec/ at all. Naming only one would make
+# the skill unusable in the repository that ships it.
+assert_has "the report location covers a project with OpenSpec" "$rv" "openspec/changes/"
+assert_has "and one without it" "$rv" "Step 6"
+# Agnostic by construction. The moment a skill names one agent's tooling it stops
+# running identically under the others, which is the premise the whole harness
+# rests on - instructions by path, never by an agent's shortcut.
+for tool in Playwright playwright sonnet Sonnet "gh pr" MCP "/qa"; do
+  if printf '%s' "$rv" | grep -qF "$tool"; then
+    no "runtime-verification names no agent-specific tooling ($tool)" "found in the skill"
+  else
+    ok "runtime-verification names no agent-specific tooling ($tool)"
+  fi
+done
+# The migration procedure moved out of the project-owned template and into the
+# skill so it can be improved upstream. The template keeps its TODO: moving the
+# procedure must not read as if the question had been answered.
+assert_has "the migration procedure lives in the skill now" "$rv" "Apply it twice"
+assert_has "including migrating a store that already has data" "$rv" "already has data"
+assert_has "the loop template still asks the project for its own commands" \
+  "$(cat "$HOME_DIR/templates/mandatory-steps.md")" "TODO(harness)"
+assert_has "and reaches the procedure through the skill" \
+  "$(cat "$HOME_DIR/templates/mandatory-steps.md")" "runtime-verification/SKILL.md"
+# The loop has to actually call it, or the skill is shelf-ware.
+assert_has "run-task reaches runtime verification through the skill" \
+  "$rt" ".agents/skills/runtime-verification/SKILL.md"
+# Stage 6 fixes findings and re-runs stage 5. The gate re-runs; the runtime check
+# did not, so a review that changed behaviour left a report describing code that
+# no longer existed.
+assert_has "and re-runs it when a review finding changed behaviour" \
+  "$rt" "Re-run the runtime verification"
+# Unsupervised there is nobody to hand a credential over, so a verification that
+# cannot run is an escalation rather than a silently skipped step. Match the
+# escalation list alone: the phrase also appears in the autonomy log section
+# further down, so asserting it against the whole file proved nothing at all.
+esc=$(sed -n '/^### Stop and ask/,/^### How to stop/p' "$HOME_DIR/skills/auto-run-task/SKILL.md")
+assert_has "unsupervised, a runtime check that cannot run escalates" \
+  "$esc" "runtime verification that cannot be run"
+# Without this round a new project installs a skill that looks for a declaration
+# nobody was ever asked to write.
+hs="$HOME_DIR/skills/harness-setup/SKILL.md"
+assert_has "harness-setup asks how the project is exercised for real" \
+  "$(cat "$hs")" "exercised for real"
+# The heading is not the round. Assert what the round has to extract, or gutting
+# its body down to a title would pass.
+assert_has "including the account or fixture, and never a real credential" \
+  "$(cat "$hs")" "Never a real credential"
+assert_has "and whether there is a store to migrate" "$(cat "$hs")" "already has data"
+# Adding a round renumbers the ones below it, and the "Write" section refers to
+# one of them BY NUMBER. That back-reference can point at the wrong round with
+# the whole suite still green - it did, until this test existed.
+idx=$(sed -n 's/^### Round \([0-9]*\) - the index and the extras.*/\1/p' "$hs")
+assert_eq "the round that decides AGENTS.md is the one the write step names" \
+  "$(sed -n 's/.*only if round \([0-9]*\) said so.*/\1/p' "$hs")" "$idx"
+assert_eq "and the rounds are numbered without a gap" \
+  "$(sed -n 's/^### Round \([0-9]*\) .*/\1/p' "$hs" | tail -1)" "$(grep -c '^### Round ' "$hs")"
+# Three documents state the count in words, and two of them are the ones nobody
+# remembers to update.
+rw=$(sed -n 's/.*Ask in \*\*\([a-z]*\) rounds\*\*.*/\1/p' "$hs")
+assert_eq "the README agrees on how many rounds the interview has" \
+  "$(sed -n 's/.*asks in \([a-z]*\) rounds.*/\1/p' "$HOME_DIR/README.md")" "$rw"
+assert_eq "and so does the skill library document" \
+  "$(sed -n 's/.*asks in \([a-z]*\) rounds,.*/\1/p' "$HOME_DIR/docs/03-skills.md")" "$rw"
 
 # start-project is reached through `norma home`, because there is no repository
 # to vendor it into yet - so that path has to work from anywhere.

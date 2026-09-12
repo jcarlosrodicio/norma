@@ -191,6 +191,16 @@ was not cosmetic - a skill added upstream reached Claude Code through
 `.claude/skills` and stayed **invisible to every agent that reads `AGENTS.md` by
 path**, which is the portability the whole harness is built on.
 
+**A template owns the commands, never the method.** `templates/mandatory-steps.md`
+is written once and becomes the project's, which is right for what it decides and
+wrong for what it explains: a procedure parked there never receives an upgrade
+again. That is what happened to runtime verification - the loop's step 5 carried
+the whole method, so three consumers each drifted their own way and no
+improvement could reach any of them. The method moved into
+`skills/runtime-verification/`, vendored like the gate; the template kept its
+`TODO(harness)` markers, which are the commands. When a template paragraph
+explains *how* rather than deciding *what*, it belongs upstream.
+
 **`doctor` detects rather than imposes.** It reports what the repository already
 enforces, what drifted, what templates are unfilled, and which user-level tools
 are missing. It changes nothing. That posture came out of writing a duplicate

@@ -58,7 +58,11 @@ assumption is indistinguishable from a bug that has not been found yet.
 2. **The phase cannot be done without changing something outside it** - another
    phase's code, a published contract, a schema someone else reads.
 3. **It needs something only the human has**: a credential, a real `.env` value, a
-   paid or external account, a new runtime dependency or service.
+   paid or external account, a new runtime dependency or service. This is also
+   where a runtime verification that cannot be run lands - no account to log in
+   with, no device, a service this machine cannot reach. Supervised somebody
+   hands it over; here it stops the run, because reporting that step done on the
+   strength of the unit tests is exactly the failure this mode cannot survive.
 4. **It is destructive or irreversible**: a migration that drops or rewrites
    existing rows, deleting a public interface, rewriting pushed history.
 5. **The harness itself is what is blocking** - `config.sh` names a command this
@@ -229,7 +233,10 @@ It carries:
 - **Retries.** Anything that failed and was fixed, with what the failure was. The
   reviewer should never have to reconstruct that from the commit list.
 - **Deferred.** What was left for a later phase, and why.
-- **Not covered.** What the tests and the runtime verification do not prove.
+- **Not covered.** What the tests and the runtime verification do not prove, and
+  whether the runtime verification ran at all - which surface it exercised, or why
+  the change had none. With nobody watching, a step quietly skipped reads exactly
+  like a step that passed.
 
 Write it as you go, not from memory at the end. Memory is exactly what an
 unsupervised run has least of.

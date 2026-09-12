@@ -105,8 +105,11 @@ Then follow `.agents/skills/openspec-verify-change/SKILL.md` to contrast the wor
 against the artifacts - completeness, correctness, coherence with the recorded
 decisions.
 
-Do the runtime verification the project requires (simulator, HTTP calls, end-to-end),
-and write the report into `openspec/changes/<change>/reports/`.
+Last, follow `.agents/skills/runtime-verification/SKILL.md`. The gate proves the code
+does what its tests say; that step proves the thing works, which is a different
+failure and the one the tests cannot see. It decides whether the change has a surface
+at all, exercises the happy path and the failure path, and writes the report where
+this project keeps them.
 
 ## 6. Review
 
@@ -122,6 +125,12 @@ data, also follow `.agents/skills/code-auditing/SKILL.md`.
 
 Fix what it finds, then re-run stage 5. A finding you argue with instead of checking
 is a finding you did not understand yet.
+
+**Re-run the runtime verification too, not only the gate**, whenever a fix changed
+behaviour rather than shape. The gate re-runs because the hook forces it; nothing
+forces this one, so a review that changed what the user sees used to leave a report
+describing code that no longer existed. Re-exercise the affected flow and say in the
+report that you did.
 
 ## 7. Document
 

@@ -66,7 +66,7 @@ them what you already know and what you are about to ask about.
 
 ## 2. Interview, in rounds
 
-Ask in **four rounds**, in this order. Each round is a handful of questions with
+Ask in **five rounds**, in this order. Each round is a handful of questions with
 your proposed answer attached. **STOP after each round and wait**: a wrong answer in
 round 1 is copied into every document you write later.
 
@@ -90,16 +90,38 @@ depend only on domain and ports?" gets a decision.
 1. The default branch name, and the branch naming convention.
 2. Where the roadmap lives, and whether work is organised in phases.
 3. Where tests live per layer, and which runner or flag each needs.
-4. How this project is exercised **for real** - a simulator, an HTTP call, the
-   packed CLI, a browser flow - and when that is mandatory.
-5. Which areas are sensitive enough to also require `code-auditing`:
+4. Which areas are sensitive enough to also require `code-auditing`:
    authentication, credentials, payments, personal data.
-6. Which documents own which topic, and where a new decision is registered.
-7. Whether CI runs the full suite on the pull request. That is the backstop for
+5. Which documents own which topic, and where a new decision is registered.
+6. Whether CI runs the full suite on the pull request. That is the backstop for
    `git commit --no-verify`, the one hole the hook cannot close - if CI does not do
    it, say so, because then the hole is real.
 
-### Round 3 - the architecture criteria (`docs/harness/architecture-rules.md`)
+### Round 3 - how the project is exercised for real (`docs/harness/mandatory-steps.md`, Step 5)
+
+`.agents/skills/runtime-verification/SKILL.md` is the procedure, and it arrives
+with every upgrade. What it cannot know is the commands, and it looks for them
+here first - a Step 5 left on its `TODO(harness)` marker means every run has to
+rediscover them. Ask until you can write it down:
+
+1. The command that boots this project the way a person uses it, and anything it
+   needs first - a container, a seed, a build.
+2. Where it surfaces: a URL and a screen, an endpoint, the packed CLI, a
+   simulator and which device.
+3. The account, fixture or sample payload to exercise it with.
+   Never a real credential - name where the human keeps it instead.
+4. How the effect is observed: the log to read, the row to look at, the response
+   to inspect. The layer you can see is not evidence on its own.
+5. How the failure path is reached deliberately. That is half the step, and it is
+   the half nobody documents.
+6. Whether this project migrates a data store, and if so the commands to bring
+   the real engine up, apply a migration twice, and apply it to a store that
+   already has data. If it does not migrate anything, record that too, so nobody
+   goes looking for it.
+7. When the step does not apply at all - a library with no runtime surface of its
+   own - and why.
+
+### Round 4 - the architecture criteria (`docs/harness/architecture-rules.md`)
 
 1. Which reference applies - `references/backend.md`, `references/frontend.md`, or
    both on different directories.
@@ -113,7 +135,7 @@ depend only on domain and ports?" gets a decision.
 5. Anything the reference asks for that this project deliberately does the other
    way. Record it as a deliberate exception, not as debt.
 
-### Round 4 - the index and the extras
+### Round 5 - the index and the extras
 
 1. If `AGENTS.md` does not exist or does not mention the harness, propose the
    section; if it already documents the harness, leave it alone and say so.
@@ -136,7 +158,7 @@ Now write the answers into the files, replacing every `TODO(harness)` you touche
 - `docs/harness/architecture-rules.md` - the adoption map, including the
   not-applicable section with reasons.
 - `openspec/config.yaml` - the `context` block, if the project uses OpenSpec.
-- `AGENTS.md` - only if round 4 said so.
+- `AGENTS.md` - only if round 5 said so.
 
 Anything unanswered stays in the file as a marked open question. Do not quietly
 drop it, and do not answer it yourself.

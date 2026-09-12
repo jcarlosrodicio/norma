@@ -94,7 +94,7 @@ worse than one that admits what it is.
 decisions it cannot infer. The `harness-setup` skill fills them **by interviewing
 you**: it reads the repository first (scripts, CI, whatever already enforces your
 architecture, the branch and roadmap conventions), comes back with proposals rather
-than a blank form, asks in four rounds, and then writes `config.sh`,
+than a blank form, asks in five rounds, and then writes `config.sh`,
 `mandatory-steps.md` and `architecture-rules.md` from your answers. It also installs
 the harness first if it is not there yet.
 
@@ -214,7 +214,7 @@ repository gets copies, which is what makes them survive a clone.
 test/run.sh
 ```
 
-231 tests over the gate's real behaviour - its refusals above all - over every
+264 tests over the gate's real behaviour - its refusals above all - over every
 profile and the detection that picks one, over the shape of the skill library, and
 over `install`, `upgrade` and `doctor`, each in a throwaway git repository with a
 stub stack adapter. They live here, once, because the gate is the same file everywhere:
