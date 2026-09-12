@@ -96,8 +96,12 @@ the ability to write files is all it assumes.
 
 It ends by installing the harness and handing over to `harness-setup`, carrying
 the answers it already has, and it makes the founding commit the way
-[`02-flows.md`](02-flows.md) describes. The two must not re-interview the human: rounds 3 and
-4 of `start-project` cover most of rounds 1 and 2 of `harness-setup`.
+[`02-flows.md`](02-flows.md) describes. The two must not re-interview the human:
+the design conversation and the roadmap it builds already settle the stack, its
+commands, the branch and phase conventions and where the tests live - which is
+most of rounds 1 and 2 of `harness-setup`. (This paragraph used to name "rounds 3
+and 4 of `start-project`", contradicting the one above it: that skill has no
+rounds, and never had.)
 
 ## The description field is the whole trigger
 
