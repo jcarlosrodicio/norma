@@ -192,7 +192,18 @@ Three things bound it, and none of them may be softened:
   reviewed by nobody. A red CI is not a finished run: a failure inside the phase is
   fixed and pushed again, twice at most, then escalated.
 - **Every decision it took instead of asking is written down**, in
-  `openspec/changes/<change>/reports/autonomy.md` and linked from the pull request.
+  `openspec/changes/<change>/reports/autonomy.md` and linked from the pull request -
+  at the path the archive left it, `changes/archive/<date>-<change>/`, because
+  `close` moves the folder before `deliver` writes that link. A dead link to the log
+  is the same as no log.
+
+`close` also has prompts that only a human can answer, and unsupervised nobody
+does: `openspec-archive-change` stops on incomplete artifacts, unchecked tasks, and
+whether to sync the delta specs. `auto-run-task` answers all three rather than
+leaving them to chance - sync always, and unchecked tasks at that point mean the
+phase is not finished rather than a prompt to click through. "Archive without
+syncing" is the plausible wrong pick: it leaves the specs describing a system that
+no longer exists, and looking finished.
 
 The gate, the hook and the tests behave identically in this mode - an unsupervised
 agent is exactly the case they were built for. What `auto-run-task` adds on top is a

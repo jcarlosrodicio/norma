@@ -145,6 +145,11 @@ in **this** change rather than in a branch after the merge:
    needs the pull request to be merged**, which is the assumption that used to push
    them into a second branch.
 
+Archiving **moves the change folder**, reports and all, so everything you wrote
+into `openspec/changes/<change>/reports/` now lives under
+`openspec/changes/archive/<date>-<change>/`. Point at the new path in anything that
+links it, and do not go looking for the old one afterwards.
+
 Then **re-run stage 5**. Archiving moves and rewrites files, so the stamp is now
 older than the change and the hook will refuse the commit - correctly, since it
 cannot tell an archive from a code edit.

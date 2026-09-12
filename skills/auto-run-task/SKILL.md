@@ -106,9 +106,9 @@ Do everything that does not depend on the answer **first**. Then:
 
 ## The stages, and what replaces each stop
 
-Follow `run-task` in order. Three stages differ - the two stops it removes, and
-the delivery it replaces the third with. Every other stage, stage 8 included, runs
-exactly as written there.
+Follow `run-task` in order. Four things differ: the two stops it removes, the
+prompts it has to answer itself while closing the change, and the delivery it puts
+in place of the third stop. Every other stage runs exactly as written there.
 
 ### Stage 1 - Enrich: triage instead of stop
 
@@ -141,17 +141,35 @@ Record the result of that check in the autonomy log. `tasks.md` remains the
 persistent state: mark entries as you finish them, so an interrupted run resumes
 instead of restarting.
 
+### Stage 8 - Close the change: the prompts are yours to answer
+
+The stage runs exactly as `run-task` writes it. What that file does not have to say,
+because it has a human in the room, is that
+`.agents/skills/openspec-archive-change/SKILL.md` **stops to ask** - and here nobody
+answers. Three points, and none of the answers is discretionary:
+
+- **Delta specs out of sync - sync them.** Always. "Archive without syncing" leaves
+  `openspec/specs/` describing a system that no longer exists, which is the precise
+  defect this stage was added to stop, and it leaves it looking finished. Say in the
+  log that you synced, and which capabilities it touched.
+- **Artifacts not done, or tasks still unchecked - do not confirm past it.** At
+  stage 8 that is not a prompt to click through: it means the phase is not finished.
+  Finish them if they are yours to finish. If they are not, the plan and the
+  repository disagree, which is escalation reason 7.
+- **Anything else it asks** is decided by the contract above, and the answer goes in
+  the log like every other one.
+
+Then re-run stage 5, as `run-task` says: the archive moved files, and the hook
+refuses a stamp older than them.
+
 ### Stage 9 - Deliver instead of hand over
 
 This is where the two skills differ most. `run-task` stops before the commit;
 this one carries the change to a pull request and leaves it there.
 
-Stage 8 - closing the phase in the roadmap and archiving the change - runs first
-and unchanged, so the archive and the synced specs travel **inside** this pull
-request. Unsupervised that is not a convenience, it is the difference between one
-delivery and a second branch nobody is there to remember. Its re-run of stage 5
-after the archive is not optional either: the hook refuses a commit whose stamp
-predates the files, and an archive rewrites files.
+Stage 8 ran first, so the archive and the synced specs travel **inside** this pull
+request. Unsupervised that is not a convenience: it is the difference between one
+delivery and a second branch nobody is there to remember.
 
 **One phase, one branch, one pull request.** Commits are atomic inside it - one
 per coherent unit of `tasks.md`, following `.agents/skills/commit/SKILL.md`, with
@@ -192,8 +210,16 @@ not improvise a different delivery.
 ## The autonomy log
 
 Written into the change folder alongside the verification report -
-`openspec/changes/<change>/reports/autonomy.md` - and linked from the pull
-request. It carries:
+`openspec/changes/<change>/reports/autonomy.md` - and linked from the pull request.
+
+**Mind where it ends up.** Stage 8 archives the change, and archiving *moves* that
+folder, so by the time the pull request is written the log lives at
+`openspec/changes/archive/<date>-<change>/reports/autonomy.md`. Link that path, and
+open it from the pushed branch before calling the run finished. A dead link to the
+log is the same as no log, and the log is the whole compensation for the stops you
+skipped.
+
+It carries:
 
 - **Decisions taken instead of asked.** Every question from stage 1, its answer,
   the reason, and the alternative rejected.

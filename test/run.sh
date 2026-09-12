@@ -434,8 +434,18 @@ assert_has "update-docs names the roadmap, which no diff points at" \
   "$(cat "$HOME_DIR/skills/update-docs/SKILL.md")" "roadmap entry"
 # Unsupervised, the archive has to travel inside the pull request: there is no
 # second branch because there is nobody to remember it.
-assert_has "auto-run-task delivers after closing, not instead of it" \
-  "$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")" "### Stage 9 - Deliver"
+auto=$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")
+assert_has "auto-run-task delivers after closing, not instead of it" "$auto" "### Stage 9 - Deliver"
+# openspec-archive-change stops to ask three times, and unsupervised nobody
+# answers. "Archive without syncing" is the plausible wrong pick: it leaves the
+# specs describing a system that no longer exists, and looking finished.
+assert_has "and answers the prompts the archive stops on" "$auto" "### Stage 8 - Close the change"
+assert_has "syncing the delta specs rather than archiving past them" "$auto" "Archive without syncing"
+# Archiving MOVES the change folder, so the log the pull request links is no
+# longer where it was written - and a dead link to it is the same as no log.
+assert_has "and links the autonomy log where the archive left it" "$auto" "changes/archive/"
+assert_has "run-task says the reports move with the change" \
+  "$(cat "$HOME_DIR/skills/run-task/SKILL.md")" "moves the change folder"
 assert_has "the loop template makes closing the change binding too" \
   "$(cat "$HOME_DIR/templates/mandatory-steps.md")" "close the change"
 
