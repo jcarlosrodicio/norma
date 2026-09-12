@@ -190,12 +190,21 @@ inject_agents_block() {
   step "~ AGENTS.md (harness block)"
 }
 
-# True only inside norma's own repository. Both sides are resolved to a physical
-# path: the CLI reaches its home through `cd ..` while git reports the real one,
-# and on macOS a temporary directory alone is enough to make the two spellings
-# differ.
+# True inside norma's own repository. Two questions, because one is not enough.
+#
+# Paths, resolved physically: the CLI reaches its home through `cd ..` while git
+# reports the real one, and on macOS a temporary directory alone is enough to make
+# the two spellings differ.
+#
+# Then shape, which catches what paths cannot: a git worktree or a second checkout
+# of norma, driven by the installed CLI. The paths differ there and the repository
+# is still norma - and copying would destroy that tree's symlinks exactly as it
+# would here. Worktrees are how this harness tells everyone to work, so that is a
+# tree that gets made, not a hypothetical.
 is_self_host() {
-  [ "$(cd "$REPO" && pwd -P)" = "$(cd "$HOME_DIR" && pwd -P)" ]
+  if [ "$(cd "$REPO" && pwd -P)" = "$(cd "$HOME_DIR" && pwd -P)" ]; then return 0; fi
+  if [ -f "$REPO/bin/norma" ] && [ -f "$REPO/core/verify" ] && [ -d "$REPO/skills" ]; then return 0; fi
+  return 1
 }
 
 vendor_skills() {

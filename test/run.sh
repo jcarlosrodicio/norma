@@ -561,6 +561,18 @@ assert_has "but a real directory there is reported, not silently replaced" "$OUT
 assert_eq "and left where it is" "$(cat "$NH/.agents/skills/commit/SKILL.md")" "copy"
 rm -rf "$NH"
 
+# Paths alone would miss the tree this harness tells everyone to make: a worktree
+# or second checkout of norma, driven by the INSTALLED cli. The paths differ, the
+# repository is still norma, and copying would destroy its links just the same.
+NW=$(mktemp -d)
+cp -R "$HOME_DIR/bin" "$HOME_DIR/core" "$HOME_DIR/skills" "$HOME_DIR/profiles" \
+      "$HOME_DIR/templates" "$HOME_DIR/VERSION" "$NW/"
+(cd "$NW" && git init -q && git config user.email t@example.com && git config user.name Test \
+   && echo '{}' > package.json && "$NORMA" install --profile node) >/dev/null 2>&1
+assert_eq "another checkout of norma is still norma, whichever cli drives it" \
+  "$(readlink "$NW/.agents/skills/run-task")" "../../skills/run-task"
+rm -rf "$NW"
+
 # A dry run that prints half the plan is worse than none: the link is how an
 # agent reaches the skill, and it was never announced.
 new_repo

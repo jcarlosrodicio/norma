@@ -218,11 +218,16 @@ Two adaptations the contract could not express on its own:
   `doctor` is satisfied and a clone resolves it.
 
   **The installer knows this about itself**, rather than leaving it as a
-  convention nobody enforces. When the repository it is acting on *is* norma's own
-  home - both paths resolved physically, because the CLI reaches its home through
-  `cd ..` while git reports the real one - vendoring a skill means creating that
-  link, repairing one that points at a skill which moved, and refusing to replace
-  a real directory someone put there. It does not merely tolerate the links: it
+  convention nobody enforces. When the repository it is acting on *is* norma,
+  vendoring a skill means creating that link, repairing one that points at a skill
+  which moved, and refusing to replace a real directory someone put there.
+
+  It asks that in two ways, because one is not enough. Paths, resolved physically,
+  since the CLI reaches its home through `cd ..` while git reports the real one.
+  Then shape - `bin/norma`, `core/verify`, `skills/` - which catches what paths
+  cannot: **a git worktree or second checkout of norma driven by the installed
+  CLI**. The paths differ there and the repository is still norma, and this harness
+  is the one telling everyone to work in worktrees, so that tree gets made. It does not merely tolerate the links: it
   creates them, because otherwise self-hosting is maintained by hand and every
   skill added upstream needs two symlinks made by whoever remembers.
 
