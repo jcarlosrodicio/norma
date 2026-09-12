@@ -212,7 +212,7 @@ git hook and not a paragraph asking the agent to behave.
 
 **Self-hosting: decided, yes.** `norma` installs its own harness. The gate parses
 every shell file and runs the whole suite; the hook is real, so a branch per
-change applies here too. Before this, the loop imposed on three repositories ran
+change applies here too. Before this, the loop imposed on the consumer repositories ran
 here on nothing but discipline - and discipline is exactly what the harness exists
 to replace.
 
