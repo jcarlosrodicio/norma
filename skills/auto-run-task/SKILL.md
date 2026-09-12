@@ -194,6 +194,37 @@ Then:
    request that looks like any other hides the one fact a reviewer needs to
    calibrate how hard to look: that nothing in it was agreed with a human before
    it was written.
+
+   **Carry the evidence in.** Whatever
+   `.agents/skills/runtime-verification/SKILL.md` captured is sitting outside the
+   repository, and supervised it would reach the human through the hand-over
+   message. There is no hand-over message here, so evidence that does not travel
+   in this pull request does not exist for the reviewer.
+
+   *How* it travels depends on what this project is hosted on, and that is a
+   project decision - **not the harness's to assume**. Use whatever its own
+   pull-request tooling offers for attachments. Where that is the GitHub CLI it
+   is `--attach`, one per file, and the body reference and the attached path must
+   be the same string **byte for byte** - a near miss uploads the file and leaves
+   a dead link in the merged body, which is worse than no evidence because it
+   looks like evidence:
+
+   ```sh
+   gh pr create --title "..." --body-file <body.md> \
+     --attach '<path>#the list before the change'
+   ```
+
+   with `![the list before the change](<path>)` in the body at the same spelling.
+   That path is a path from this machine, and the pushed body may not keep one -
+   the upload is what removes it, by rewriting the reference to the uploaded
+   asset. So **check the body afterwards and confirm it no longer carries the
+   path**.
+
+   If it still does, or the tooling cannot attach at all - an older CLI, a forge
+   without the feature, no tool for it - **do not improvise** another way to
+   publish somebody's screenshots onto the internet. Take the path out of the
+   body, say there that the evidence could not be attached, and put the paths in
+   the report for the human to place by hand.
 3. **Wait for CI**, when the repository runs it on pull requests. The run is not
    finished with a red pull request. **Classify the failure before reacting to
    it**, and quote the log line that decided the classification - three kinds,

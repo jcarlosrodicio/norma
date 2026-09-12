@@ -194,6 +194,9 @@ deferral.
 
 - what was built, in one paragraph;
 - the tests you selected and why, with the counts;
+- what the runtime verification exercised, its verdict, and the **paths** to any
+  evidence it captured - the committed report carries the file names, so this
+  message is the only place the human learns where the files actually are;
 - what the adversarial review found and what you did about it;
 - which documents you updated, and where the phase was closed;
 - that the change is archived and the specs synced, or what blocks it;
