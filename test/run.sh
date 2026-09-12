@@ -468,6 +468,24 @@ for r in $refs; do
   fi
 done
 
+# Starting a task on a dirty or stale branch costs the whole loop: the diff the
+# review reads is not the change, and the gate vouches for somebody else's work.
+# The hook refuses the default branch, which is the only one of these it can see.
+assert_has "run-task checks the tree before it writes anything" \
+  "$rt" "### Before the first edit"
+assert_has "including a branch that is behind the base" "$rt" "behind the base"
+assert_has "and work in the tree that is not this task's" "$rt" "not part of this task"
+
+# "Two attempts then escalate" treated a flake and a real regression the same, so
+# a flake burned both attempts, and a base branch that was already red invited a
+# fix that travels in this pull request - against this file's own limit of never
+# working outside the phase.
+assert_has "auto-run-task classifies a CI failure before reacting to it" \
+  "$auto" "Caused by this change"
+assert_has "a flake is retried and does not spend an attempt" "$auto" "does not spend"
+assert_has "and a base branch that is already red is not this run's to fix" \
+  "$auto" "Already red on the base branch"
+
 # The autonomous variant removes the three stops, so the two limits that keep an
 # unsupervised run reviewable have to be stated in it, explicitly.
 auto=$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")

@@ -189,8 +189,13 @@ Three things bound it, and none of them may be softened:
   every question at once.
 - **It ends at an open pull request**, never at a merge, a deploy or a publish. That
   pull request is the human's only review point, so removing it would leave the run
-  reviewed by nobody. A red CI is not a finished run: a failure inside the phase is
-  fixed and pushed again, twice at most, then escalated.
+  reviewed by nobody. A red CI is not a finished run, and the failure is classified
+  before it is touched: caused by this change, fixed and pushed again, twice at
+  most; a flake, re-run without spending either attempt; already red on the base
+  branch, escalated rather than fixed, because that repair would smuggle work from
+  outside the phase into this pull request. Treating the three alike is how an
+  unsupervised run burns its attempts on a flake, or "fixes" somebody else's
+  breakage inside a phase pull request.
 - **Every decision it took instead of asking is written down**, in
   `openspec/changes/<change>/reports/autonomy.md` and linked from the pull request -
   at the path the archive left it, `changes/archive/<date>-<change>/`, because

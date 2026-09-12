@@ -58,6 +58,24 @@ Create and switch to a feature branch before any edit, named after the roadmap p
 the work belongs to. Never work on the default branch - `.githooks/pre-commit`
 refuses commits there anyway.
 
+### Before the first edit
+
+That refusal is the only one of these git can make for you. Read `git status` and
+the diff against the base branch before writing anything:
+
+- **Work in the tree that is not part of this task.** Stop and ask what to do with
+  it - keep, stash, discard - and do not build on top of it. The diff your reviewer
+  reads would not be this change, and the gate would vouch for somebody else's code
+  as if you had tested it.
+- **Commits on this branch that are not part of this task.** Ask whether to branch
+  off the base instead of stacking on them.
+- **A branch behind the base branch.** Update it first. Otherwise you spend the loop
+  on something already fixed upstream, and the conflict arrives at delivery, which
+  is the worst moment for it.
+
+Only start from a clean, up-to-date tree. Skipping this is cheap to do and expensive
+to discover.
+
 ## 3. Plan
 
 Follow `.agents/skills/openspec-new-change/SKILL.md`, then
