@@ -91,6 +91,14 @@ decision goes in `docs/01-architecture.md`; a new skill goes in
 Do not commit, push or merge. The human reviews. Only after explicit approval,
 follow [`../../skills/commit/SKILL.md`](../../skills/commit/SKILL.md).
 
+**One exception, and only when the human asked for it explicitly.** A phase handed
+over to run unsupervised follows
+[`../../skills/auto-run-task/SKILL.md`](../../skills/auto-run-task/SKILL.md): the
+loop ends at an open pull request instead, with every decision taken without asking
+written down and linked from it. Steps 0 to 8 do not relax at all. Merging and
+propagating stay with the human in both modes - step 10 below is never the agent's
+to trigger.
+
 ## Step 10 - Propagate, only when asked
 
 Consumers pick up a release with `norma upgrade`, one commit each. Read "When not

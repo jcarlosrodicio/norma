@@ -110,6 +110,42 @@ orient → enrich → branch → plan → implement → verify → review → do
 `docs/harness/mandatory-steps.md` in each project is the binding checklist, with
 that project's real commands.
 
+### The same loop with nobody watching
+
+`skills/auto-run-task/SKILL.md` runs those same stages when the human handed over a
+whole phase and left. The stops do not disappear - each becomes something the agent
+does and records:
+
+```
+orient → enrich → branch → plan → implement → verify → review → document → deliver
+         ^decide          ^self-review                                     ^commit, push, PR, CI
+```
+
+Three things bound it, and none of them may be softened:
+
+- **It stops anyway for seven reasons** - the answer changes *what* is built rather
+  than how; the phase needs something outside itself; it needs a credential or a
+  new dependency; the step is destructive; the harness itself is what is blocking;
+  the same failure survived two attempts; the roadmap and the repository disagree.
+  When it stops it commits, pushes, does **not** open the pull request, and asks
+  every question at once.
+- **It ends at an open pull request**, never at a merge, a deploy or a publish. That
+  pull request is the human's only review point, so removing it would leave the run
+  reviewed by nobody. A red CI is not a finished run: a failure inside the phase is
+  fixed and pushed again, twice at most, then escalated.
+- **Every decision it took instead of asking is written down**, in
+  `openspec/changes/<change>/reports/autonomy.md` and linked from the pull request.
+
+The gate, the hook and the tests behave identically in this mode - an unsupervised
+agent is exactly the case they were built for. What `auto-run-task` adds on top is a
+refusal to game them: never `--no-verify`, never an edit to `verify` or the hook to
+make a run pass, and never a failing test silenced instead of fixed.
+
+Projects that run it need one edit to the file norma does not own: `Step 9 - Stop`
+in their `docs/harness/mandatory-steps.md` has to name the exception, or the binding
+checklist forbids the delivery the procedure requires. The template carries it for
+new installs; an existing project edits its own copy.
+
 ## The one commit that precedes the rules
 
 A project created by `start-project` cannot satisfy the hook on its first commit:

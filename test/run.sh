@@ -255,6 +255,9 @@ assert_file "vendors the gate" scripts/harness/verify
 assert_file "writes a config from the profile" scripts/harness/config.sh
 assert_file "vendors the hook" .githooks/pre-commit
 assert_file "vendors run-task as a real directory" .agents/skills/run-task/SKILL.md
+# auto-run-task is a delta over run-task: it delegates every stage to that file by
+# path, so shipping one without the other leaves a procedure pointing at nothing.
+assert_file "vendors the autonomous variant beside it" .agents/skills/auto-run-task/SKILL.md
 assert_file "vendors the setup interview" .agents/skills/harness-setup/SKILL.md
 assert_file "and the architecture reference" .agents/skills/architecture-guidelines/references/backend.md
 # start-project is the one skill that is not vendored: it runs before the
@@ -268,6 +271,10 @@ assert_eq "arms the hook path" "$(git config --get core.hooksPath)" ".githooks"
 assert_has "AGENTS.md carries the block" "$(cat AGENTS.md)" "harness:begin"
 assert_has "and points at the loop entry point" "$(cat AGENTS.md)" "run-task"
 assert_eq "the claude symlink stays inside the repo" "$(readlink .claude/skills/run-task)" "../../.agents/skills/run-task"
+assert_has "the loop template names the one exception to its final stop" \
+  "$(cat docs/harness/mandatory-steps.md)" "auto-run-task"
+assert_has "and the AGENTS.md block tells an agent when that variant applies" \
+  "$(cat AGENTS.md)" "auto-run-task"
 
 git add -A >/dev/null 2>&1
 # --no-verify on purpose: this test is about the installer, and the hook it just
@@ -412,6 +419,33 @@ done
 for vs in $(sed -n 's/^VENDORED_SKILLS="\(.*\)"$/\1/p' "$HOME_DIR/bin/norma"); do
   assert_file "VENDORED_SKILLS names '$vs', and it is there" "$HOME_DIR/skills/$vs/SKILL.md"
 done
+
+# Skills reference each other by path. A path naming a skill nobody installs is a
+# dead end at the worst moment - `auto-run-task` is nothing but such references.
+# openspec-* are the exception: the openspec tool vendors those, not norma.
+refs=$(grep -rho '\.agents/skills/[a-z0-9-]*' "$HOME_DIR"/skills/ | sed 's|.*/||' | sort -u)
+vendored=$(sed -n 's/^VENDORED_SKILLS="\(.*\)"$/\1/p' "$HOME_DIR/bin/norma")
+for r in $refs; do
+  case $r in openspec-*|"") continue ;; esac
+  found=0
+  for v in $vendored; do [ "$v" = "$r" ] && found=1; done
+  if [ "$found" -eq 1 ]; then
+    ok "the '$r' a skill points at is a skill install ships"
+  else
+    no "the '$r' a skill points at is a skill install ships" "not in VENDORED_SKILLS"
+  fi
+done
+
+# The autonomous variant removes the three stops, so the two limits that keep an
+# unsupervised run reviewable have to be stated in it, explicitly.
+auto=$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")
+assert_has "auto-run-task delegates the stages to run-task instead of copying them" \
+  "$auto" ".agents/skills/run-task/SKILL.md"
+assert_has "auto-run-task ends at a pull request and never merges it" \
+  "$auto" "never merge the pull request"
+assert_has "auto-run-task refuses to bypass the hook" "$auto" "--no-verify"
+assert_has "auto-run-task records what it decided instead of asking" \
+  "$auto" "reports/autonomy.md"
 
 # start-project is reached through `norma home`, because there is no repository
 # to vendor it into yet - so that path has to work from anywhere.

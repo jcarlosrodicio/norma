@@ -8,6 +8,12 @@
   adversarial review, document, hand over - and marks the points where you must stop
   and wait for the human. Read and follow that file; in Claude Code it is also
   invocable as `/run-task`.
+- **Unsupervised runs:** when the human hands over a whole roadmap phase and is not
+  there to answer questions, the procedure is
+  [`.agents/skills/auto-run-task/SKILL.md`](.agents/skills/auto-run-task/SKILL.md)
+  (`/auto-run-task`). Same stages and same gate; it decides the ambiguities itself,
+  records every decision, and ends at an open pull request instead of stopping
+  before the commit. Use it only when the human asked for it.
 - Mandatory per-task loop: [`docs/harness/mandatory-steps.md`](docs/harness/mandatory-steps.md).
   It is not advisory - every task list must contain its steps, in order.
 - **Architecture criteria:** [`docs/harness/architecture-rules.md`](docs/harness/architecture-rules.md)
@@ -29,4 +35,6 @@
   a clone) and are exposed to Claude Code through relative symlinks in
   `.claude/skills`.
 - The loop stops before delivery: no commit, push, pull request, publish or deploy
-  until the human approves.
+  until the human approves. An unsupervised run under `auto-run-task` is the single
+  exception, and it still stops at the open pull request - merging, deploying and
+  publishing are never the agent's.

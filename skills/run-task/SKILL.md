@@ -1,6 +1,6 @@
 ---
 name: run-task
-description: Use to run a complete implementation task end to end - a roadmap phase item, a feature, a fix or a refactor - from a vague request to code that is verified and waiting for human review. Invoke it whenever the user asks for work to be built rather than just discussed, and follow it in order without skipping stages.
+description: Use to run a complete implementation task end to end - a roadmap phase item, a feature, a fix or a refactor - from a vague request to code that is verified and waiting for human review. Invoke it whenever the user asks for work to be built rather than just discussed, and follow it in order without skipping stages. It stops three times for the human; use auto-run-task instead when they hand over a whole phase and want it delivered to a pull request without being asked anything.
 version: 1.0.0
 ---
 
@@ -8,6 +8,12 @@ version: 1.0.0
 
 The whole loop in one procedure. Follow it **in order**. Every stage produces the
 input for the next, so skipping one leaves the following stage guessing.
+
+It stops three times for the human: after enriching, after planning, and before
+delivery. Those stops are the point of this procedure. When the human is not there
+to answer them - they handed over a phase and left - the procedure is
+`.agents/skills/auto-run-task/SKILL.md`, which runs these same stages and replaces
+each stop with a decision it records instead of a question it asks.
 
 ## Portability
 

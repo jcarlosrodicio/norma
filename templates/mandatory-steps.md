@@ -154,3 +154,12 @@ which topic, and where a new decision has to be registered.
 Do not commit, push, open a pull request, publish or deploy. The loop ends here and
 the human reviews. Only after explicit approval, follow
 `.agents/skills/commit/SKILL.md`.
+
+**One exception, and only when the human asked for it explicitly.** A phase handed
+over to run unsupervised follows `.agents/skills/auto-run-task/SKILL.md`, and that
+loop ends at an **open pull request** instead: the human's review point moves from
+before the commit to the pull request itself. Nothing above this step relaxes - the
+gate, the tests, the runtime verification, the adversarial review and the
+documentation are exactly the same, and that procedure additionally requires every
+decision taken without asking to be written down and linked from the pull request.
+Merging, deploying and publishing stay with the human in both modes.

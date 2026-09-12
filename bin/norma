@@ -31,7 +31,7 @@ SELF=$(resolve "$0")
 HOME_DIR=$(cd "$(dirname "$SELF")/.." && pwd)
 VERSION=$(cat "$HOME_DIR/VERSION")
 
-VENDORED_SKILLS="run-task harness-setup enrich-task adversarial-review commit update-docs code-auditing writing-skills using-git-worktrees architecture-guidelines"
+VENDORED_SKILLS="run-task auto-run-task harness-setup enrich-task adversarial-review commit update-docs code-auditing writing-skills using-git-worktrees architecture-guidelines"
 BEGIN_MARK="<!-- harness:begin -->"
 END_MARK="<!-- harness:end -->"
 

@@ -104,6 +104,37 @@ not answer stays in the document as an explicit open question - it never guesses
 convention, because a guessed convention that everybody then follows is worse than
 an admitted gap.
 
+## Running a whole phase unattended: `/auto-run-task`
+
+`run-task` is the loop, and it stops three times for you: after enriching, after
+planning, and before delivery. `auto-run-task` is the same loop for when you are not
+there to answer - you hand over a roadmap phase and leave.
+
+```
+orient → enrich → branch → plan → implement → verify → review → document → deliver
+         ^decide          ^self-review                                     ^commit, push, PR, CI
+```
+
+Each stop becomes something the agent does and **writes down**: the open questions
+are decided from the roadmap and the architecture documents, the plan is checked
+against the phase instead of shown to you, and the run ends at an **open pull
+request** with a green CI - never a merge, a deploy or a publish. Every decision it
+took instead of asking lands in `reports/autonomy.md`, linked from that pull request,
+so you review once, afterwards, and can stop at the first decision you disagree with.
+
+It stops anyway for seven reasons - among them a question that changes *what* gets
+built rather than how, anything destructive, anything needing a credential, and the
+same failure surviving two attempts. Then it commits, pushes, does **not** open the
+pull request, and asks you everything at once.
+
+Nothing about the gate relaxes: no `--no-verify`, no edit to `verify` or the hook to
+make a run pass, and no failing test silenced instead of fixed - with nobody
+watching, *make it green* is the failure mode this mode exists to refuse.
+
+A project that already had the harness needs one edit before using it: `Step 9` of
+its own `docs/harness/mandatory-steps.md` has to name the exception, or the binding
+checklist forbids the delivery. New installs get it from the template.
+
 ## Who owns what
 
 This is the whole design. Get it wrong and either upgrades destroy your decisions,
@@ -164,7 +195,7 @@ owned file you edited locally instead of clobbering it.
 test/run.sh
 ```
 
-173 tests over the gate's real behaviour - its refusals above all - over every
+191 tests over the gate's real behaviour - its refusals above all - over every
 profile and the detection that picks one, over the shape of the skill library, and
 over `install`, `upgrade` and `doctor`, each in a throwaway git repository with a
 stub stack adapter. They live here, once, because the gate is the same file everywhere:
