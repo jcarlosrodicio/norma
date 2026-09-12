@@ -130,6 +130,30 @@ inject_agents_block() {
   # "Managed by the norma installer" went stale forever, because only `install`
   # ever rewrote it - so a new skill reached Claude Code through .claude/skills
   # and stayed invisible to every agent that reads AGENTS.md by path.
+  if [ -f AGENTS.md ]; then
+    # Both markers, exactly once each, in order - or this touches nothing at all.
+    # The awk below copies up to the begin marker, inserts the block, and resumes
+    # at the end marker. With a begin and no end - or an end that does not match
+    # to the byte, where one trailing space is enough - it never resumes, and
+    # everything after the marker is gone: somebody's architecture notes, their
+    # release process, their conventions. A refusal they can read and fix beats a
+    # rewrite they discover in a diff.
+    nb=$(grep -cxF "$BEGIN_MARK" AGENTS.md || true)
+    ne=$(grep -cxF "$END_MARK" AGENTS.md || true)
+    paired=0
+    if [ "$nb" -eq 0 ] && [ "$ne" -eq 0 ]; then
+      paired=1
+    elif [ "$nb" -eq 1 ] && [ "$ne" -eq 1 ]; then
+      lb=$(grep -nxF "$BEGIN_MARK" AGENTS.md | cut -d: -f1)
+      le=$(grep -nxF "$END_MARK" AGENTS.md | cut -d: -f1)
+      if [ "$lb" -lt "$le" ]; then paired=1; fi
+    fi
+    if [ "$paired" -eq 0 ]; then
+      warn "AGENTS.md: harness markers are not a matching pair (begin x$nb, end x$ne) - leaving the whole file alone."
+      warn "  Each marker must be its own line, exact to the byte: '$BEGIN_MARK' then '$END_MARK'. Delete both to own the section outright."
+      return 0
+    fi
+  fi
   if [ "$MODE" = upgrade ]; then
     if [ ! -f AGENTS.md ] || ! grep -qF "$BEGIN_MARK" AGENTS.md; then
       step "= AGENTS.md (kept, yours: no harness markers to refresh)"

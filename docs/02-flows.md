@@ -61,6 +61,10 @@ Three details that are each there for a reason:
   block announces itself as managed, so leaving it stale - which is what happened
   while only `install` rewrote it - made a new skill invisible to every agent that
   reads `AGENTS.md` by path, however correctly it had been vendored.
+
+  Everything outside the pair survives verbatim: the architecture notes above it,
+  the release process below it, the project's own conventions. **Unless the pair
+  is not a pair**, which is why that is now a refusal - see below.
 - **`.claude/skills/<name>` is repaired, not merely created.** The old check asked
   whether something was there, never whether it pointed at the right place, so a
   link left dangling or aimed elsewhere survived every upgrade. A real directory at
@@ -75,6 +79,21 @@ If an owned file was edited locally and upstream has not changed, it reports and
 keeps the local edit instead of clobbering it; `--force` replaces it. When upstream
 *has* changed, the upgrade replaces it - deliberately, and so far without saying
 that a local edit went with it.
+
+### The refusal that guards the block
+
+`AGENTS.md` is rewritten only when the markers are **exactly one of each, each on
+its own line, matching to the byte, begin before end**. Anything else - a begin
+with no end, an end carrying one trailing space, a duplicated marker, the two in
+the wrong order - and the whole file is left alone with a message saying what is
+wrong and how to fix it.
+
+That is not defensiveness. The rewrite copies everything up to the begin marker,
+inserts the block, and resumes at the end marker; with nothing to resume at, it
+**deletes the rest of the file** - the release process, the house conventions,
+whatever lived below. It did exactly that until this refusal existed, and a single
+trailing space was enough to trigger it. The failure was silent and the damage was
+somebody else's content, which is the worst combination a tool can offer.
 
 `--dry-run` prints the whole plan, the links included. A plan that announced a
 skill but not the link an agent reaches it through was worse than no plan: it read

@@ -148,6 +148,18 @@ or your projects drift apart.
 | `scripts/harness/VERSION` | `openspec/config.yaml` |
 | `AGENTS.md` between the harness markers | `AGENTS.md` outside them, or with no markers at all |
 
+**About that last row.** `<!-- harness:begin -->` / `<!-- harness:end -->` are how a
+project asks for the block to be kept current; `upgrade` then rewrites what is
+between them and **nothing else** - your architecture notes above it and your
+release process below it survive verbatim. No markers, no rewrite: the file is
+yours whole, which is what the three oldest consumers ended up with. Delete both
+markers any time to take the section back.
+
+The markers must be an exact matching pair, each alone on its line. They are not
+processed hopefully: a begin with no end, or an end with one trailing space, and
+`norma` refuses the whole file and tells you why - because the rewrite would
+otherwise delete everything below the marker.
+
 The gate is **byte-identical in every project**. Everything stack-specific lives in
 `config.sh`, which the gate sources - so there is no generated file to drift, and
 nothing to re-generate when the harness changes.
@@ -195,7 +207,7 @@ owned file you edited locally instead of clobbering it.
 test/run.sh
 ```
 
-202 tests over the gate's real behaviour - its refusals above all - over every
+212 tests over the gate's real behaviour - its refusals above all - over every
 profile and the detection that picks one, over the shape of the skill library, and
 over `install`, `upgrade` and `doctor`, each in a throwaway git repository with a
 stub stack adapter. They live here, once, because the gate is the same file everywhere:

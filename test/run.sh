@@ -492,6 +492,42 @@ printf '# Only mine\n' > AGENTS.md
 assert_eq "and once the markers are gone it never comes back" "$(cat AGENTS.md)" "# Only mine"
 done_repo
 
+# What lies outside the markers is the project's, and this is the test that says
+# so: architecture notes, where-to-read-what, release process, house conventions.
+new_repo
+echo '{}' > package.json
+"$NORMA" install --profile node >/dev/null
+printf '# Mine\n\n## Architecture\nLayers: domain, data, presentation.\n\n%s\n## Harness\nSTALE\n%s\n\n## Release\nfastlane, see ops/release.md\n' \
+  '<!-- harness:begin -->' '<!-- harness:end -->' > AGENTS.md
+"$NORMA" upgrade >/dev/null 2>&1
+A=$(cat AGENTS.md)
+assert_has "what precedes the markers survives an upgrade" "$A" "Layers: domain, data, presentation."
+assert_has "and what follows them too" "$A" "fastlane, see ops/release.md"
+assert_no "only the block between them is replaced" "$A" "STALE"
+assert_has "with the current block in its place" "$A" "auto-run-task"
+done_repo
+
+# The awk copies up to the begin marker and resumes at the end marker. Unpaired,
+# it never resumes and deletes the rest of the file - which is why an unpaired
+# marker is refused outright instead of processed hopefully. One trailing space
+# on the end marker was enough to lose everything below it.
+for broken in "begin-with-no-end" "end-that-does-not-match-to-the-byte"; do
+  new_repo
+  echo '{}' > package.json
+  "$NORMA" install --profile node >/dev/null
+  if [ "$broken" = "begin-with-no-end" ]; then
+    printf '# Mine\n%s\nold\n\n## Release\nfastlane\n' '<!-- harness:begin -->' > AGENTS.md
+  else
+    printf '# Mine\n%s\nold\n%s \n\n## Release\nfastlane\n' '<!-- harness:begin -->' '<!-- harness:end -->' > AGENTS.md
+  fi
+  before=$(cat AGENTS.md)
+  OUT=$("$NORMA" upgrade 2>&1)
+  assert_has "refuses AGENTS.md with a $broken" "$OUT" "not a matching pair"
+  assert_eq "and leaves the file byte for byte" "$(cat AGENTS.md)" "$before"
+  assert_has "saying how to fix it" "$OUT" "exact to the byte"
+  done_repo
+done
+
 # A dry run that prints half the plan is worse than none: the link is how an
 # agent reaches the skill, and it was never announced.
 new_repo
