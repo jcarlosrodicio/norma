@@ -11,9 +11,10 @@ path** so any agent can follow it without a skill system of its own.
 |---|---|
 | `run-task` | The whole loop in one procedure, and the single entry point. References every stage by file path, closes the change before handing over, and marks the three stops. |
 | `auto-run-task` | The same loop with nobody watching: it replaces each of the three stops with a decision it records, and ends at an open pull request. A delta over `run-task`, not a copy of it. |
-| `harness-setup` | The interview that fills what `install` cannot infer. Detects first, asks in four rounds, never invents a decision. |
+| `harness-setup` | The interview that fills what `install` cannot infer. Detects first, asks in five rounds, never invents a decision. |
 | `enrich-task` | Turns a vague request or a roadmap line into an implementable specification, ending in the open questions the request left ambiguous. |
 | `architecture-guidelines` | The shared architectural criteria - `references/backend.md` and `references/frontend.md` - plus the precedence order. A project's adoption map narrows it. |
+| `runtime-verification` | The procedure behind step 5 of the loop: decide whether the change has a surface, exercise the happy path and the failure path, and report what it does **not** cover. norma owns the method; the project owns the commands. |
 | `adversarial-review` | An independent pass that assumes the work is wrong. Zero trust, attack rather than admire, every finding with a file and a line. |
 | `code-auditing` | The security pass - OWASP Top 10, NIST - for changes touching credentials, permissions, payments or personal data. |
 | `update-docs` | Mandatory before delivery. Documentation that lags the code poisons every later session - the roadmap phase included, which is the update no diff points at. |
@@ -22,9 +23,22 @@ path** so any agent can follow it without a skill system of its own.
 | `start-project` | The interview that turns "I want to build X" into documents, a roadmap of phases and an installed harness. **Not vendored** - see below. |
 | `writing-skills` | How to write a skill. Third-party; the source of `render-graphs.js` and the reason linters must exclude `.agents`. |
 
-Eleven vendored, plus one that is not. That is the ceiling. The workshop this harness came from
-is explicit about it: thirty skills and seventeen agents is a symptom, not a
-feature. A skill earns its place by being invoked, not by existing.
+Twelve vendored, plus one that is not. That is the ceiling, and it has moved
+once - which is worth saying here rather than quietly editing a number. The
+workshop this harness came from is explicit about the danger: thirty skills and
+seventeen agents is a symptom, not a feature. A skill earns its place by being
+invoked, not by existing.
+
+`runtime-verification` earned it on exactly that test. It is invoked by every
+task that changes behaviour - more often than `code-auditing`, vendored since the
+start - and before it existed, the stage it covers was the only stage of the loop
+with no procedure of its own. `run-task` spent one line on it and everything else
+lived in `docs/harness/mandatory-steps.md`, which the **project** owns. A
+procedure kept there never receives an upgrade, so each consumer drifted its own
+way and no improvement could reach any of them. The split it introduces is the
+one the gate already makes: norma owns the method, the project owns the commands.
+The migration checks moved out of the template for that reason, and the template
+keeps its `TODO(harness)` markers, which are the commands.
 
 ## The autonomous variant is a delta, not a copy
 

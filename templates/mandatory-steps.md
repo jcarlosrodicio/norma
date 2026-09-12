@@ -96,41 +96,26 @@ it holds for every agent and for you. After a fresh clone, restore it with
 
 ## Step 5 - Runtime verification (MANDATORY when behaviour changed)
 
-Unit tests do not prove the thing works. TODO(harness): how this project is
-exercised for real - a simulator, an HTTP call, the packed CLI, a browser flow -
-including the failure path. Capture what you observed in the report.
+Unit tests do not prove the thing works. The procedure is
+[`.agents/skills/runtime-verification/SKILL.md`](../../.agents/skills/runtime-verification/SKILL.md):
+it decides whether the change has a surface at all, exercises the happy path and
+the failure path, and says in the report what it did **not** cover. Follow it
+rather than restating it here - it is maintained upstream and arrives with every
+upgrade.
 
-Skip only when the change cannot surface at runtime, and say why.
+What this file owns is the part no installer can know: **the commands**.
+
+TODO(harness): how this project is exercised for real - the command that boots
+it, the URL or the screen, the account or fixture to use, and how you see the
+effect (the log, the row, the response). The skill looks here first; leaving this
+marker in place means every run has to rediscover it.
 
 ### When the change migrates a data store (MANDATORY, no exceptions)
 
-An in-memory or throwaway store is not the store. A migration verified only
-against an embedded engine, a WASM build or a container the test framework
-creates and destroys has been verified against a *fresh, empty* schema - which is
-the one case that never happens in production.
-
-So bring up the real thing and drive the change through it. If the project ships a
-container definition for its own dependencies, that is what it is for:
-
-```
-docker compose -f <compose file> up -d      # or the project's own script
-<the migrate command>
-<the command, endpoint or screen that exercises the change>
-```
-
-Three things to check, and record them in the report:
-
-1. **Apply it twice.** The second run must be a no-op, not an error and not a
-   duplicate.
-2. **Migrate a store that already has data**, not one you just created. A fresh
-   schema proves nothing about a populated one, and a column that cannot be added
-   to existing rows is exactly the failure this step exists to catch.
-3. **Name the engine and version you ran against.** "It worked locally" without
-   saying what "locally" was is not evidence - especially when the tests ran on a
-   different engine than production uses.
-
-TODO(harness): the project's real commands for the three steps above, or a
-statement that this project has no migrated store and why.
+TODO(harness): if this project migrates a data store, the real commands for the
+three checks the skill requires - bring the engine up, apply the migration twice,
+and apply it to a store that already has data. If it has no migrated store, say
+so here and why, so nobody goes looking.
 
 ## Step 6 - Report
 
