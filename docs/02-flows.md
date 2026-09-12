@@ -50,11 +50,35 @@ Installing twice changes nothing - there is a test for it.
 ## `norma upgrade [--force]`
 
 Re-vendors only what the harness owns: the gate, the hook, the skills, the
-version stamp. It never touches `config.sh`, the documents, `openspec/config.yaml`
-or `AGENTS.md`.
+version stamp, and the `AGENTS.md` block **when the markers are there**. It never
+touches `config.sh`, the documents or `openspec/config.yaml`.
+
+Three details that are each there for a reason:
+
+- **The `AGENTS.md` block is refreshed only between `<!-- harness:begin -->` and
+  `<!-- harness:end -->`.** Those markers are the project's opt-in; without them
+  the file is untouched, down to not appending a block to one that lost it. The
+  block announces itself as managed, so leaving it stale - which is what happened
+  while only `install` rewrote it - made a new skill invisible to every agent that
+  reads `AGENTS.md` by path, however correctly it had been vendored.
+- **`.claude/skills/<name>` is repaired, not merely created.** The old check asked
+  whether something was there, never whether it pointed at the right place, so a
+  link left dangling or aimed elsewhere survived every upgrade. A real directory at
+  that path is still left alone: that is how `openspec` ships its own skills, and
+  deleting them is not the harness's business.
+- **The version stamp is written last**, and that order is load-bearing rather than
+  incidental. The local-edit guard below decides by comparing the repository's
+  stamp against the upstream version, so stamping first would answer its own
+  question and clobber every local edit silently.
 
 If an owned file was edited locally and upstream has not changed, it reports and
-keeps the local edit instead of clobbering it; `--force` replaces it.
+keeps the local edit instead of clobbering it; `--force` replaces it. When upstream
+*has* changed, the upgrade replaces it - deliberately, and so far without saying
+that a local edit went with it.
+
+`--dry-run` prints the whole plan, the links included. A plan that announced a
+skill but not the link an agent reaches it through was worse than no plan: it read
+as complete.
 
 ### When not to propagate
 

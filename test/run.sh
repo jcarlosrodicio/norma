@@ -470,7 +470,54 @@ printf '# Mine\n\n## Harness\n\nMy notes: run-task, scripts/harness/verify.\n' >
 "$NORMA" upgrade --force >/dev/null 2>&1
 assert_eq "upgrade restores the gate it owns" "$(head -1 scripts/harness/verify)" "#!/bin/sh"
 assert_eq "and leaves config.sh alone" "$(cat scripts/harness/config.sh)" "# MINE"
-assert_has "and never touches AGENTS.md" "$(cat AGENTS.md)" "My notes"
+assert_has "and never touches an AGENTS.md that carries no markers" "$(cat AGENTS.md)" "My notes"
+assert_no "not even to append a block to it" "$(cat AGENTS.md)" "harness:begin"
+done_repo
+
+# The markers say "Managed by the norma installer". Before this, only `install`
+# ever rewrote the block, so the promise was false on every upgrade: a skill
+# added upstream reached Claude Code through .claude/skills and stayed invisible
+# to every agent that reads AGENTS.md by path.
+new_repo
+echo '{}' > package.json
+"$NORMA" install --profile node >/dev/null
+sed -i.bak 's/^- \*\*Full procedure/- STALE MARKER TEXT\n- **Full procedure/' AGENTS.md && rm -f AGENTS.md.bak
+assert_has "a marked block can go stale" "$(cat AGENTS.md)" "STALE MARKER TEXT"
+OUT=$("$NORMA" upgrade 2>&1)
+assert_no "upgrade refreshes the block the markers declare managed" "$(cat AGENTS.md)" "STALE MARKER TEXT"
+assert_has "and leaves the markers in place for the next one" "$(cat AGENTS.md)" "harness:begin"
+assert_has "saying so, because it is the one project file it may rewrite" "$OUT" "AGENTS.md"
+printf '# Only mine\n' > AGENTS.md
+"$NORMA" upgrade >/dev/null 2>&1
+assert_eq "and once the markers are gone it never comes back" "$(cat AGENTS.md)" "# Only mine"
+done_repo
+
+# A dry run that prints half the plan is worse than none: the link is how an
+# agent reaches the skill, and it was never announced.
+new_repo
+echo '{}' > package.json
+"$NORMA" install --profile node >/dev/null
+rm -rf .agents/skills/commit .claude/skills/commit
+OUT=$("$NORMA" upgrade --dry-run 2>&1)
+assert_has "a dry run announces the skill it would vendor" "$OUT" "would vendor .agents/skills/commit"
+assert_has "and the link an agent would reach it through" "$OUT" "would link .claude/skills/commit"
+assert_nofile "and writes neither of them" .agents/skills/commit
+done_repo
+
+# Repairing, not just creating: a link pointing at the wrong place is exactly
+# what survives a rename upstream, and doctor can only report it.
+new_repo
+echo '{}' > package.json
+"$NORMA" install --profile node >/dev/null
+ln -sfn ../../.agents/skills/somewhere-else .claude/skills/commit
+"$NORMA" upgrade >/dev/null 2>&1
+assert_eq "upgrade repairs a link pointing at the wrong skill" \
+  "$(readlink .claude/skills/commit)" "../../.agents/skills/commit"
+rm -f .claude/skills/commit
+mkdir -p .claude/skills/commit && echo mine > .claude/skills/commit/SKILL.md
+"$NORMA" upgrade >/dev/null 2>&1
+assert_eq "but a real directory there is not the harness's to delete" \
+  "$(cat .claude/skills/commit/SKILL.md)" "mine"
 done_repo
 
 echo ""

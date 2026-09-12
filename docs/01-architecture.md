@@ -51,7 +51,7 @@ project's decisions, or the consumers drift apart until the harness means nothin
 | `.githooks/pre-commit` | `docs/harness/mandatory-steps.md` |
 | `.agents/skills/<vendored>` | `docs/harness/architecture-rules.md` |
 | `scripts/harness/VERSION` | `openspec/config.yaml` |
-| | `AGENTS.md` |
+| `AGENTS.md` between the harness markers | `AGENTS.md` outside them, or with no markers at all |
 
 The rule behind the table: **norma owns what is identical everywhere; the project
 owns everything that expresses a decision.** An installer cannot know your layers,
@@ -171,10 +171,25 @@ consumer repositories had hand-written gates differing in exactly four values.
 Generating a file per project would have re-created the same drift with extra
 machinery.
 
-**The project owns its `AGENTS.md` harness section.** The installer writes the
-block only when the file does not exist or says nothing about the harness. All
-three consumers had customised that section within days; owning it would have
-overwritten real content on the first upgrade.
+**The project owns its `AGENTS.md` harness section - unless it keeps the
+markers.** The installer writes the block only when the file does not exist or
+says nothing about the harness. All three consumers had customised that section
+within days; owning the whole file would have overwritten real content on the
+first upgrade.
+
+The markers are what resolves that. `<!-- harness:begin -->` is the project
+*asking* for the block to be managed, and the block itself says so - "Edit the
+harness upstream, not this block." So an upgrade rewrites what is between them,
+and touches nothing else in the file: no markers, or content outside them, and it
+is the project's. A project that wants the section for itself deletes the markers,
+which is exactly what the three customised consumers had effectively done by never
+receiving them.
+
+For a while the code did neither: only `install` ever rewrote the block, so a
+marked section that promised to be managed went stale on every upgrade. The cost
+was not cosmetic - a skill added upstream reached Claude Code through
+`.claude/skills` and stayed **invisible to every agent that reads `AGENTS.md` by
+path**, which is the portability the whole harness is built on.
 
 **`doctor` detects rather than imposes.** It reports what the repository already
 enforces, what drifted, what templates are unfilled, and which user-level tools

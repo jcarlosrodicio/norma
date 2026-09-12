@@ -146,7 +146,7 @@ or your projects drift apart.
 | `.githooks/pre-commit` | `docs/harness/mandatory-steps.md` |
 | `.agents/skills/<vendored>` | `docs/harness/architecture-rules.md` |
 | `scripts/harness/VERSION` | `openspec/config.yaml` |
-| | `AGENTS.md` |
+| `AGENTS.md` between the harness markers | `AGENTS.md` outside them, or with no markers at all |
 
 The gate is **byte-identical in every project**. Everything stack-specific lives in
 `config.sh`, which the gate sources - so there is no generated file to drift, and
@@ -195,7 +195,7 @@ owned file you edited locally instead of clobbering it.
 test/run.sh
 ```
 
-191 tests over the gate's real behaviour - its refusals above all - over every
+202 tests over the gate's real behaviour - its refusals above all - over every
 profile and the detection that picks one, over the shape of the skill library, and
 over `install`, `upgrade` and `doctor`, each in a throwaway git repository with a
 stub stack adapter. They live here, once, because the gate is the same file everywhere:

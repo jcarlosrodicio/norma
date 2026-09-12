@@ -123,6 +123,19 @@ ensure_line() {
 
 inject_agents_block() {
   block=$HOME_DIR/templates/agents-section.md
+  # The markers are the project's opt-in to this block being managed, and they
+  # are the only thing an upgrade acts on. A file that documents the harness in
+  # its own words, or one that never carried the block, is the project's: an
+  # upgrade leaves it exactly as it found it. Without this, a block that says
+  # "Managed by the norma installer" went stale forever, because only `install`
+  # ever rewrote it - so a new skill reached Claude Code through .claude/skills
+  # and stayed invisible to every agent that reads AGENTS.md by path.
+  if [ "$MODE" = upgrade ]; then
+    if [ ! -f AGENTS.md ] || ! grep -qF "$BEGIN_MARK" AGENTS.md; then
+      step "= AGENTS.md (kept, yours: no harness markers to refresh)"
+      return 0
+    fi
+  fi
   if [ ! -f AGENTS.md ]; then
     [ "$DRY" -eq 1 ] && { step "would create AGENTS.md"; return 0; }
     { printf '# Repository instructions for AI agents\n\n'
@@ -161,19 +174,38 @@ vendor_skills() {
     # A symlink is replaced even when it resolves to identical content: one that
     # escapes the repository does not survive a clone on another machine.
     if [ ! -L "$dst" ] && [ -d "$dst" ] && diff -rq "$src" "$dst" >/dev/null 2>&1; then :
+    elif [ "$DRY" -eq 1 ]; then
+      step "would vendor $dst"
     else
-      [ "$DRY" -eq 1 ] && { step "would vendor $dst"; continue; }
       mkdir -p .agents/skills
       rm -rf "$dst"
       cp -R "$src" "$dst"
       step "+ $dst"
     fi
+    # The link is examined on every run, not only when the skill was just
+    # vendored. Two reasons, both paid for: a dry run that skipped this printed
+    # an incomplete plan - it announced the skill and never the link an agent
+    # actually reaches it through - and a link left pointing somewhere else was
+    # never repaired, because the old check only asked whether something was
+    # there, not whether it was right.
     link=.claude/skills/$s
-    if [ ! -e "$link" ] && [ ! -L "$link" ]; then
-      [ "$DRY" -eq 1 ] && { step "would link $link"; continue; }
-      mkdir -p .claude/skills
-      ln -sfn "../../.agents/skills/$s" "$link"
-      step "+ $link -> ../../.agents/skills/$s"
+    want=../../.agents/skills/$s
+    relink=0
+    if [ -L "$link" ]; then
+      if [ "$(readlink "$link")" != "$want" ]; then relink=1; fi
+    elif [ ! -e "$link" ]; then
+      relink=1
+    fi
+    # A real directory there is left alone: that is how openspec and other tools
+    # ship their own skills, and deleting them is not the harness's business.
+    if [ "$relink" -eq 1 ]; then
+      if [ "$DRY" -eq 1 ]; then
+        step "would link $link -> $want"
+      else
+        mkdir -p .claude/skills
+        ln -sfn "$want" "$link"
+        step "+ $link -> $want"
+      fi
     fi
   done
 }
@@ -273,9 +305,14 @@ cmd_upgrade() {
   install_owned "$HOME_DIR/core/verify" scripts/harness/verify 755
   install_owned "$HOME_DIR/core/pre-commit" .githooks/pre-commit 755
   vendor_skills
+  inject_agents_block
+  # The stamp goes LAST, and moving it is not a tidy-up: install_owned decides
+  # whether a locally edited file is kept by comparing this file against the
+  # upstream VERSION, so stamping first would answer its own question and
+  # clobber every local edit without a word.
   install_owned "$HOME_DIR/VERSION" scripts/harness/VERSION 644
   say ""
-  say "config.sh, docs/harness/*.md, openspec/config.yaml and AGENTS.md were not touched."
+  say "config.sh, docs/harness/*.md and openspec/config.yaml were not touched."
 }
 
 check() { if [ "$1" = 0 ]; then step "ok  $2"; else bad "$2 - $3"; fi; }
