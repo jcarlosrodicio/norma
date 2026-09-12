@@ -163,17 +163,22 @@ Then:
    request that looks like any other hides the one fact a reviewer needs to
    calibrate how hard to look: that nothing in it was agreed with a human before
    it was written.
-3. **Wait for CI**, if the repository runs it on pull requests. The run is not
+3. **Wait for CI**, when the repository runs it on pull requests. The run is not
    finished with a red pull request. A failure inside the phase's scope is yours
    to fix: fix it, verify, push again - at most **two** attempts at the same
    failing job, then escalate with the output. A failure caused by something
    outside the phase is escalation reason 2, not a licence to go fix it.
+
+   A repository with no CI on pull requests skips this step and **says so in the
+   report**, because then the local gate is the only thing that ran and the
+   reviewer should know it.
 4. **Stop at the open pull request.** Do not merge it, and do not ask whether to.
    The human's single review point is that pull request, and taking it away is the
    same mistake as skipping the stops without recording anything.
 
-If there is no remote, no `gh` or no CI, say which, stop at the last local commit,
-and report - do not improvise a different delivery.
+If there is no remote, or no tool to open a pull request with, there is nowhere to
+deliver: stop at the last local commit, say which of the two it was, and report. Do
+not improvise a different delivery.
 
 ## The autonomy log
 
