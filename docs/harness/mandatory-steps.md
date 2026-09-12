@@ -79,12 +79,19 @@ Follow [`../../skills/adversarial-review/SKILL.md`](../../skills/adversarial-rev
 Those two files are the enforcement: a hole in them is silent, and every refusal
 they make exists because something got through once.
 
-## Step 8 - Update documentation (MANDATORY, always last before delivery)
+## Step 8 - Update documentation and close the change (MANDATORY, before delivery)
 
 Follow [`../../skills/update-docs/SKILL.md`](../../skills/update-docs/SKILL.md).
 A new refusal goes in the table in `docs/02-flows.md` **with its reason**; a new
 decision goes in `docs/01-architecture.md`; a new skill goes in
 `docs/03-skills.md` and in `VENDORED_SKILLS`.
+
+Stage 8 of the loop also closes the change - the roadmap phase and the OpenSpec
+archive - and **here both halves are no-ops, which is a statement rather than an
+omission**: this repository is the harness, its unit of work is a change rather
+than a phase, and it has no `openspec/` directory at all. Say so in the report
+instead of reporting a stage done. The day either becomes true, this paragraph is
+what has to change first.
 
 ## Step 9 - Stop
 
