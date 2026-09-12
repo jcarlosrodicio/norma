@@ -195,10 +195,23 @@ Then:
    calibrate how hard to look: that nothing in it was agreed with a human before
    it was written.
 3. **Wait for CI**, when the repository runs it on pull requests. The run is not
-   finished with a red pull request. A failure inside the phase's scope is yours
-   to fix: fix it, verify, push again - at most **two** attempts at the same
-   failing job, then escalate with the output. A failure caused by something
-   outside the phase is escalation reason 2, not a licence to go fix it.
+   finished with a red pull request. **Classify the failure before reacting to
+   it**, and quote the log line that decided the classification - three kinds,
+   and treating them alike is how an unsupervised run goes wrong:
+
+   - **Caused by this change** - a test, a type, a lint or a build error your own
+     diff explains. Fix it, verify, push again: at most **two** attempts at the
+     same failing job, then escalate with the output.
+   - **A flake** - a timeout, a network blip, an infrastructure error with no
+     logical link to the diff. Re-run the job. A re-run **does not spend** one of
+     those two attempts, because nothing was learned and nothing was changed -
+     but the same job flaking twice is a finding for the report, not a third
+     re-run.
+   - **Already red on the base branch** - the job fails without your diff too.
+     That is escalation reason 2, and fixing it would put work from outside the
+     phase inside this pull request, which this file forbids a few lines above.
+     Name the job, say the pull request cannot go green until somebody else's
+     problem does, and stop.
 
    A repository with no CI on pull requests skips this step and **says so in the
    report**, because then the local gate is the only thing that ran and the
