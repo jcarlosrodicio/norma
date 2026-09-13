@@ -561,6 +561,37 @@ assert_has "a flake is retried and does not spend an attempt" "$auto" "does not 
 assert_has "and a base branch that is already red is not this run's to fix" \
   "$auto" "Already red on the base branch"
 
+# A real run hit HTTP 429 from its model provider - a request-rate cap, then a
+# concurrency cap - and the agent translated that into "my budget is exhausted",
+# then used the invented budget to justify ending the phase with 22 of 45 tasks
+# undone. None of the seven escalation reasons covers a provider refusing you, so
+# it had no sanctioned category and made one up.
+assert_has "a provider limit is not one of the seven reasons" \
+  "$auto" "A provider refusing you is not the harness blocking you"
+assert_has "it is retried, and if it persists the run is interrupted, not finished" \
+  "$auto" "interrupted, not finished"
+# The same run reported an estimated budget as a fact, on a plan with unlimited
+# tokens. An agent cannot measure what it has left, and the skill already forbids
+# reporting anything else it has not checked.
+assert_has "and a self-estimated budget is never reported as a fact" \
+  "$auto" "cannot measure"
+# The concurrency cap was tripped by fanning out subagents. No skill here ever
+# asked for that fan-out, and now none leaves the ceiling unsaid - as arithmetic,
+# because the limit is the provider's number and not the harness's.
+assert_has "fanning out has a ceiling derived from the provider's own limit" \
+  "$auto" "minus two"
+# Agnostic by construction, same rule the sibling skill is held to: the arithmetic
+# may not harden into one vendor's number.
+# Whole words: the provider that prompted this is a three-letter name, and a
+# substring check for it matches "dominant".
+for tool in deepseek nan openai anthropic gemini; do
+  if printf '%s' "$auto" | grep -qiE "(^|[^a-z])$tool([^a-z]|$)"; then
+    no "auto-run-task names no provider ($tool)" "found in the skill"
+  else
+    ok "auto-run-task names no provider ($tool)"
+  fi
+done
+
 # The autonomous variant removes the three stops, so the two limits that keep an
 # unsupervised run reviewable have to be stated in it, explicitly.
 auto=$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")

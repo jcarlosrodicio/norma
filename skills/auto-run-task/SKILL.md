@@ -74,6 +74,41 @@ assumption is indistinguishable from a bug that has not been found yet.
 Nothing else qualifies. "I would prefer to confirm" is not an entry on this list;
 neither is an ambiguity you have not yet tried to resolve from the documents.
 
+### Your model provider is not on that list either
+
+A rate limit, a refused request, a timeout from the thing that runs you: none of
+those is a reason to end the phase, narrow it, or hand back work you could have
+finished. **A provider refusing you is not the harness blocking you** - reason 5
+is about `config.sh` naming a command this machine does not have, not about an
+HTTP 429.
+
+- **Retry, with a wait.** These clear on their own; that is what a rate limit is.
+- **If it does not clear, the run is interrupted, not finished.** Say exactly
+  that, name the task in `tasks.md` where it stopped, and stop. An interruption
+  reported as a completed phase is the most expensive lie in this file, because
+  the next session believes it.
+- **Never estimate what you have left and then report the estimate as a fact.**
+  You **cannot measure** your remaining context, tokens or spend, and a guess
+  dressed as a number is the same failure as a test you claim passed without
+  running it. If you think you are running low, that is a feeling; `tasks.md` is
+  the fact.
+
+This is written from a real run: it hit a concurrency cap, called it "my budget is
+exhausted", and used the budget it had invented to justify delivering a phase with
+half its tasks undone - on a plan that was billed for none of it.
+
+### Fanning out has a ceiling
+
+Nothing here asks you to run subagents in parallel. When you choose to, the
+ceiling is your provider's concurrent-request limit **minus two**: one for the
+agent doing the asking, which is you, and one spare for whatever else shares that
+key - another session, a scheduled job, the human working alongside you. Fan out
+wider and you do not go faster; you collect the errors above and then reason about
+what they mean.
+
+The limit is the provider's number, not the harness's, so it is arithmetic rather
+than a constant: read it from your own provider and subtract.
+
 ### How to stop
 
 Do everything that does not depend on the answer **first**. Then:
@@ -305,7 +340,8 @@ to catch that.
 ## Reporting honestly
 
 Everything `run-task` says about honest reporting applies with more force, because
-the report is now the human's **only** view of the run. Say plainly which stages
-were skipped, which checks were not run, and which decisions you are least sure
-about. A stage reported as done without the command output behind it spends
+the report is now the human's **only** view of the run. That includes what stopped
+you: name the actual error, quoted, rather than your theory about what it meant.
+Say plainly which stages were skipped, which checks were not run, and which
+decisions you are least sure about. A stage reported as done without the command output behind it spends
 trust that this mode runs entirely on.
