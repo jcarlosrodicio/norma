@@ -61,7 +61,12 @@ stamp() {
 # would be unpassable for documentation, configuration and harness work. This mode
 # runs the static gates and refuses the moment it sees a code file.
 if [ "$1" = "--docs-only" ]; then
-  PATTERN=$(printf '%s\n' $HARNESS_CODE_PATHS | sed 's|/*$||' | paste -sd'|' -)
+  # An entry is a directory prefix or an exact file. Matching only the prefix left
+  # code at the repository root invisible to this refusal - a Go main.go, a compose
+  # file - so a change that could take the whole thing down passed as documentation.
+  # Every regex metacharacter is escaped: these are paths, not patterns, and a
+  # project can legitimately have a '+' or a '[' in one.
+  PATTERN=$(printf '%s\n' $HARNESS_CODE_PATHS | sed 's,/*$,,; s,[].^$*+?(){}|[\\],\\&,g' | paste -sd'|' -)
   # Judge the commit being prepared. With something staged, that IS the change
   # about to land, so an unrelated dirty tree - another session's work in
   # progress, say - does not block a documentation commit. With nothing staged
@@ -71,7 +76,7 @@ if [ "$1" = "--docs-only" ]; then
   else
     CHANGED=$(git diff --cached --name-only)
   fi
-  CODE=$(printf '%s\n' "$CHANGED" | grep -E "^($PATTERN)/" || true)
+  CODE=$(printf '%s\n' "$CHANGED" | grep -E "^($PATTERN)(/|\$)" || true)
   if [ -n "$CODE" ]; then
     printf 'harness: --docs-only refused. These files are code:\n' >&2
     printf '%s\n' "$CODE" | sed 's/^/  /' >&2
