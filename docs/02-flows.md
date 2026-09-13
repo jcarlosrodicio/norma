@@ -187,6 +187,15 @@ Three things bound it, and none of them may be softened:
   the same failure survived two attempts; the roadmap and the repository disagree.
   When it stops it commits, pushes, does **not** open the pull request, and asks
   every question at once.
+
+  **Its own model provider is not one of the seven**, and that had to be written
+  down: a real run hit a concurrency cap, reported it as "my budget is exhausted",
+  and used the budget it had invented to deliver a phase with half the tasks
+  undone - on a plan that was billed for none of it. A rate limit is retried; if it
+  persists the run is **interrupted, not finished**, and says so with the task in
+  `tasks.md` where it stopped. Nothing here asks for parallel subagents either, and
+  when a run chooses them the ceiling is the provider's concurrency limit minus
+  two: one for the agent asking, one spare for whatever else shares the key.
 - **It ends at an open pull request**, never at a merge, a deploy or a publish. That
   pull request is the human's only review point, so removing it would leave the run
   reviewed by nobody. A red CI is not a finished run, and the failure is classified
