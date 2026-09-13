@@ -1,7 +1,7 @@
 ---
 name: adversarial-review
 description: Use after an implementation passes its own tests and verification, before committing or archiving a change - an independent red-team pass that assumes the work is wrong and tries to break it. Also use when the user asks for a devil's advocate, red-team or independent review.
-version: 1.0.0
+version: 1.1.0
 ---
 
 # adversarial-review
@@ -28,7 +28,41 @@ your own view - they anchor you to the same assumptions. Read them last, if at a
 Run this in a fresh session, and prefer a different model from the one that wrote
 the code.
 
-## What to attack
+## 1. Map the change
+
+Before attacking anything, list every file the change touches. That list is the
+checklist for the whole pass. Identify an entry by `(path, status)`, not by path
+alone - a path appears twice when a deletion is followed by a recreation.
+
+Every entry ends in one of two states: **reviewed**, or **skipped with a concrete
+reason** - "generated file, no hand-written logic", "lockfile, the diff is machine
+output". "Looked minor" is not a reason, and neither is running out of attention.
+
+Reviewing one file does not cover its counterpart. An implementation file does not
+cover its header, its interface, its test or its configuration, and the smaller
+member of a pair is exactly where a forgotten update hides.
+
+The counts go in the output. A review that silently covered two thirds of the diff
+reads exactly like one that covered all of it, and the verdict it ends on is worth
+nothing - which is what this checklist exists to make visible.
+
+## 2. Plan the attack
+
+Go through the mapped files once and write down, for each risk point:
+
+- the severity you expect - blocking, should fix, nit;
+- what is at stake, concretely: where it is, what breaks, who notices;
+- what you have to read to confirm it or kill it, named - this function's callers,
+  that migration, the test that claims to cover it.
+
+Then go and confirm them. The plan holds hypotheses, not findings: an entry you
+could not confirm is dropped, and saying that costs nothing. Planning first is also
+what keeps the pass from spending its whole attention on the first file and
+arriving at the last one with none left.
+
+If the change carries no identifiable risk, write that instead of padding the list.
+
+## 3. What to attack
 
 1. **Incorrect assumptions.** Every place the code assumes a value exists, is
    non-empty, is unique, is ordered, is in a given state, or arrives once.
@@ -60,12 +94,59 @@ the code.
    adopted - the adoption map says which rules apply here, and a rule listed as not
    applicable is not a finding.
 
+Cross-file findings are part of the job: an inconsistency between two files in the
+change, an update applied to one caller and not the other, a contract broken on one
+side. Read whatever context you need, but file every finding against a file that
+the change actually touches.
+
 For a dedicated security pass following OWASP Top 10 and NIST, use the
 `code-auditing` skill instead - this skill covers correctness broadly.
 
+## 4. Fact-check your own findings
+
+A finding is not evidence because you produced it. Go through the list once more
+with the opposite job: not "is this worth reporting" but "does the diff prove this
+wrong".
+
+The two mistakes available here are not equally expensive. **Reporting a wrong
+finding costs somebody a few minutes. Dropping a correct one destroys it in
+silence** - it reaches nobody, and nobody learns it was dropped. So when the
+evidence falls short of proof, it stays. "Suspicious", "I cannot verify this", "low
+value" and "the code looks fine to me now" all mean it stays.
+
+Drop a finding on exactly two grounds:
+
+- **A - it describes code that is not there.** The symbol, statement or construct it
+  names appears nowhere in the file it was filed against. The same construct in a
+  sibling file does not rescue it.
+- **B - a diff line contradicts it literally.** It calls an identifier unused and
+  the diff uses it; it says a check is missing and the diff contains it; it says a
+  value is hardcoded and the diff reads it from a variable. The contradiction has to
+  be readable straight off the diff - needing a chain of reasoning to reach it means
+  there is none.
+
+**Never drop a finding** whose subject is memory safety, concurrency, a declaration
+that disagrees with its definition, a behavioural or compatibility change, or a
+parameter the function accepts and never uses - whatever you concluded about it.
+Those are the categories where a wrongly dropped finding is most expensive and your
+own confidence is worth least, including your confidence that the language or the
+runtime does not behave the way the finding claims.
+
+None of these is a ground: you disagree with the fix it proposes; you consider the
+flagged code acceptable as written; you cannot confirm it; it quotes the wrong line
+while describing something the diff does contain. Judge the claim, not the citation.
+
+This step shares an author with the findings it judges, which makes it weaker than
+it looks - it still removes what the diff flatly refutes. When the pass runs in a
+fresh session with a different model, as the context boundary asks, so does this
+step, and then it is worth considerably more.
+
 ## Output
 
-Group findings by severity: **Blocking**, **Should fix**, **Nit**.
+Open with the coverage line: files in the change, files reviewed, files skipped,
+and the reason for each skip.
+
+Then group findings by severity: **Blocking**, **Should fix**, **Nit**.
 
 Each finding:
 
@@ -77,3 +158,9 @@ Each finding:
 Close with a single explicit verdict: **safe to commit** or **not safe to commit**.
 If you found nothing blocking, say so plainly - do not invent findings to look
 thorough.
+
+---
+
+The coverage contract of stage 1 and the two grounds of stage 4 are adapted from
+[`alibaba/open-code-review`](https://github.com/alibaba/open-code-review)
+(Apache-2.0), which runs them as separate passes around its review agent.
