@@ -510,6 +510,19 @@ assert_has "then verifying again, because an archive rewrites files" "$rt" "re-r
 assert_has "the loop's last stage is still the human's" "$rt" "## 9. Hand over"
 assert_has "update-docs names the roadmap, which no diff points at" \
   "$(cat "$HOME_DIR/skills/update-docs/SKILL.md")" "roadmap entry"
+# A review that read two thirds of the diff reads exactly like one that read all
+# of it, and ends on the same verdict. The file checklist and the counts in the
+# output are the only thing that makes the difference visible.
+adv=$(cat "$HOME_DIR/skills/adversarial-review/SKILL.md")
+assert_has "adversarial-review accounts for every file in the change" "$adv" "## 1. Map the change"
+assert_has "closing each one as reviewed or skipped for a stated reason" "$adv" "skipped with a concrete"
+assert_has "and reporting the coverage beside the verdict" "$adv" "Open with the coverage line"
+# The pass that judges the findings shares an author with them, so left to its
+# own taste it drops the ones it is least able to judge. The asymmetry and the
+# protected subjects are what stop that.
+assert_has "it fact-checks its findings before reporting them" "$adv" "## 4. Fact-check your own findings"
+assert_has "dropping one only on the two grounds the diff can prove" "$adv" "exactly two grounds"
+assert_has "and never on the subjects where being wrong costs most" "$adv" "Never drop a finding"
 # Unsupervised, the archive has to travel inside the pull request: there is no
 # second branch because there is nobody to remember it.
 auto=$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")
