@@ -564,6 +564,34 @@ assert_has "run-task checks the tree before it writes anything" \
 assert_has "including a branch that is behind the base" "$rt" "behind the base"
 assert_has "and work in the tree that is not this task's" "$rt" "not part of this task"
 
+# A red gate, a red test or a review finding used to go straight back to an edit:
+# stage 6 said "fix what it finds, then re-run stage 5" and nothing in between said
+# what kind of wrong it was. Editing the implementation is right for exactly one of
+# the four, and the expensive mistakes - loosening the check, re-running unchanged,
+# inventing a capability nobody planned - are the other three mistaken for it.
+assert_has "run-task classifies a failure before retrying it" \
+  "$rt" "### When it comes back red"
+assert_has "quoting the evidence that decided the classification" "$rt" "quote the line"
+assert_has "only one of the four justifies editing the implementation" \
+  "$rt" "only one of the four"
+assert_has "a check that is wrong is fixed against the spec, never loosened" \
+  "$rt" "never by deleting it"
+assert_has "a missing capability goes back to the plan instead" "$rt" "work, not a retry"
+assert_has "and a retry that changed nothing is not a retry" "$rt" "Never re-run unchanged"
+# The compounding half, and the reason this repository keeps a reason beside every
+# refusal: a failure that keeps coming back has to stop being retried and become a
+# test, a gate or a line in the documents.
+assert_has "a failure seen before is a gap, not another attempt" \
+  "$rt" "becomes infrastructure"
+# Unsupervised runs stage 5 exactly as written, so the classification has to reach
+# the log that stands in for the human who would have read it.
+assert_has "auto-run-task logs which of the four a failure was" \
+  "$auto" "which of the four"
+# Two classifications in sibling skills read as rivals unless one says how they
+# compose: CI decides whose failure it is, stage 5 decides what is broken.
+assert_has "the CI triage hands its own diff's failures to that classification" \
+  "$auto" "When it comes back red"
+
 # "Two attempts then escalate" treated a flake and a real regression the same, so
 # a flake burned both attempts, and a base branch that was already red invited a
 # fix that travels in this pull request - against this file's own limit of never

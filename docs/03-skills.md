@@ -9,7 +9,7 @@ path** so any agent can follow it without a skill system of its own.
 
 | Skill | What it is for |
 |---|---|
-| `run-task` | The whole loop in one procedure, and the single entry point. References every stage by file path, closes the change before handing over, and marks the three stops. |
+| `run-task` | The whole loop in one procedure, and the single entry point. References every stage by file path, classifies a failure before retrying it, closes the change before handing over, and marks the three stops. |
 | `auto-run-task` | The same loop with nobody watching: it replaces each of the three stops with a decision it records, and ends at an open pull request. A delta over `run-task`, not a copy of it. |
 | `harness-setup` | The interview that fills what `install` cannot infer. Detects first, asks in five rounds, never invents a decision. |
 | `enrich-task` | Turns a vague request or a roadmap line into an implementable specification, ending in the open questions the request left ambiguous. |

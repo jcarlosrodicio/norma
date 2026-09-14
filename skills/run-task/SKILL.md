@@ -129,6 +129,50 @@ failure and the one the tests cannot see. It decides whether the change has a su
 at all, exercises the happy path and the failure path, and writes the report where
 this project keeps them.
 
+### When it comes back red
+
+Any of the three can come back red - the gate, the contrast against the artifacts,
+the runtime verification - and stage 6 sends you back here too. Before you change
+anything, **name which of these four it is and quote the line that decided it**.
+The reflex is to edit, re-run and hope; that is how a session spends an hour making
+the wrong thing green.
+
+- **The code is wrong.** The check is right and the change does not do what it
+  claims. Fix the code - this is the **only one of the four** that justifies
+  editing the implementation.
+- **The check is wrong.** It asserts something the specification never asked for,
+  or it encodes the behaviour this change deliberately replaces. Fix it against
+  the spec, quoting in the report what backs the new assertion - and fix it by
+  changing what it asserts, **never by deleting it**, skipping it, or loosening it
+  until it passes. That move is indistinguishable from hiding a defect, including
+  to you.
+- **The harness is pointed at the wrong thing.** The selection missed the tests
+  that cover the change, or the stamp is older than the file you just edited.
+  Nothing is wrong with the code: correct what you named and run it again. A gate
+  that refuses for a reason your change does not explain - `config.sh` naming a
+  command this machine does not have - is a different thing: that file is the
+  **project's**, never yours to edit your way past, so it goes in the report, and
+  unsupervised it is an escalation rather than a fix.
+- **Something is missing.** There is no fixture, no seam, no way to reach the thing
+  under test at all. That is **work, not a retry** - it goes back to stage 3 and
+  into `tasks.md`, because a capability invented at the retry point is one nobody
+  planned and nobody reviewed.
+
+**Never re-run unchanged**, expecting a different answer. A retry that changed
+nothing asks the same question twice; if you cannot say what you changed since the
+last run, you have not classified the failure yet. The one exception is a failure
+you have classified as a **flake** - a timeout, a network blip, nothing in the diff
+that explains it - and calling something a flake is a claim you back with the log
+line, not a shrug. The same check flaking twice is a finding for the report, not a
+third run.
+
+**A failure you have seen before stops being a retry and becomes infrastructure.**
+Not the second attempt at one failure - the same failure arriving again, in a later
+task or a later session. A case the tests never covered becomes a test; a rule that
+keeps being broken becomes a gate or a refusal; a decision that keeps being
+re-litigated becomes a line in the documents, with its reason beside it. A loop
+that skips this pays the same price for the same failure forever.
+
 ## 6. Review
 
 Follow `.agents/skills/adversarial-review/SKILL.md`.
