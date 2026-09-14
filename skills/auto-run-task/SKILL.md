@@ -266,8 +266,10 @@ Then:
    and treating them alike is how an unsupervised run goes wrong:
 
    - **Caused by this change** - a test, a type, a lint or a build error your own
-     diff explains. Fix it, verify, push again: at most **two** attempts at the
-     same failing job, then escalate with the output.
+     diff explains. This step decides only *whose* failure it is; what is actually
+     broken is the four kinds in stage 5's "When it comes back red", and they
+     apply here unchanged. Classify, fix, verify, push again: at most **two**
+     attempts at the same failing job, then escalate with the output.
    - **A flake** - a timeout, a network blip, an infrastructure error with no
      logical link to the diff. Re-run the job. A re-run **does not spend** one of
      those two attempts, because nothing was learned and nothing was changed -
@@ -309,8 +311,11 @@ It carries:
 - **The plan self-review** from stage 3.
 - **Deviations.** Any architecture rule bent, with its justification. A silent
   deviation is a defect; an unsupervised silent deviation is worse.
-- **Retries.** Anything that failed and was fixed, with what the failure was. The
-  reviewer should never have to reconstruct that from the commit list.
+- **Retries.** Anything that failed and was fixed, **which of the four** kinds in
+  stage 5 you classified it as, and the line that decided it. The reviewer should
+  never have to reconstruct that from the commit list. Supervised, that
+  classification is said out loud to somebody who can object to it; here the log is
+  the only place it is ever checked.
 - **Deferred.** What was left for a later phase, and why.
 - **Not covered.** What the tests and the runtime verification do not prove, and
   whether the runtime verification ran at all - which surface it exercised, or why
