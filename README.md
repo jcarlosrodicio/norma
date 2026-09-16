@@ -112,7 +112,8 @@ there to answer - you hand over a roadmap phase and leave.
 
 ```
 orient → enrich → branch → plan → implement → verify → review → document → close → deliver
-         ^decide          ^self-review                                             ^commit, push, PR, CI
+         ^decide ^run      ^self-review                                     ^run    ^commit, push, PR, CI
+                  start                                                      close
 ```
 
 Each stop becomes something the agent does and **writes down**: the open questions
@@ -135,6 +136,45 @@ A project that already had the harness needs one edit before using it: `Step 9` 
 its own `docs/harness/mandatory-steps.md` has to name the exception, or the binding
 checklist forbids the delivery. New installs get it from the template.
 
+## One task, several sessions
+
+The loop deliberately splits a task across sessions: the adversarial review asks
+for a fresh one on a different model, the correction comes back afterwards, an
+unsupervised run fans out into subagents. **A task run is not an agent session**,
+and nothing in the harness used to say so - the verification stamp describes one
+gate run, the change folder describes the artifacts, and neither says "these four
+sessions were one task".
+
+```sh
+scripts/harness/run start phase-16-whatever   # right after creating the branch
+scripts/harness/run close <report path>       # with the change, after the archive
+```
+
+`start` writes `.harness/run.json` - a run id, the change, the branch, the
+timestamp. A file in the worktree rather than an environment variable, because the
+reviewer is launched fresh and inherits nothing, and because git already gives
+every worktree its own, so two of them running at once need no mechanism at all.
+It refuses while a run from another branch is open: a different branch is a
+different task, and letting the old one attach itself silently would make every
+later correlation a lie.
+
+Then the pieces that produce evidence record their own: the gate records the mode,
+the selection, the outcome and the duration of every verification; the runtime
+verification records a surface and one of its three verdicts; the review records
+its coverage, its counts and its verdict. `close` seals that into a JSON summary
+the change carries, and removes the context so the next task cannot inherit it.
+
+Three things it deliberately is not. It is **not a score** - the findings stay in
+the report with their file, their line and the input that triggers them, because a
+number cannot be argued with. It **gates nothing** - a stale run is reported by
+`doctor`, never refused by the gate, since verification must not gain a way to fail
+that has nothing to do with the code. And it is **entirely optional**: without a
+context every command writes nothing and exits 0, so a project that upgrades and
+never runs `start` sees no change at all.
+
+Nothing here reaches the network. Whatever collects your agents' telemetry can join
+on that run id afterwards; the harness's job ends at writing it down.
+
 ## Who owns what
 
 This is the whole design. Get it wrong and either upgrades destroy your decisions,
@@ -143,6 +183,7 @@ or your projects drift apart.
 | The harness owns it - replaced on `upgrade` | The project owns it - never touched |
 |---|---|
 | `scripts/harness/verify` | `scripts/harness/config.sh` |
+| `scripts/harness/run` | `.harness/` - runtime state, gitignored, nobody's to keep |
 | `.githooks/pre-commit` | `docs/harness/mandatory-steps.md` |
 | `.agents/skills/<vendored>` | `docs/harness/architecture-rules.md` |
 | `scripts/harness/VERSION` | `openspec/config.yaml` |
@@ -214,7 +255,8 @@ repository gets copies, which is what makes them survive a clone.
 test/run.sh
 ```
 
-302 tests over the gate's real behaviour - its refusals above all - over every
+385 tests over the gate's real behaviour - its refusals above all - over the run
+context and what the gate records through it, over every
 profile and the detection that picks one, over the shape of the skill library, and
 over `install`, `upgrade` and `doctor`, each in a throwaway git repository with a
 stub stack adapter. They live here, once, because the gate is the same file everywhere:

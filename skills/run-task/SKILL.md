@@ -58,6 +58,27 @@ Create and switch to a feature branch before any edit, named after the roadmap p
 the work belongs to. Never work on the default branch - `.githooks/pre-commit`
 refuses commits there anyway.
 
+Then open the run context, which is what makes everything that follows one task
+rather than a pile of unrelated sessions:
+
+```
+scripts/harness/run start <the branch slug>
+```
+
+**A task run is not an agent session.** This task is implemented in one session,
+reviewed in another - deliberately on a different model - and corrected in a third,
+and the identity that has to survive all three is the task's. That is what this
+records, in a file in the worktree rather than in an environment variable, because
+the reviewer is launched fresh and never inherits your environment.
+
+It is idempotent on the same branch, so a resumed session just runs it again. It
+**refuses** when a run from another branch is still open: close that one first,
+or the evidence of this task lands under somebody else's identity. Starting here
+and not earlier is deliberate - orienting and enriching happen before the branch
+exists, sometimes on the default branch and sometimes for a task that is then
+abandoned, and a run minted there would be an orphan. The cost is declared: what
+you did before the branch is not correlated.
+
 ### Before the first edit
 
 That refusal is the only one of these git can make for you. Read `git status` and
@@ -113,8 +134,11 @@ scripts/harness/verify <the test targets involved in this task>
 ```
 
 One command, any agent. It runs the static gates plus only the tests involved in the
-task, and records the result. It refuses to run without a target: naming what you
-selected is part of the step. `--full` is for genuinely cross-cutting changes only,
+task, and records the result - in `.harness/verified` for the hook, and, when a run
+context is open, as an entry in the run's evidence log carrying the mode, the
+selection, the outcome and the duration. You do not run anything extra for that; the
+gate does it, offline, and a failure to record can never fail a verification. It
+refuses to run without a target: naming what you selected is part of the step. `--full` is for genuinely cross-cutting changes only,
 and you justify it in the report. `--docs-only` is for a change that touches no code
 at all - it runs the static gates and refuses the moment it sees a code file, so it
 is not a way around the tests.
@@ -221,9 +245,33 @@ into `openspec/changes/<change>/reports/` now lives under
 `openspec/changes/archive/<date>-<change>/`. Point at the new path in anything that
 links it, and do not go looking for the old one afterwards.
 
-Then **re-run stage 5**. Archiving moves and rewrites files, so the stamp is now
-older than the change and the hook will refuse the commit - correctly, since it
-cannot tell an archive from a code edit.
+3. **Close the run**, after the archive and writing straight into its final path:
+
+   ```
+   scripts/harness/run close openspec/changes/archive/<date>-<change>/reports/norma-run.json
+   ```
+
+   It writes the durable evidence summary - the verifications with their
+   selections, the runtime verification verdicts, the review coverage and
+   findings, and the agent sessions that worked on this task - and then removes
+   the context, so the next task cannot inherit it. `.harness/` is runtime state
+   and disappears; this file is what survives the task. Where the project has no
+   `openspec/`, `scripts/harness/run close` with no argument prints the summary
+   and you put it in the report.
+
+   **After the archive, not before.** Closing first means the archive then moves
+   the summary, and every link to it is written against a path that no longer
+   exists - the same trap the reports have.
+
+   One thing it cannot carry, and saying so is part of reporting honestly: **the
+   final confirmation run below**. Any file written after a verification
+   invalidates the stamp, this summary included, so the last gate run of the task
+   happens after the summary is sealed. What attests to that one is
+   `.harness/verified` and the hook that refuses the commit without it.
+
+Then **re-run stage 5**. Archiving moves and rewrites files and closing the run
+writes one, so the stamp is now older than the change and the hook will refuse the
+commit - correctly, since it cannot tell either of them from a code edit.
 
 Doing this afterwards instead costs a second branch, a second review and a second
 gate run, and leaves the default branch carrying code whose specs were never
@@ -244,6 +292,8 @@ deferral.
 - what the adversarial review found and what you did about it;
 - which documents you updated, and where the phase was closed;
 - that the change is archived and the specs synced, or what blocks it;
+- the **run id** and where its evidence summary landed, so the human can find this
+  task's sessions in whatever collects their telemetry;
 - anything you left out, and why.
 
 Do not commit, push, open a pull request, publish, merge or deploy. When the user

@@ -1,0 +1,265 @@
+#!/bin/sh
+# The harness run context. Vendored from the harness repository and IDENTICAL in
+# every project: it encodes no stack-specific decision at all.
+#
+#   scripts/harness/run start <change-slug> [--kind production|benchmark]
+#   scripts/harness/run status
+#   scripts/harness/run event <type> [key=value...]
+#   scripts/harness/run close [<output file>]
+#
+# A task run is not an agent session. One task is implemented in one session,
+# reviewed in another - deliberately on a different model - and corrected in a
+# third, and the identity that has to survive all three is the task's. That
+# identity lives in a file in the worktree rather than in an environment
+# variable, because the agent process is often already running before the task
+# begins, and the independent reviewer is launched fresh.
+#
+# The absence of a run context is a NORMAL, SUPPORTED state. `event` is a silent
+# no-op without one, so anything that calls it - the gate, a telemetry adapter -
+# works unchanged in a repository where nobody ever started a run.
+#
+# Nothing here reaches the network, and nothing here belongs to a project: edit
+# the harness upstream.
+set -e
+
+ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+cd "$ROOT"
+
+DIR=$ROOT/.harness
+RUN=$DIR/run.json
+EVENTS=$DIR/run-events.jsonl
+STALE_SECONDS=604800   # 7 days
+
+die() { printf 'harness: %s\n' "$1" >&2; exit 2; }
+
+usage() {
+  sed -n '5,8p' "$0" | sed 's/^# \{0,1\}//' >&2
+  exit 2
+}
+
+now()    { date -u '+%Y-%m-%dT%H:%M:%SZ'; }
+branch() { git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown; }
+
+# The branch as it is STORED, which is what every comparison below has to use.
+# git allows a double quote in a branch name, so the stored form is escaped and
+# the live form is not: comparing the two directly made such a branch
+# permanently stale, and made `start` refuse to be idempotent on the very branch
+# it had just recorded.
+stored_branch() { json_string "$(branch)"; }
+
+# A JSON string value. Backslash first, or it escapes the escapes. Control
+# characters are dropped rather than encoded: nothing this file records has any
+# business carrying one, and a raw newline would break the one-line-per-event
+# format that makes the log readable with grep.
+json_string() {
+  printf '%s' "$1" | tr -d '\000-\037' | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+# key=value -> "key": value, with the value typed. An integer stays unquoted so a
+# consumer can sum a duration or a finding count without parsing strings back.
+#
+# The sign is stripped before the digit test, and testing "digits and dashes" as
+# one class is the mistake that has to be avoided: it makes `2026-09-16` and
+# `12-34` look like integers and emits them bare, which is not JSON at all. A
+# session id is exactly the field where that shape turns up, and it is the field
+# the whole correlation hangs on.
+json_pair() {
+  k=${1%%=*}
+  v=${1#*=}
+  case $k in
+    [a-z]*) : ;;
+    *) die "event key '$k' must start with a lowercase letter" ;;
+  esac
+  case $v in
+    -*) digits=${v#-} ;;
+    *) digits=$v ;;
+  esac
+  case $digits in
+    ''|*[!0-9]*) printf '"%s": "%s"' "$(json_string "$k")" "$(json_string "$v")" ;;
+    *) printf '"%s": %s' "$(json_string "$k")" "$v" ;;
+  esac
+}
+
+read_field() {
+  # The context is written by this file alone, one field per line, so a reader
+  # built out of sed is enough and pulls in no dependency a project might not
+  # have. Anything more elaborate would be reading a format we do not control.
+  sed -n "s/^  \"$1\": \"\\(.*\\)\",\\{0,1\\}\$/\\1/p" "$RUN" | head -1
+}
+
+epoch_of() {
+  # Seconds since the epoch for an ISO-8601 UTC timestamp. GNU and BSD date
+  # disagree on the flag, and a machine with neither must not break the gate:
+  # an unknown age is reported as fresh rather than guessed.
+  date -u -d "$1" '+%s' 2>/dev/null \
+    || date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$1" '+%s' 2>/dev/null \
+    || echo ""
+}
+
+# Prints the reason this context no longer describes the current task, or
+# nothing when it still does. A stale context never blocks anything: it is
+# reported, and the events it collects are marked.
+staleness() {
+  [ -f "$RUN" ] || return 0
+  was=$(read_field branch)
+  if [ -n "$was" ] && [ "$was" != "$(stored_branch)" ]; then
+    printf 'started on branch %s, you are on %s' "$was" "$(branch)"
+    return 0
+  fi
+  started=$(epoch_of "$(read_field started_at)")
+  [ -n "$started" ] || return 0
+  age=$(( $(date -u '+%s') - started ))
+  if [ "$age" -gt "$STALE_SECONDS" ]; then
+    printf 'started %s days ago' "$(( age / 86400 ))"
+  fi
+}
+
+cmd_start() {
+  kind=production
+  slug=""
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --kind) kind=$2; shift 2 ;;
+      --kind=*) kind=${1#*=}; shift ;;
+      -*) die "unknown option: $1" ;;
+      *) [ -z "$slug" ] || die "unexpected argument: $1"; slug=$1; shift ;;
+    esac
+  done
+  [ -n "$slug" ] || usage
+  case $slug in
+    *[!A-Za-z0-9._-]*) die "the change slug may only contain letters, digits, '.', '_' and '-'" ;;
+  esac
+  case $kind in
+    production|benchmark) : ;;
+    *) die "--kind must be 'production' or 'benchmark', not '$kind'" ;;
+  esac
+
+  if [ -f "$RUN" ]; then
+    existing=$(read_field run_id)
+    # Starting twice on the same branch is the normal case: a session resumed, a
+    # correction, a reviewer arriving fresh. It reuses the identity rather than
+    # minting a second one for the same task.
+    if [ "$(read_field branch)" = "$(stored_branch)" ]; then
+      printf 'harness: run %s already active for this branch\n' "$existing"
+      return 0
+    fi
+    # A different branch means a different task, and letting the old context
+    # attach itself to it silently would make every later correlation a lie.
+    die "run $existing is still active, started on branch $(read_field branch).
+  Close it first:  scripts/harness/run close [<output file>]"
+  fi
+
+  version=unknown
+  [ -r "$ROOT/scripts/harness/VERSION" ] && version=$(cat "$ROOT/scripts/harness/VERSION")
+  # Sortable, and unique enough for worktrees started in the same second.
+  suffix=$(od -An -tx1 -N4 /dev/urandom 2>/dev/null | tr -d ' \n')
+  [ -n "$suffix" ] || suffix=$$
+  id="nr_$(date -u '+%Y%m%dT%H%M%SZ')_$suffix"
+
+  mkdir -p "$DIR"
+  # No absolute path from this machine, here or in the events: the summary this
+  # produces is committed, and the telemetry contract downstream refuses one.
+  cat > "$RUN" <<EOF
+{
+  "schema": "norma.run/1",
+  "run_id": "$(json_string "$id")",
+  "kind": "$(json_string "$kind")",
+  "change": "$(json_string "$slug")",
+  "branch": "$(json_string "$(branch)")",
+  "repo": "$(json_string "$(basename "$ROOT")")",
+  "started_at": "$(json_string "$(now)")",
+  "norma_version": "$(json_string "$version")"
+}
+EOF
+  : > "$EVENTS"
+  printf 'harness: run %s started (%s)\n' "$id" "$kind"
+}
+
+cmd_status() {
+  if [ ! -f "$RUN" ]; then
+    echo "harness: no active run - that is a normal state"
+    return 0
+  fi
+  cat "$RUN"
+  why=$(staleness)
+  [ -n "$why" ] && printf 'harness: this run is STALE - %s\n' "$why" >&2
+  if [ -f "$EVENTS" ]; then
+    printf 'harness: %s events recorded\n' "$(wc -l < "$EVENTS" | tr -d ' ')"
+  fi
+  return 0
+}
+
+cmd_event() {
+  # Without a context there is nothing to correlate to. Exit 0 and write
+  # nothing: the callers are the gate and the telemetry adapters, and neither
+  # may fail because a run was never started.
+  [ -f "$RUN" ] || return 0
+  type=$1
+  [ -n "$type" ] || usage
+  shift
+  case $type in
+    *[!a-z_]*) die "event type '$type' may only contain lowercase letters and '_'" ;;
+  esac
+
+  line="{\"schema\": \"norma.event/1\", \"run_id\": \"$(json_string "$(read_field run_id)")\""
+  line="$line, \"at\": \"$(json_string "$(now)")\", \"type\": \"$(json_string "$type")\""
+  for pair in "$@"; do
+    case $pair in
+      *=*) line="$line, $(json_pair "$pair")" ;;
+      *) die "event fields are key=value, got '$pair'" ;;
+    esac
+  done
+  # An event collected against a context that no longer describes the current
+  # task is still worth having - it is the evidence that the two drifted.
+  [ -n "$(staleness)" ] && line="$line, \"stale\": true"
+  printf '%s}\n' "$line" >> "$EVENTS"
+}
+
+cmd_close() {
+  out=$1
+  if [ ! -f "$RUN" ]; then
+    echo "harness: no active run to close"
+    return 0
+  fi
+
+  # The events go in verbatim, each one already carrying its own type. Grouping
+  # them here would mean re-parsing a format this file just wrote, for something
+  # `grep '"type": "review"'` already answers.
+  summary=$(mktemp)
+  {
+    printf '{\n  "schema": "norma.run.summary/1",\n  "run": '
+    sed 's/^/  /; 1s/^  //' "$RUN" | sed '$ s/$/,/'
+    printf '  "closed_at": "%s",\n  "events": [' "$(json_string "$(now)")"
+    if [ -s "$EVENTS" ]; then
+      printf '\n'
+      sed 's/^/    /; $ !s/$/,/' "$EVENTS"
+      printf '  ]\n}\n'
+    else
+      printf ']\n}\n'
+    fi
+  } > "$summary"
+
+  if [ -n "$out" ]; then
+    mkdir -p "$(dirname "$out")"
+    mv "$summary" "$out"
+    printf 'harness: run %s closed -> %s\n' "$(read_field run_id)" "$out"
+  else
+    cat "$summary"
+    rm -f "$summary"
+  fi
+
+  # Closing removes the context. The evidence that mattered is in the summary,
+  # which the change carries; what is left here is runtime state, and leaving it
+  # behind is how the next task inherits somebody else's run.
+  rm -f "$RUN" "$EVENTS"
+}
+
+cmd=${1:-}
+[ $# -gt 0 ] && shift
+case $cmd in
+  start)  cmd_start "$@" ;;
+  status) cmd_status ;;
+  event)  cmd_event "$@" ;;
+  close)  cmd_close "$1" ;;
+  *) usage ;;
+esac

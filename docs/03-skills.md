@@ -9,13 +9,13 @@ path** so any agent can follow it without a skill system of its own.
 
 | Skill | What it is for |
 |---|---|
-| `run-task` | The whole loop in one procedure, and the single entry point. References every stage by file path, classifies a failure before retrying it, closes the change before handing over, and marks the three stops. |
+| `run-task` | The whole loop in one procedure, and the single entry point. References every stage by file path, classifies a failure before retrying it, opens the run context on the branch stage and closes it with the change, and marks the three stops. |
 | `auto-run-task` | The same loop with nobody watching: it replaces each of the three stops with a decision it records, and ends at an open pull request. A delta over `run-task`, not a copy of it. |
 | `harness-setup` | The interview that fills what `install` cannot infer. Detects first, asks in five rounds, never invents a decision. |
 | `enrich-task` | Turns a vague request or a roadmap line into an implementable specification, ending in the open questions the request left ambiguous. |
 | `architecture-guidelines` | The shared architectural criteria - `references/backend.md` and `references/frontend.md` - plus the precedence order. A project's adoption map narrows it. |
-| `runtime-verification` | The procedure behind step 5 of the loop: decide whether the change has a surface, exercise the happy path and the failure path, capture the evidence the surface actually needs, and report what it does **not** cover. norma owns the method; the project owns the commands. |
-| `adversarial-review` | An independent pass that assumes the work is wrong. Zero trust, attack rather than admire, every finding with a file and a line. Accounts for every file in the diff, and fact-checks its own findings before reporting them. |
+| `runtime-verification` | The procedure behind step 5 of the loop: decide whether the change has a surface, exercise the happy path and the failure path, capture the evidence the surface actually needs, and report what it does **not** cover. Ends by recording a surface and one of three verdicts against the run. norma owns the method; the project owns the commands. |
+| `adversarial-review` | An independent pass that assumes the work is wrong. Zero trust, attack rather than admire, every finding with a file and a line. Accounts for every file in the diff, fact-checks its own findings before reporting them, and records its coverage, its counts and its verdict against the run - the findings themselves stay in the report. |
 | `code-auditing` | The security pass - OWASP Top 10, NIST - for changes touching credentials, permissions, payments or personal data. |
 | `update-docs` | Mandatory before delivery. Documentation that lags the code poisons every later session - the roadmap phase included, which is the update no diff points at. |
 | `commit` | Atomic commits, explicit paths, message written from the actual diff. Never `git add -A`. |

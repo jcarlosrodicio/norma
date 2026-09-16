@@ -297,6 +297,7 @@ cmd_install() {
   [ "$DRY" -eq 1 ] && say "  (dry run: nothing is written)"
 
   install_owned "$HOME_DIR/core/verify" scripts/harness/verify 755
+  install_owned "$HOME_DIR/core/run" scripts/harness/run 755
   install_kept  "$HOME_DIR/profiles/$PROFILE.sh" scripts/harness/config.sh
   install_owned "$HOME_DIR/core/pre-commit" .githooks/pre-commit 755
   install_owned "$HOME_DIR/VERSION" scripts/harness/VERSION 644
@@ -378,6 +379,7 @@ cmd_upgrade() {
   was=$( [ -f scripts/harness/VERSION ] && cat scripts/harness/VERSION || echo unknown )
   say "norma $was -> $VERSION in $REPO"
   install_owned "$HOME_DIR/core/verify" scripts/harness/verify 755
+  install_owned "$HOME_DIR/core/run" scripts/harness/run 755
   install_owned "$HOME_DIR/core/pre-commit" .githooks/pre-commit 755
   vendor_skills
   inject_agents_block
@@ -412,6 +414,26 @@ cmd_doctor() {
       fi
     else
       step "ok  verify matches norma $VERSION"
+    fi
+  fi
+
+  [ -x scripts/harness/run ] && st=0 || st=1
+  check $st "scripts/harness/run present and executable" "run 'norma install'"
+
+  # A run left open on another branch is the failure this reports: the next task
+  # would collect its evidence against somebody else's identity. The gate does
+  # not refuse for it - verification must not gain a way to fail that has nothing
+  # to do with the code - so this is where a human hears about it.
+  if [ -f .harness/run.json ]; then
+    ran=$(sed -n 's/^  "branch": "\(.*\)",$/\1/p' .harness/run.json | head -1)
+    if [ -z "$ran" ]; then
+      # Reporting "ok" here would be worse than saying nothing: it would vouch
+      # for a context this cannot actually read.
+      warn ".harness/run.json is there but its branch could not be read - 'scripts/harness/run status' will say more"
+    elif [ "$ran" != "$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" ]; then
+      warn "an active run started on branch '$ran' - close it: scripts/harness/run close <output file>"
+    else
+      step "ok  a run is active for this branch"
     fi
   fi
 

@@ -5,9 +5,10 @@ scripts/harness/verify <what you were verifying>   # the gate: parse + the suite
 test/run.sh                                        # the suite alone, while iterating
 ```
 
-One suite, currently 317 tests, a couple of seconds. The gate runs it whole - it
+One suite, currently 385 tests, a couple of seconds. The gate runs it whole - it
 is indivisible, so there is nothing to select - after parsing every shell file. It covers the gate's real
-behaviour, the config contract, the hook's four refusals, every stack profile and
+behaviour, the config contract, the hook's four refusals, the run context and what
+the gate records through it, every stack profile and
 the detection that chooses one, the shape of the skill library, and `start`,
 `install`, `upgrade` and `doctor`.
 
@@ -28,8 +29,10 @@ Helpers:
 - `new_repo` creates the temporary repository **and moves into it**, setting `$R`.
 - `done_repo` returns to the repository root and deletes it.
 - `with_gate` copies `core/verify` plus the stub config into place.
+- `with_run` copies `core/run` into place; a test that needs both calls both.
 - `gate <args>` runs the gate, capturing combined output in `$OUT` and the exit
   code in `$RC`.
+- `ctx <args>` does the same for `scripts/harness/run`.
 - `assert_eq`, `assert_has`, `assert_no`, `assert_file`, `assert_nofile`.
 
 ## Conventions, each one paid for
@@ -47,6 +50,15 @@ Helpers:
   survives in a refusal, that a stamp was not written by a refused run.
 - **`--no-verify` in a test needs a comment** saying why. There is one, in the
   installer test: the hook it just installed correctly refuses that commit.
+- **Assert that the gate survives a broken run context**, not only that it uses a
+  working one. The whole claim of that feature is that recording evidence cannot
+  cost a verification, and the only way that claim stays true is a test with a
+  `scripts/harness/run` that exits non-zero.
+- **An invariant that lives in prose can still be tested.** Which stage closes the
+  run, and that it comes after the archive, is a line number comparison over two
+  documents - the same trick the interview-round tests use. It costs four lines
+  and it catches a reordering that would otherwise be found by a dead link in a
+  merged pull request.
 
 ## Adding a test
 

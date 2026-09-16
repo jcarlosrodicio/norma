@@ -25,6 +25,10 @@ Work from the change artifacts and the diff. Do not read the implementation
 author's reasoning, planning notes or self-reported test summaries before forming
 your own view - they anchor you to the same assumptions. Read them last, if at all.
 
+`.harness/run-events.jsonl` is one of those: it holds what the author's runs
+already concluded. `scripts/harness/run status` is not - it carries an identity and
+no judgement, which is why the step below can use it without breaking this boundary.
+
 Run this in a fresh session, and prefer a different model from the one that wrote
 the code.
 
@@ -158,6 +162,22 @@ Each finding:
 Close with a single explicit verdict: **safe to commit** or **not safe to commit**.
 If you found nothing blocking, say so plainly - do not invent findings to look
 thorough.
+
+Then record the same thing where a machine can read it, **in addition to** the
+report above and never instead of it:
+
+```
+scripts/harness/run event review review=adversarial \
+  files_in_change=<n> files_reviewed=<n> files_skipped=<n> \
+  blocking=<n> should_fix=<n> nit=<n> verdict=<safe_to_commit|not_safe_to_commit>
+```
+
+Counts and a verdict, not a score: the findings themselves stay in the report,
+where the file, the line and the triggering input live. A review collapsed into a
+number is a review nobody can act on. Without a run context the command writes
+nothing and exits 0, so it is safe to run anywhere. Run it again after the fixes,
+adding `unresolved=<n>`, because the review the human reads is the one that ran
+last.
 
 ---
 
