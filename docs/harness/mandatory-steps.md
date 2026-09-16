@@ -12,6 +12,16 @@ Create and switch to a branch before any edit. This repository has no phases, so
 name it after the change: `hook-stale-stamp-hint`, `profile-rust`. Never work on
 `master`; `.githooks/pre-commit` refuses it.
 
+Then open the run context, with the branch name as the slug:
+
+```
+scripts/harness/run start <branch name>
+```
+
+It is idempotent on the same branch and refuses while a run from another branch is
+still open. Step 4 records its own result against it, step 5 and step 7 record
+theirs, and step 8 closes it.
+
 ## Step 1 - Plan before code
 
 Say what you are changing and what you are not. A change to `core/` or `bin/`
@@ -42,7 +52,9 @@ scripts/harness/verify --docs-only     # docs/, README.md, AGENTS.md only
 
 It parses every shell file, then runs the whole suite. The selection is recorded
 in the stamp even though the suite is indivisible: a reviewer reads it to know
-what you thought you were covering.
+what you thought you were covering. With a run open it is recorded in the run's
+evidence log too, with the outcome and the duration - the gate does that itself,
+offline, and it cannot fail a verification.
 
 `--docs-only` refuses the moment the change touches `bin/`, `core/`, `profiles/`,
 `skills/`, `templates/`, `test/` or `scripts/`, and the hook refuses code
@@ -73,6 +85,10 @@ See "When not to propagate" in [`../02-flows.md`](../02-flows.md).
 
 What changed, the test count, what you verified by hand, and what you left out.
 
+Step 5 and step 7 each end by recording a machine-readable event against the run -
+a surface and a verdict, a coverage count and a finding count. That is in addition
+to this report and never instead of it.
+
 ## Step 7 - Adversarial review (MANDATORY for changes to the gate or the hook)
 
 Follow [`../../skills/adversarial-review/SKILL.md`](../../skills/adversarial-review/SKILL.md).
@@ -92,6 +108,26 @@ omission**: this repository is the harness, its unit of work is a change rather
 than a phase, and it has no `openspec/` directory at all. Say so in the report
 instead of reporting a stage done. The day either becomes true, this paragraph is
 what has to change first.
+
+Its third half is not a no-op. **Close the run:**
+
+```
+scripts/harness/run close
+```
+
+With no argument it prints the summary instead of writing a file, which is the
+right shape here precisely because there is no change folder to put one in: it
+goes into the report of step 6.
+
+**Close it last, after the final run of step 4.** Everything it removes lives
+under the gitignored `.harness/`, so nothing it does can invalidate a stamp - and
+closing after the last verification is the one ordering where the summary carries
+that verification too. A project that writes the summary into a change folder
+cannot have this: there the file itself invalidates the stamp, so it closes before
+the confirming run and the summary is one verification short. Here it is not, and
+that is worth keeping.
+
+A run left open is a run the next change inherits, so closing is not optional.
 
 ## Step 9 - Stop
 

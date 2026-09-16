@@ -154,6 +154,22 @@ It carries:
 Subject to the same rule as every committed file: no credentials, no tokens, no
 `.env` values, and no absolute paths from this machine.
 
+Then record the verdict where a machine can read it, **in addition to** the report
+and never instead of it:
+
+```
+scripts/harness/run event runtime_verification surface=<screen|command|endpoint|store|none> \
+  verdict=<works_as_specified|does_not|could_not_be_verified> evidence_count=<n>
+```
+
+The three verdicts are the three above, unchanged - collapsing *could not be
+verified* into *does not* is the same lie here as it is in the report, and a
+machine reading it later cannot tell them apart afterwards. Without a run context
+the command writes nothing and exits 0. **One event per surface** when the change
+touched more than one, for the same reason the evidence is captured per surface.
+No paths, no output, no page dumps: this is a count and a verdict, and the report
+is where the words go.
+
 ## When it cannot be run at all
 
 A credential you do not have, a paid or external service, a device that is not

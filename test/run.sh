@@ -63,6 +63,20 @@ with_gate() {
   cp "$HOME_DIR/test/fixtures/config.sh" scripts/harness/config.sh
 }
 
+with_run() {
+  mkdir -p scripts/harness
+  cp "$HOME_DIR/core/run" scripts/harness/run
+  chmod +x scripts/harness/run
+}
+
+# run the run context, capturing stdout+stderr and the exit code
+ctx() {
+  set +e
+  OUT=$(sh scripts/harness/run "$@" 2>&1)
+  RC=$?
+  set -e
+}
+
 # run the gate, capturing stdout+stderr and the exit code
 gate() {
   set +e
@@ -231,6 +245,190 @@ gate --docs-only
 assert_eq "a config without HARNESS_CODE_PATHS is a hard failure" "$RC" 2
 done_repo
 
+# --------------------------------------------------------- the run context ----
+echo ""
+echo "the run context"
+
+new_repo; with_run
+ctx status
+assert_eq "status without a context is not a failure" "$RC" 0
+assert_has "and says so plainly" "$OUT" "normal state"
+ctx event verify outcome=pass
+assert_eq "an event without a context is a silent no-op" "$RC" 0
+assert_nofile "writing nothing at all" "$R/.harness/run-events.jsonl"
+done_repo
+
+new_repo; with_run
+git switch -qc phase-16-demo
+ctx start phase-16-demo
+assert_eq "start creates a run" "$RC" 0
+assert_file "as a file in the worktree, not an environment variable" "$R/.harness/run.json"
+assert_has "printing the identity it minted" "$OUT" "nr_"
+first=$(sed -n 's/^  "run_id": "\(.*\)",$/\1/p' .harness/run.json)
+ctx start phase-16-demo
+assert_eq "starting again on the same branch reuses it" "$RC" 0
+assert_eq "rather than minting a second identity for one task" \
+  "$(sed -n 's/^  "run_id": "\(.*\)",$/\1/p' .harness/run.json)" "$first"
+done_repo
+
+new_repo; with_run
+git switch -qc branch-a
+sh scripts/harness/run start task-a >/dev/null
+git switch -qc branch-b
+ctx start task-b
+assert_eq "an active run from another branch refuses the new one" "$RC" 2
+assert_has "naming the branch it belongs to" "$OUT" "branch-a"
+assert_has "and how to end it" "$OUT" "run close"
+done_repo
+
+new_repo; with_run
+git switch -qc branch-a
+sh scripts/harness/run start task-a >/dev/null
+git switch -qc branch-b
+sh scripts/harness/run event verify outcome=pass
+assert_has "an event collected against a drifted context is marked stale" \
+  "$(cat .harness/run-events.jsonl)" '"stale": true'
+done_repo
+
+new_repo; with_run
+git switch -qc phase-16-demo
+sh scripts/harness/run start phase-16-demo >/dev/null
+ctx start 'not a slug'
+assert_eq "a slug with a space is refused" "$RC" 2
+ctx start ok --kind sideways
+assert_eq "a kind outside the two is refused" "$RC" 2
+assert_has "naming both of them" "$OUT" "benchmark"
+ctx event verify Mode=full
+assert_eq "an event key that is not lowercase is refused" "$RC" 2
+ctx event verify lonely
+assert_eq "an event field that is not key=value is refused" "$RC" 2
+done_repo
+
+new_repo; with_run
+git switch -qc phase-16-demo
+sh scripts/harness/run start phase-16-demo >/dev/null
+sh scripts/harness/run event review 'verdict=he said "no"' blocking=2
+assert_has "a quote in a value is escaped rather than breaking the line" \
+  "$(cat .harness/run-events.jsonl)" '\"no\"'
+assert_has "an integer stays an integer" "$(cat .harness/run-events.jsonl)" '"blocking": 2'
+assert_eq "one event is one line" "$(wc -l < .harness/run-events.jsonl | tr -d ' ')" "1"
+# Digits and dashes are not an integer, and reading them as one emitted a bare
+# 2026-09-16 into the log: not JSON at all, in the one field the whole
+# correlation hangs on.
+sh scripts/harness/run event agent_session runtime=codex session_id=2026-09-16 turns=-3
+assert_has "an id of digits and dashes is quoted, not emitted as a number" \
+  "$(tail -1 .harness/run-events.jsonl)" '"session_id": "2026-09-16"'
+assert_has "while a negative integer is still a number" \
+  "$(tail -1 .harness/run-events.jsonl)" '"turns": -3'
+assert_has "and a lone dash is a string" \
+  "$(sh scripts/harness/run event review verdict=- && tail -1 .harness/run-events.jsonl)" '"verdict": "-"'
+done_repo
+
+# git allows a double quote in a branch name, and the branch reaches both the
+# context and every event written against it.
+new_repo; with_run
+git switch -qc 'quote"branch'
+ctx start awkward-branch
+assert_eq "a branch name carrying a quote does not break the context" "$RC" 0
+assert_has "it is escaped where it is stored" "$(cat .harness/run.json)" 'quote\"branch'
+sh scripts/harness/run event verify outcome=pass
+assert_no "and the event it stamps is not marked stale by its own branch" \
+  "$(cat .harness/run-events.jsonl)" '"stale": true'
+done_repo
+
+new_repo; with_run
+ctx
+assert_eq "no subcommand prints the usage" "$RC" 2
+assert_has "naming start" "$OUT" "run start"
+assert_has "and close" "$OUT" "run close"
+assert_has "starting at the first command, with no blank line from the comment block" \
+  "$(printf '%s' "$OUT" | head -1)" "run start"
+done_repo
+
+new_repo; with_run
+git switch -qc phase-16-demo
+sh scripts/harness/run start phase-16-demo >/dev/null
+sh scripts/harness/run event agent_session runtime=claude-code session_id=abc turns=7
+ctx close reports/norma-run.json
+assert_eq "close writes the durable summary" "$RC" 0
+assert_file "at the path it was given, creating the directory" "$R/reports/norma-run.json"
+assert_has "carrying the run" "$(cat reports/norma-run.json)" "norma.run.summary/1"
+assert_has "and the session that has to be correlated with it" \
+  "$(cat reports/norma-run.json)" "claude-code"
+assert_nofile "and removes the context, so no task inherits another's run" "$R/.harness/run.json"
+assert_nofile "including its events" "$R/.harness/run-events.jsonl"
+ctx close
+assert_eq "closing nothing is not a failure" "$RC" 0
+done_repo
+
+new_repo; with_run
+git switch -qc phase-16-demo
+sh scripts/harness/run start phase-16-demo >/dev/null
+ctx close
+assert_eq "a run with no events still closes" "$RC" 0
+assert_has "with an empty event list rather than a broken one" "$OUT" '"events": []'
+done_repo
+
+# ------------------------------------------ the gate records what it decided ----
+echo ""
+echo "the gate and the run context"
+
+new_repo; with_gate
+gate unit
+assert_eq "the gate passes with no run context at all" "$RC" 0
+assert_file "and still writes its stamp" "$R/.harness/verified"
+done_repo
+
+new_repo; with_gate; with_run
+git switch -qc phase-16-demo
+sh scripts/harness/run start phase-16-demo >/dev/null
+gate unit
+assert_eq "the gate passes with a run context" "$RC" 0
+assert_has "recording the mode" "$(cat .harness/run-events.jsonl)" '"mode": "selected"'
+assert_has "and the selection a reviewer has to judge" \
+  "$(cat .harness/run-events.jsonl)" '"selection": "unit"'
+assert_has "and that it passed" "$(cat .harness/run-events.jsonl)" '"outcome": "pass"'
+gate --full
+assert_has "--full is recorded as what it is" "$(cat .harness/run-events.jsonl)" '"mode": "full"'
+gate --docs-only
+assert_has "so is --docs-only" "$(cat .harness/run-events.jsonl)" '"mode": "docs-only"'
+done_repo
+
+new_repo; with_gate; with_run
+git switch -qc phase-16-demo
+sh scripts/harness/run start phase-16-demo >/dev/null
+gate
+assert_eq "a gate refused for naming no target still exits 2" "$RC" 2
+assert_eq "and records nothing: nothing was verified" \
+  "$(wc -l < .harness/run-events.jsonl | tr -d ' ')" "0"
+done_repo
+
+new_repo; with_gate; with_run
+git switch -qc phase-16-demo
+cat > scripts/harness/config.sh <<'STUB'
+HARNESS_CODE_PATHS="src"
+harness_gates() { echo gates; }
+harness_test_selected() { return 3; }
+harness_test_all() { return 0; }
+STUB
+sh scripts/harness/run start phase-16-demo >/dev/null
+gate unit
+assert_eq "a failing suite still fails the gate with its own code" "$RC" 3
+assert_has "and the failure is recorded as a failure" \
+  "$(cat .harness/run-events.jsonl)" '"outcome": "fail"'
+assert_has "with the code that caused it" "$(cat .harness/run-events.jsonl)" '"exit_code": 3'
+assert_nofile "and no stamp is written" "$R/.harness/verified"
+done_repo
+
+new_repo; with_gate; with_run
+git switch -qc phase-16-demo
+sh scripts/harness/run start phase-16-demo >/dev/null
+printf '#!/bin/sh\nexit 9\n' > scripts/harness/run
+gate unit
+assert_eq "a broken 'run' costs a record, never a verification" "$RC" 0
+assert_file "the stamp is written regardless" "$R/.harness/verified"
+done_repo
+
 # ---------------------------------------------------------- the hook ----------
 echo ""
 echo "the pre-commit hook"
@@ -327,6 +525,9 @@ mkdir -p src && echo '{}' > package.json
 OUT=$("$NORMA" install --profile node)
 assert_has "install points at the setup interview" "$OUT" "harness-setup/SKILL.md"
 assert_file "vendors the gate" scripts/harness/verify
+assert_file "vendors the run context beside it" scripts/harness/run
+assert_eq "executable, because the gate and the adapters call it" \
+  "$([ -x scripts/harness/run ] && echo yes)" "yes"
 assert_file "writes a config from the profile" scripts/harness/config.sh
 assert_file "vendors the hook" .githooks/pre-commit
 assert_file "vendors run-task as a real directory" .agents/skills/run-task/SKILL.md
@@ -508,6 +709,29 @@ assert_has "by archiving it, in this branch" "$rt" "openspec-archive-change/SKIL
 assert_has "and by closing the phase where the roadmap describes it" "$rt" "roadmap"
 assert_has "then verifying again, because an archive rewrites files" "$rt" "re-run stage 5"
 assert_has "the loop's last stage is still the human's" "$rt" "## 9. Hand over"
+
+# The run context opens where the task first has a name the repository agrees
+# with, and closes AFTER the archive. Both ends are load-bearing and both are
+# prose, so they are asserted rather than trusted.
+assert_has "run-task opens the run context on the branch stage" "$rt" "scripts/harness/run start"
+assert_has "saying why a task run is not an agent session" "$rt" "not an agent session"
+assert_has "and closes it at stage 8" "$rt" "scripts/harness/run close"
+# Closing before the archive means the archive moves the summary and every link
+# to it is written against a path that stops existing.
+for doc in "$HOME_DIR/skills/run-task/SKILL.md" "$HOME_DIR/templates/mandatory-steps.md"; do
+  arch=$(grep -n 'openspec-archive-change/SKILL.md' "$doc" | head -1 | cut -d: -f1)
+  cl=$(grep -n 'scripts/harness/run close' "$doc" | head -1 | cut -d: -f1)
+  if [ -n "$arch" ] && [ -n "$cl" ] && [ "$cl" -gt "$arch" ]; then
+    ok "$(basename "$(dirname "$doc")")/$(basename "$doc") closes the run after the archive"
+  else
+    no "$(basename "$doc") closes the run after the archive" "archive at line ${arch:-?}, close at line ${cl:-?}"
+  fi
+done
+# The block injected into a consumer's AGENTS.md is how an agent that reads by
+# path learns the command exists at all. A skill nobody is told about is vendored
+# and invisible, which is the failure the markers were added to stop.
+assert_has "the AGENTS.md block names the run context" \
+  "$(cat "$HOME_DIR/templates/agents-section.md")" "scripts/harness/run start"
 assert_has "update-docs names the roadmap, which no diff points at" \
   "$(cat "$HOME_DIR/skills/update-docs/SKILL.md")" "roadmap entry"
 # A review that read two thirds of the diff reads exactly like one that read all
@@ -798,8 +1022,11 @@ echo '{}' > package.json
 echo "# MINE" > scripts/harness/config.sh
 echo "broken" > scripts/harness/verify
 printf '# Mine\n\n## Harness\n\nMy notes: run-task, scripts/harness/verify.\n' > AGENTS.md
+rm -f scripts/harness/run
 "$NORMA" upgrade --force >/dev/null 2>&1
 assert_eq "upgrade restores the gate it owns" "$(head -1 scripts/harness/verify)" "#!/bin/sh"
+assert_file "and brings the run context to a project installed before it existed" \
+  scripts/harness/run
 assert_eq "and leaves config.sh alone" "$(cat scripts/harness/config.sh)" "# MINE"
 assert_has "and never touches an AGENTS.md that carries no markers" "$(cat AGENTS.md)" "My notes"
 assert_no "not even to append a block to it" "$(cat AGENTS.md)" "harness:begin"
@@ -962,6 +1189,24 @@ OUT=$("$NORMA" doctor 2>&1); RC=$?
 set -e
 assert_eq "catches a symlink that escapes the repository" "$RC" 1
 assert_has "explaining why it matters" "$OUT" "another machine"
+done_repo
+
+# The gate deliberately does not refuse for this - verification must not gain a
+# way to fail that has nothing to do with the code - so doctor is the only place
+# a human is told that the next task is about to collect evidence against
+# somebody else's identity.
+new_repo
+echo '{}' > package.json
+"$NORMA" install --profile node >/dev/null
+git switch -qc branch-a
+sh scripts/harness/run start task-a >/dev/null
+git switch -qc branch-b
+set +e
+OUT=$("$NORMA" doctor 2>&1); RC=$?
+set -e
+assert_has "doctor reports a run left open on another branch" "$OUT" "branch-a"
+assert_has "and how to end it" "$OUT" "run close"
+assert_eq "as a warning, not a blocking problem" "$RC" 0
 done_repo
 
 # --------------------------------------------------------------------- end ----

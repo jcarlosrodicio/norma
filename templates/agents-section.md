@@ -30,6 +30,12 @@
 - `.githooks/pre-commit` enforces it - no stamp, a stale stamp, or the default
   branch and the commit is refused, whatever agent you are. After a fresh clone:
   `git config core.hooksPath .githooks`.
+- **Run context:** `scripts/harness/run start <branch slug>` right after creating the
+  branch, `scripts/harness/run close <report path>` when closing the change. A task
+  run is not an agent session - the implementation, the independent review and the
+  corrections are deliberately different sessions, and this is what makes them one
+  task. The gate and the review steps record their evidence against it; the summary
+  it produces is committed with the change.
 - The agent executes verification itself. Never ask the human to run the tests.
 - Project skills are real directories in `.agents/skills` (vendored, so they survive
   a clone) and are exposed to Claude Code through relative symlinks in

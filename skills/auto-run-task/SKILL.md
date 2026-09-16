@@ -128,6 +128,11 @@ Do everything that does not depend on the answer **first**. Then:
 - Never delete, skip, `xfail`, `@Ignore` or loosen an assertion in a test that
   fails because of your change. A red test is information; silencing it is the one
   failure this whole mode cannot survive.
+- **Never write an evidence event by hand**, and never edit `.harness/` to say
+  something happened. Every event is emitted by the thing that did the work - the
+  gate records its own verification, the review records the review it just ran.
+  A hand-written `outcome=pass` is a test you claimed passed without running it,
+  except that this one is designed to be believed by a machine.
 - Never push to the default branch, never merge the pull request, never enable
   auto-merge, never force-push a branch that is already on the remote.
 - Never deploy, publish a package, run a migration against a production store, or
@@ -198,8 +203,13 @@ answers. Three points, and none of the answers is discretionary:
 - **Anything else it asks** is decided by the contract above, and the answer goes in
   the log like every other one.
 
-Then re-run stage 5, as `run-task` says: the archive moved files, and the hook
-refuses a stamp older than them.
+`run-task` also closes the run context here, and it closes it **after** the archive,
+writing straight into `openspec/changes/archive/<date>-<change>/reports/`. That is
+the path the pull request links - unlike the autonomy log, which is written before
+the archive and therefore moves, this one is born at its final address.
+
+Then re-run stage 5, as `run-task` says: the archive moved files and the close wrote
+one, and the hook refuses a stamp older than them.
 
 ### Stage 9 - Deliver instead of hand over
 
@@ -229,6 +239,13 @@ Then:
    request that looks like any other hides the one fact a reviewer needs to
    calibrate how hard to look: that nothing in it was agreed with a human before
    it was written.
+
+   **Name the run id and link its evidence summary**, beside the autonomy log.
+   Unsupervised, this phase was probably implemented, reviewed and corrected in
+   several sessions and possibly on several models, and that file is the only
+   thing that says those sessions were one task. The two documents answer
+   different questions and neither replaces the other: the log says what was
+   decided, the summary says what was verified and by whom.
 
    **Carry the evidence in.** Whatever
    `.agents/skills/runtime-verification/SKILL.md` captured is sitting outside the
@@ -321,6 +338,8 @@ It carries:
   whether the runtime verification ran at all - which surface it exercised, or why
   the change had none. With nobody watching, a step quietly skipped reads exactly
   like a step that passed.
+- **The run id**, once, at the top. It is how anybody later joins this log to the
+  sessions that produced it.
 
 Write it as you go, not from memory at the end. Memory is exactly what an
 unsupervised run has least of.
@@ -338,9 +357,15 @@ Unsupervised, do the best available version and **say which one it was**:
 - otherwise in-session, reading the change cold from `git diff` rather than from
   your memory of writing it, which is the bias the fresh session existed to break.
 
-Either way the findings are fixed and stage 5 runs again. A finding argued with
-instead of checked is a finding not understood yet - and here there is no human
-to catch that.
+Either way the findings are fixed and stage 5 runs again, and the review event that
+skill ends on is recorded either way too. **A subagent or a fresh context is a
+different session but the same task**, so it does not start a run of its own: it
+reads the one already open in the worktree. That is exactly the case the run
+context exists for, and it is the reason the identity lives in a file rather than
+in the environment you would not have passed it.
+
+A finding argued with instead of checked is a finding not understood yet - and here
+there is no human to catch that.
 
 ## Reporting honestly
 

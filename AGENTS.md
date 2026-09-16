@@ -29,6 +29,7 @@ disagree, the documentation wins and the disagreement is a finding to report.
 ```
 bin/norma          the CLI: start | install | upgrade | doctor | home | version
 core/verify        the verification gate, vendored into projects unchanged
+core/run           the task run context: one identity across the sessions a task takes
 core/pre-commit    the git hook that makes the gate binding
 profiles/*.sh      prefab config.sh per stack: flutter, node, pnpm-turbo, python
 skills/            the canonical skill library, vendored into projects as real dirs
@@ -74,8 +75,10 @@ asked for it, and read `docs/harness/mandatory-steps.md` step 9 first.
 `norma` installs its own harness, so the gate and the hook are real here:
 
 ```
+scripts/harness/run start <branch name>          # right after creating the branch
 scripts/harness/verify <what you were verifying>
-scripts/harness/verify --docs-only     # docs/, README.md, AGENTS.md only
+scripts/harness/verify --docs-only               # docs/, README.md, AGENTS.md only
+scripts/harness/run close                        # last, after the final verification
 ```
 
 `.githooks/pre-commit` refuses `master`, a missing or stale stamp, and code

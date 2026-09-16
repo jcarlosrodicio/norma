@@ -32,6 +32,48 @@ USAGE
 # use rtk when present: same commands, far less output in the agent's context
 run() { if command -v rtk >/dev/null 2>&1; then rtk "$@"; else "$@"; fi; }
 
+# Record the outcome of this verification against the run context, when there is
+# one. Three properties this must never lose, in order of how expensive losing
+# them is:
+#
+#   1. It cannot change what the gate decides. The status the trap fires with is
+#      the status the shell exits with - nothing below calls exit - and every
+#      command is guarded, so a broken or missing `run` costs a record, never a
+#      verification.
+#   2. It reaches no network. The gate has to keep working with the machine
+#      offline; evidence that needs a server is evidence the gate cannot collect.
+#   3. It is a no-op without a run context, which `scripts/harness/run event`
+#      already guarantees. A project that never starts a run sees no change.
+RECORD_MODE=""
+record_outcome() {
+  rc=$?
+  [ -n "$RECORD_MODE" ] || return 0
+  [ -x "$ROOT/scripts/harness/run" ] || return 0
+  if [ "$rc" -eq 0 ]; then outcome=pass; else outcome=fail; fi
+  set +e
+  if [ "$RECORD_STARTED" -gt 0 ] 2>/dev/null; then
+    "$ROOT/scripts/harness/run" event verify \
+      mode="$RECORD_MODE" selection="$RECORD_SELECTION" outcome="$outcome" \
+      exit_code="$rc" duration_s="$(( $(date '+%s') - RECORD_STARTED ))" >/dev/null 2>&1
+  else
+    "$ROOT/scripts/harness/run" event verify \
+      mode="$RECORD_MODE" selection="$RECORD_SELECTION" outcome="$outcome" \
+      exit_code="$rc" >/dev/null 2>&1
+  fi
+  set -e
+  return 0
+}
+
+# Armed only once the gate is about to do real work, so the refusals above it -
+# no target named, no config, --docs-only over code - record nothing. Those are
+# the harness being pointed at the wrong thing, not a verification that happened.
+record_from() {
+  RECORD_MODE=$1
+  RECORD_SELECTION=$2
+  RECORD_STARTED=$(date '+%s' 2>/dev/null || echo 0)
+  trap record_outcome EXIT
+}
+
 if [ ! -r "$CONFIG" ]; then
   echo "harness: missing $CONFIG - run 'norma install' or 'norma doctor'" >&2
   exit 2
@@ -84,10 +126,13 @@ if [ "$1" = "--docs-only" ]; then
     exit 2
   fi
   echo "harness: docs-only change - static gates only, no tests to select"
+  record_from docs-only docs-only
   harness_gates
   stamp "docs-only"
   exit 0
 fi
+
+if [ "$1" = "--full" ]; then record_from full --full; else record_from selected "$*"; fi
 
 harness_gates
 

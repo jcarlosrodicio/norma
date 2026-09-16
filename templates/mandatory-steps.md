@@ -25,6 +25,18 @@ Create and switch to a branch before any edit. TODO(harness): state the naming
 convention (for example `phase-NN-<slug>`). Never work directly on the default
 branch.
 
+Then open the run context:
+
+```
+scripts/harness/run start <the branch slug>
+```
+
+A task run is not an agent session. This task may be implemented in one session,
+reviewed in another and corrected in a third, and that command is what makes the
+three one task. It is idempotent on the same branch and **refuses** while a run
+from another branch is still open. Every later step records its evidence against
+it, and step 8 closes it.
+
 ## Step 1 - Plan before code
 
 The task list must exist and be reviewed before implementation starts. Keep entries
@@ -89,6 +101,10 @@ changes only, and you justify it in the report.
 Record what you selected, why, and the passed/failed/skipped counts. Zero new static
 findings: fix them, do not annotate them away.
 
+When a run context is open, the gate also records the mode, the selection, the
+outcome and the duration into the run's evidence log. You run nothing extra for
+that, it never reaches the network, and it cannot make a verification fail.
+
 This gate is not advisory. `.githooks/pre-commit` refuses the commit when the stamp
 is missing, older than the staged files, or when you are on the default branch - so
 it holds for every agent and for you. After a fresh clone, restore it with
@@ -122,6 +138,11 @@ so here and why, so nobody goes looking.
 Write the verification report into the change folder: commands executed, results,
 what was verified by hand, and what was left uncovered.
 
+The skills for steps 5 and 7 each end by recording a machine-readable event -
+a surface and a verdict, a coverage count and a finding count. Those are **in
+addition to** this report, never instead of it: the findings, the file, the line
+and the triggering input live here, and nothing is reduced to a score.
+
 ## Step 7 - Adversarial review (MANDATORY)
 
 Follow `.agents/skills/adversarial-review/SKILL.md`, preferably in a fresh session
@@ -147,9 +168,24 @@ request as the code, because neither needs it merged to be true:
    `openspec/specs/` and moves the change folder under `openspec/changes/archive/`.
    Ordinary file operations, both of them.
 
-**Then run step 4 again.** Archiving rewrites and moves files, so the stamp is now
-older than the change and the hook will refuse the commit - correctly, because it
-cannot tell an archive from a code edit.
+3. **Close the run**, after the archive, straight into its final path:
+
+   ```
+   scripts/harness/run close openspec/changes/archive/<date>-<change>/reports/norma-run.json
+   ```
+
+   `.harness/` is runtime state and disappears; that file is what survives this
+   task. After the archive, not before - closing first means the archive moves the
+   summary and every link to it points at a path that no longer exists. What it
+   cannot carry is the confirmation run below, because that one happens after the
+   summary is sealed; `.harness/verified` and the hook are what attest to it.
+   TODO(harness): if this project keeps its reports somewhere other than an OpenSpec
+   change folder, say where - and if it has no OpenSpec at all, say that
+   `scripts/harness/run close` with no argument prints the summary for the report.
+
+**Then run step 4 again.** Archiving rewrites and moves files and closing the run
+writes one, so the stamp is now older than the change and the hook will refuse the
+commit - correctly, because it cannot tell either of them from a code edit.
 
 Leaving either half for after the merge costs a second branch, a second review and
 a second gate run, and leaves the default branch carrying code whose specs were

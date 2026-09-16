@@ -48,6 +48,7 @@ project's decisions, or the consumers drift apart until the harness means nothin
 | norma owns it - replaced on `upgrade` | The project owns it - never touched |
 |---|---|
 | `scripts/harness/verify` | `scripts/harness/config.sh` |
+| `scripts/harness/run` | `.harness/` (runtime state, gitignored, nobody's to keep) |
 | `.githooks/pre-commit` | `docs/harness/mandatory-steps.md` |
 | `.agents/skills/<vendored>` | `docs/harness/architecture-rules.md` |
 | `scripts/harness/VERSION` | `openspec/config.yaml` |
@@ -109,6 +110,64 @@ Four rules, in order. Each exists because of a specific failure:
 The one hole is `git commit --no-verify`, which no git hook can close. CI running
 the full suite on the pull request is the backstop, and the loop template says so
 explicitly rather than pretending otherwise.
+
+### `core/run` - the task's identity
+
+Byte-identical in every project, and it encodes no stack-specific decision at
+all: there is no config to source, because there is nothing here a project could
+legitimately disagree with.
+
+It exists because of one fact the rest of the harness had no way to express:
+**a task run is not an agent session.** The loop deliberately splits a task
+across sessions - the adversarial review asks for a fresh session on a different
+model, a correction comes back afterwards, an unsupervised run fans out into
+subagents - and before this, nothing tied those together. The verification stamp
+describes one gate run. The change folder describes the artifacts. Neither says
+"these four sessions were one task", which is exactly what somebody looking at
+the telemetry those sessions emit needs to know.
+
+```sh
+scripts/harness/run start <change slug> [--kind production|benchmark]
+scripts/harness/run status
+scripts/harness/run event <type> [key=value...]
+scripts/harness/run close [<output file>]
+```
+
+`start` writes `.harness/run.json`: a run id, the kind, the change, the branch,
+the repository name, the timestamp and the norma version. No secrets, no prompts,
+no model output, no absolute path from this machine - the summary it eventually
+produces is committed, and a machine path in a committed file is a rule this
+harness already has. `event` appends a line to `.harness/run-events.jsonl`.
+`close` writes the summary - the run plus every event, verbatim - and removes
+both files.
+
+Four decisions inside it, each one load-bearing:
+
+- **A file in the worktree, not an environment variable.** The agent process is
+  usually running before the task begins, and the independent reviewer is
+  launched fresh and inherits nothing. An exported variable cannot describe a
+  task that started after the shell did, which is the normal case rather than the
+  edge one.
+- **`.harness/`, which is already gitignored and already per worktree.** Two
+  concurrent worktrees get separate contexts with no mechanism at all, because
+  git gave each one its own working directory. Nothing had to be invented for
+  concurrency, and the run id carries a random suffix only so two runs started in
+  the same second are still distinct.
+- **No run context is a normal state.** `event` is a silent no-op without one and
+  exits 0. That is what lets the gate call it unconditionally, and what makes
+  this whole feature invisible to a project that upgrades and never uses it.
+- **It gates nothing.** A stale context - one started on another branch, or a
+  week ago - is reported by `status` and by `doctor`, and marks the events it
+  collects, but refuses nothing. Verification must not gain a way to fail that
+  has nothing to do with the code, and `start` refusing a second branch is the
+  one refusal, made at the only moment where it costs nobody a red gate.
+
+The gate records its own result through it - mode, selection, outcome, exit code,
+duration - and that record is armed only once the gate is about to do real work,
+so the refusals above it record nothing: no target named and no config are the
+harness being pointed at the wrong thing, not a verification that happened. The
+record reaches no network, and a `run` that is missing, broken or non-executable
+costs a record and never a verification.
 
 ### `profiles/*.sh` - stack adapters
 
@@ -244,6 +303,17 @@ Two adaptations the contract could not express on its own:
   Until that existed, `norma upgrade` run in this tree silently turned all eleven
   links into copies - undoing the decision above, in the one repository where no
   consumer would ever notice, and leaving the stale stamp that made it visible.
+
+**Evidence is recorded by whatever produced it, and never reduced to a score.**
+The run's evidence log is written by the gate for its own verification, by the
+runtime verification for its own verdict, by the review for its own coverage and
+findings - never by an agent summarising all three afterwards. That is the same
+rule as "a stage reported as done without the command output behind it", moved to
+a place a machine reads. And the ordering it implies is deterministic evidence
+first, independent review second, self-report last, which is why the review event
+carries counts and a verdict while the findings themselves stay in the report,
+with their file, their line and the input that triggers them. A number cannot be
+argued with, which is precisely what makes it useless as a review.
 
 **shellcheck is not in the gates**, deliberately. It is not installed here, and
 wiring in a linter nobody has means the gate changes behaviour the day somebody

@@ -27,7 +27,8 @@ Run inside the target repository. `--dry-run` prints the plan and writes nothing
 use it first on a repository that already has content.
 
 1. Require a git repository, and resolve the profile - detected or `--profile`.
-2. Vendor `core/verify` → `scripts/harness/verify` (0755).
+2. Vendor `core/verify` → `scripts/harness/verify` (0755) and `core/run` →
+   `scripts/harness/run` (0755).
 3. Write `profiles/<p>.sh` → `scripts/harness/config.sh` **only if absent**.
 4. Vendor `core/pre-commit` → `.githooks/pre-commit` (0755), and
    `git config core.hooksPath .githooks`.
@@ -49,8 +50,9 @@ Installing twice changes nothing - there is a test for it.
 
 ## `norma upgrade [--force]`
 
-Re-vendors only what the harness owns: the gate, the hook, the skills, the
-version stamp, and the `AGENTS.md` block **when the markers are there**. It never
+Re-vendors only what the harness owns: the gate, the run context, the hook, the
+skills, the version stamp, and the `AGENTS.md` block **when the markers are
+there**. It never
 touches `config.sh`, the documents or `openspec/config.yaml`.
 
 Three details that are each there for a reason:
@@ -132,6 +134,10 @@ the vendored copy inside the repository.
 Changes nothing; exits non-zero when something is blocking. It reports:
 
 - the gate present, and whether it matches upstream or was edited locally;
+- `scripts/harness/run` present and executable, and **a run left open on another
+  branch** - the gate does not refuse for that, deliberately, so this is the only
+  place a human hears that the next task is about to collect its evidence under
+  somebody else's identity;
 - the config contract complete, and whether it still has `TODO`;
 - the hook present and `core.hooksPath` armed;
 - `CLAUDE.md` → `AGENTS.md`, and that `AGENTS.md` points at `run-task` and the gate;
@@ -153,7 +159,8 @@ the human: after enriching, after planning, and before delivery.
 
 ```
 orient → enrich → branch → plan → implement → verify → review → document → close → hand over
-         ^stop            ^stop                                                    ^stop
+         ^stop   ^run     ^stop                                            ^run    ^stop
+                  start                                                     close
 ```
 
 `docs/harness/mandatory-steps.md` in each project is the binding checklist, with
@@ -176,8 +183,15 @@ does and records:
 
 ```
 orient → enrich → branch → plan → implement → verify → review → document → close → deliver
-         ^decide          ^self-review                                             ^commit, push, PR, CI
+         ^decide ^run      ^self-review                                     ^run    ^commit, push, PR, CI
+                  start                                                      close
 ```
+
+The run context matters more here than under supervision, not less: a phase run
+unsupervised is implemented, reviewed and corrected across sessions nobody
+watched, and that identity is what says they were one phase. The pull request
+carries the run id and links the summary beside the autonomy log - the log says
+what was decided, the summary says what was verified and by whom.
 
 Three things bound it, and none of them may be softened:
 
@@ -262,6 +276,12 @@ the day that changed, the documented bootstrap would break.
 commit being prepared, so an unrelated dirty tree does not block a documentation
 commit - and the whole change when nothing is staged.
 
+**None of the three reaches the run's evidence log**, and the gate is written so
+that it cannot: the recording is armed only once the gate is about to do real
+work. These are the harness being pointed at the wrong thing, not a verification
+that happened, and a log that counted them would report a task as having verified
+three times when it verified once.
+
 ### The hook
 
 | Refusal | Why |
@@ -270,6 +290,21 @@ commit - and the whole change when nothing is staged.
 | No stamp | Nothing was verified. |
 | Stamp older than a staged file | Code was edited after being verified. The refusal prints the previous selection, ready to paste. |
 | `docs-only` stamp with staged code | Rule 3 cannot catch code edited *before* that run, and a docs-only run vouches for no test at all. |
+
+### The run context
+
+| Refusal | Exit | Why |
+|---|---|---|
+| `start` while a run from another branch is open | 2 | A different branch is a different task. Letting the old context attach itself silently would make every later correlation a lie, and a lie a machine believes. |
+| A change slug with anything but letters, digits, `.`, `_` and `-` | 2 | It reaches a JSON file and a path. |
+| `--kind` outside `production` and `benchmark` | 2 | The distinction is the contract; a third value is a typo. |
+| An event key that is not lowercase, or a field that is not `key=value` | 2 | The log is read by machines, and a malformed line is found weeks later by whoever needed it. |
+
+Everything else here refuses nothing on purpose. `status` without a context is not
+a failure, `event` without one writes nothing and exits 0, `close` with nothing to
+close says so and exits 0. The absence of a run is a **normal, supported state**:
+it is what a project that upgrades and never adopts this sees, and what any agent
+working outside a repository sees.
 
 Soften none of these without reading the reason and replacing it with something
 stronger.
