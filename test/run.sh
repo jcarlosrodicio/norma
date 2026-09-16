@@ -41,7 +41,12 @@ new_repo() {
   cd "$HOME_DIR"
   R=$(mktemp -d)
   cd "$R"
-  git init -q
+  # `-b master` explícito, no el defecto de la máquina. Media docena de
+  # aserciones de esta suite nombran `master` como la rama por defecto, y el
+  # primer CI lo dijo: el runner tiene `init.defaultBranch=main` y el hook
+  # refusaba nombrando `main`, correctamente. La suite era la que daba por hecho
+  # la configuración de git de quien la ejecuta.
+  git init -q -b master
   git config user.email t@example.com
   git config user.name Test
   git config commit.gpgsign false

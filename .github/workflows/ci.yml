@@ -1,0 +1,34 @@
+name: CI
+
+# Hasta ahora este repositorio no tenía CI. La suite tarda dos segundos y corre
+# sólo si alguien se acuerda - y lo que este repositorio publica es el gate que
+# obliga a los demás a no olvidarse. Predicar y no cumplir.
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    # El mismo runner autoalojado que los demás repositorios: aquí no se gastan
+    # minutos de GitHub. La suite es POSIX sh y no instala nada.
+    runs-on: [self-hosted, vps-hetzner]
+    steps:
+      - uses: actions/checkout@v5
+
+      # El propio gate del harness, no una llamada suelta a la suite: si CI
+      # ejecutara algo distinto de lo que ejecuta la persona, un día uno pasaría y
+      # el otro no y nadie sabría cuál tiene razón.
+      - name: Gate completo
+        run: scripts/harness/verify --full
