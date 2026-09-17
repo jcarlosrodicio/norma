@@ -84,9 +84,13 @@ harness_test_selected() { run <runner> "$@"; }           # ONLY these targets
 harness_test_all()      { run <runner>; }                # --full
 ```
 
-`run` is provided by the gate: it routes through [rtk](https://github.com/rtk-ai/rtk)
-when installed, cutting the output that reaches an agent's context, and calls the
-command directly when not.
+`run` is provided by the gate: it executes the command and hands back its exit
+status, which is the only thing the verdict may depend on. It used to route
+through [rtk](https://github.com/rtk-ai/rtk) when installed, to cut the output
+reaching an agent's context - until a measurement in a consumer showed that
+wrapper exiting 0 where the command exited 1, so a verification passed with a
+broken typecheck. A project may still filter output inside its own `config.sh`;
+what it may not do is return a status that is not the command's.
 
 A successful run writes `.harness/verified` - the **stamp** - containing the
 timestamp, the branch and the exact selection. The stamp is runtime state: it is
