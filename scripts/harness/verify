@@ -29,8 +29,20 @@ USAGE
   exit 2
 }
 
-# use rtk when present: same commands, far less output in the agent's context
-run() { if command -v rtk >/dev/null 2>&1; then rtk "$@"; else "$@"; fi; }
+# Run a gate command. The verdict of this gate is the command's exit status, and
+# nothing between the command and this shell is allowed to decide it.
+#
+# This used to route through `rtk` when installed, to cut the output reaching an
+# agent's context. Measured on 2026-09-17 in a consumer: `rtk pnpm typecheck`
+# exited 0 where `pnpm typecheck` exited 1. The gate stamped, the hook let the
+# commit through, and CI caught it a minute later - the one thing this gate exists
+# to prevent. Some commands survived the trip and others did not, which is why it
+# went unnoticed for as long as it did.
+#
+# A project that wants the saving back can filter inside its own `config.sh`, as
+# long as the status it returns is the command's. The saving is worth something;
+# it is not worth a verification that can be wrong.
+run() { "$@"; }
 
 # Record the outcome of this verification against the run context, when there is
 # one. Three properties this must never lose, in order of how expensive losing
