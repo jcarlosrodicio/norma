@@ -358,7 +358,14 @@ Unsupervised, do the best available version and **say which one it was**:
   your memory of writing it, which is the bias the fresh session existed to break.
 
 Either way the findings are fixed and stage 5 runs again, and the review event that
-skill ends on is recorded either way too. **A subagent or a fresh context is a
+skill ends on is recorded either way too - and so is its report, in the change,
+because the session that applies the fixes may not be this one.
+
+If you leave a hand-over for the sessions that continue, say **who it is for**. A
+correction session should read the autonomy log first; a review session must not -
+its context boundary puts the author's reasoning last, if at all. A hand-over that
+tells everyone to read it first quietly removes the independence the review exists
+for. **A subagent or a fresh context is a
 different session but the same task**, so it does not start a run of its own: it
 reads the one already open in the worktree. That is exactly the case the run
 context exists for, and it is the reason the identity lives in a file rather than
