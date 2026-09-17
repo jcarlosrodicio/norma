@@ -150,6 +150,10 @@ and on a different model from the one that wrote the code. TODO(harness): name t
 areas that also require `.agents/skills/code-auditing/SKILL.md` - authentication,
 credentials, payments, personal data.
 
+The review writes its report into the change folder, dated, beside the verification
+report of step 6. A fresh session is the point of this step, and a fresh session
+ends: whatever only exists in its terminal is gone for whoever applies the fixes.
+
 ## Step 8 - Update documentation and close the change (MANDATORY, before delivery)
 
 Follow `.agents/skills/update-docs/SKILL.md`. TODO(harness): which documents own

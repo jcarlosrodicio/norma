@@ -163,6 +163,26 @@ Close with a single explicit verdict: **safe to commit** or **not safe to commit
 If you found nothing blocking, say so plainly - do not invent findings to look
 thorough.
 
+### Where the report lives
+
+**Write it where this change carries its reports**, next to the verification
+report of the step before, dated: `<date>-adversarial-review.md`. The project's
+`docs/harness/mandatory-steps.md` names that folder. A project that keeps no such
+folder puts it in the pull request body instead - what is not allowed is leaving it
+only in the session. Say the same thing in the session too; the file is not a
+summary of it, it is it.
+
+This is not bookkeeping. The session that applies these fixes is often **another
+session**, on another runtime, and a report that only exists in your terminal is a
+report it cannot read. Measured on 2026-09-17: a review recorded 13 should-fix and
+9 nit findings in the run's events, every finding pointed at a file and a line, and
+none of them existed anywhere a later session could open. The counts survived; the
+review did not.
+
+It also outlives the task. The verification report says what was checked; this one
+says what was checked **against the code**, and the human reading the pull request
+weeks later has no other way to learn what was considered and dismissed.
+
 Then record the same thing where a machine can read it, **in addition to** the
 report above and never instead of it:
 
@@ -172,7 +192,7 @@ scripts/harness/run event review review=adversarial \
   blocking=<n> should_fix=<n> nit=<n> verdict=<safe_to_commit|not_safe_to_commit>
 ```
 
-Counts and a verdict, not a score: the findings themselves stay in the report,
+Counts and a verdict, not a score: the findings themselves stay in the report file,
 where the file, the line and the triggering input live. A review collapsed into a
 number is a review nobody can act on. Without a run context the command writes
 nothing and exits 0, so it is safe to run anywhere. Run it again after the fixes,

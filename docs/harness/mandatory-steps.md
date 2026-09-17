@@ -95,6 +95,10 @@ Follow [`../../skills/adversarial-review/SKILL.md`](../../skills/adversarial-rev
 Those two files are the enforcement: a hole in them is silent, and every refusal
 they make exists because something got through once.
 
+This repository has no change folder, so the report goes **in the pull request
+body**. Wherever it goes, it cannot stay only in the reviewing session: that
+session ends, and whoever applies the fixes is often another one.
+
 ## Step 8 - Update documentation and close the change (MANDATORY, before delivery)
 
 Follow [`../../skills/update-docs/SKILL.md`](../../skills/update-docs/SKILL.md).

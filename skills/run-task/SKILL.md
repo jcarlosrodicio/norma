@@ -209,6 +209,10 @@ is a finding with a file and a line, like any other.
 For changes touching authentication, credentials, permissions, payments or personal
 data, also follow `.agents/skills/code-auditing/SKILL.md`.
 
+The review leaves its report **in the change**, next to the verification report.
+That is what makes it survive the session that wrote it - and the corrections are
+often another session, which can only read files.
+
 Fix what it finds, then re-run stage 5. A finding you argue with instead of checking
 is a finding you did not understand yet.
 
