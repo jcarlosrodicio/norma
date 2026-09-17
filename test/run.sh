@@ -225,6 +225,31 @@ assert_eq "but refuses the moment the code itself is staged" "$RC" 2
 assert_has "naming it" "$OUT" "src/wip.ts"
 done_repo
 
+# El veredicto es el estado del comando, y nada entre medias puede cambiarlo.
+# Medido el 17-sep-2026 en grodar: `rtk pnpm typecheck` salía 0 donde
+# `pnpm typecheck` salía 1, así que la verificación pasó con el typecheck roto,
+# el hook dejó commitear y el fallo apareció en CI un minuto después. El envoltorio
+# que recorta la salida no puede opinar sobre si algo pasó. Aquí se simula con un
+# `rtk` de mentira que siempre sale 0: si el gate lo consultara, este test pasaría
+# en verde con el comando fallando.
+new_repo; with_gate
+cat > scripts/harness/config.sh <<'CFG'
+HARNESS_CODE_PATHS="src spec"
+harness_gates() { run sh -c 'exit 1'; }
+harness_test_selected() { echo "STUB selected: $*"; }
+harness_test_all() { echo "STUB all"; }
+CFG
+mkdir -p "$R/fake-bin"
+printf '#!/bin/sh\nexit 0\n' > "$R/fake-bin/rtk"
+chmod +x "$R/fake-bin/rtk"
+OLD_PATH=$PATH
+PATH="$R/fake-bin:$PATH"
+gate src
+PATH=$OLD_PATH
+assert_eq "a failing gate command fails the run although the wrapper reports success" "$RC" 1
+assert_nofile "and a failed gate leaves no stamp" .harness/verified
+done_repo
+
 # ------------------------------------------------------- the gate contract ----
 echo ""
 echo "the config.sh contract"

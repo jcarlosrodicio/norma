@@ -10,8 +10,9 @@
 #   harness_test_selected()  run ONLY the targets passed as "$@".
 #   harness_test_all()      the full suite (--full, for cross-cutting changes).
 #
-# Use `run` for every command: it routes through rtk when installed, cutting the
-# output that reaches an agent's context, and calls the command directly when not.
+# Use `run` for every command: it executes it and hands back its exit status,
+# which is what the gate decides on. Filtering the output here is fine; changing
+# the status is not, and a wrapper that swallowed one is why this is spelled out.
 
 HARNESS_CODE_PATHS="modules environments"
 
