@@ -255,7 +255,7 @@ repository gets copies, which is what makes them survive a clone.
 test/run.sh
 ```
 
-385 tests over the gate's real behaviour - its refusals above all - over the run
+419 tests over the gate's real behaviour - its refusals above all - over the run
 context and what the gate records through it, over every
 profile and the detection that picks one, over the shape of the skill library, and
 over `install`, `upgrade` and `doctor`, each in a throwaway git repository with a
