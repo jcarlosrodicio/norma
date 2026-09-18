@@ -173,6 +173,64 @@ harness being pointed at the wrong thing, not a verification that happened. The
 record reaches no network, and a `run` that is missing, broken or non-executable
 costs a record and never a verification.
 
+Three fields carry the duration, and a reader needs to know which one to believe:
+
+| field | what it is |
+| --- | --- |
+| `duration_ms` | the measurement. Present whenever the machine offers a clock finer than a second, absent when it does not - never zero to stand in for a missing one. |
+| `duration_clock` | where that measurement came from: `monotonic`, `realtime_ns` or `realtime_s`. |
+| `duration_s` | whole seconds, truncated, kept at the type and meaning it has always had so consumers written before `duration_ms` existed do not change behaviour. **A new reader takes `duration_ms`**: a `0` here means "under a second", not "instant". |
+
+`duration_s` is `duration_ms` divided by a thousand, in integers, so the two
+never disagree. When the clock stepped backwards between the two reads - a wall
+clock can, a monotonic one cannot - neither field is emitted, because an interval
+that ran backwards did not measure a fast verification, it measured nothing.
+
+The clock is probed once per verification, in this order, and the order is a
+decision rather than a preference for the best clock:
+
+| order | source | `duration_clock` |
+| --- | --- | --- |
+| 1 | `date +%s%N`, when the answer really carries nanoseconds | `realtime_ns` |
+| 2 | `perl` + `Time::HiRes` CLOCK_MONOTONIC | `monotonic` |
+| 3 | `date +%s` | `realtime_s` |
+
+Monotonic is the better clock and it is second, because reaching it means
+spawning an interpreter on every verification, and a `perl` that is present but
+wedged hangs the gate with no portable way to bound it: `timeout` is not POSIX
+and macOS does not ship it. Reproduced during review - a `perl` stub that sleeps
+leaves `verify` running indefinitely on a Mac. Trying the command this script
+already depends on first means the common machine never spawns perl at all, and
+the clock step monotonic would have caught is refused below instead of being
+measured wrong. A test asserts perl is not spawned when `date` answers; it is
+the assertion that encodes this decision, and the only one that goes red if the
+order is swapped back.
+
+Being all digits is not enough to accept `date +%s%N`. **BusyBox does not
+implement `%N` and drops it silently** - `date +%s%N` in alpine answers
+`1789726082`, the same as `date +%s`, exit 0 - so the gate measures the answer
+against `date +%s` and wants exactly nine more characters. Without that check it
+would trim six characters off bare epoch seconds and publish `1789` as
+milliseconds, and a two-second verification would record zero. Every Alpine
+container in a CI would have reported that, quietly.
+
+This is the defect that named the change: with only `date +%s`, every
+verification shorter than a second recorded `duration_s=0`, and a zero produced
+by truncation reads exactly like a zero somebody measured.
+
+Two limits, both found by review and neither closed:
+
+- **A wedged `perl` still hangs the gate** on a machine whose `date` cannot do
+  nanoseconds, where perl is the only remaining precise source. `timeout` guards
+  it where it exists. A gate that runs the project's own test command has the
+  same exposure to that command, which is why this is a limit and not a refusal.
+- **The nanosecond path assumes 64-bit shell arithmetic.** The reading itself is
+  trimmed as a string rather than divided, so the 19-digit value never reaches
+  `$(( ))`, but the subtraction of two millisecond counts is around 1.7×10¹² and
+  a 32-bit shell would not hold it. Every platform this installs on today is
+  64-bit; the day one is not, the symptom is a wrong duration rather than a
+  failed verification.
+
 ### `profiles/*.sh` - stack adapters
 
 Sixteen prefab `config.sh` files: `django`, `dotnet`, `elixir`, `flutter`, `go`,

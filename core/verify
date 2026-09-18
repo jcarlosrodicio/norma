@@ -44,6 +44,119 @@ USAGE
 # it is not worth a verification that can be wrong.
 run() { "$@"; }
 
+# The clock this gate measures with, probed once when the record is armed. Three
+# sources and the event says which one answered - a duration nobody can place is
+# worth less than no duration at all.
+#
+#   realtime_ns  `date +%s%N`. Nanoseconds off the wall clock, from a command
+#                this script already depends on. GNU and macOS 26 have it. A BSD
+#                date without %N prints a literal `N` and BusyBox drops it
+#                silently, so the answer is measured against `date +%s` rather
+#                than trusted - see `nanoseconds` below.
+#   monotonic    CLOCK_MONOTONIC through perl's Time::HiRes, for the machines
+#                whose `date` cannot do nanoseconds. Immune to a clock step -
+#                the only thing that can make an elapsed time come out negative.
+#   realtime_s   `date +%s`. Whole seconds, and the reason this exists: every
+#                verification shorter than a second recorded duration_s=0, and a
+#                zero that came from truncation is indistinguishable from a zero
+#                that was measured.
+#
+# **`date` is tried before perl on purpose.** Monotonic is the better clock and
+# it is still second here, because reaching it means spawning an interpreter on
+# every verification, and a `perl` that is present but wedged hangs the gate with
+# no portable way to bound it - `timeout` is not POSIX and macOS does not ship
+# it. Preferring the command the script already runs means the common machine
+# never pays that risk, and the clock step that monotonic would have caught is
+# refused below instead of being measured wrong.
+CLOCK_SOURCE=""
+
+digits() {
+  case ${1:-} in
+    ''|*[!0-9]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+# `$(( ))` reads a leading zero as octal and dies - not returns non-zero, dies -
+# on the first 8 or 9 it finds. A clock still inside the first ten seconds of
+# 1970 produces exactly that from `date +%s%N`, and a machine with no RTC
+# battery boots there. Reproduced: `sh -c 'echo $(( 0985000000 / 1000000 ))'`
+# is a fatal "value too great for base".
+strip_zeros() {
+  value=$1
+  while :; do
+    case $value in
+      0?*) value=${value#0} ;;
+      *) break ;;
+    esac
+  done
+  echo "$value"
+}
+
+# `timeout` is not POSIX and this Mac does not have it, so it guards where it
+# exists and is skipped where it does not - the same degradation as the clock
+# below. What it protects against is a `perl` that is present but wedged: a
+# broken shim, an interpreter on a filesystem that stopped answering.
+CLOCK_TIMEOUT=""
+command -v timeout >/dev/null 2>&1 && CLOCK_TIMEOUT="timeout 2"
+
+monotonic_ms() {
+  $CLOCK_TIMEOUT perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC \
+    -e 'printf "%.0f", clock_gettime(CLOCK_MONOTONIC) * 1000' 2>/dev/null
+}
+
+# **Always succeeds.** It answers with a measurement or with nothing, and never
+# with a status: this runs inside `record_from`, where `set -e` is still armed,
+# so a clock that failed used to take the whole verification down with it. That
+# is the one thing the recording machinery is not allowed to do.
+clock_ms() {
+  case $CLOCK_SOURCE in
+    monotonic)
+      # `|| :` is not decoration: `set -e` is live inside this command
+      # substitution, so a perl that fails kills the subshell before the
+      # `return 0` below is ever reached, and takes the verification with it.
+      monotonic_ms || :
+      ;;
+    realtime_ns)
+      # Same guard, same reason. A bare `ns=$(date ...)` propagates `date`'s
+      # status - 127 when it is not on PATH at all - straight out of this
+      # function and into a `set -e` that ends the verification.
+      ns=$(date '+%s%N' 2>/dev/null) || ns=""
+      # Trim six characters rather than divide: no arithmetic means no octal
+      # and no 19-digit value to overflow a 32-bit shell.
+      if nanoseconds "$ns"; then strip_zeros "${ns%??????}"; fi
+      ;;
+    *) : ;;
+  esac
+  return 0
+}
+
+# Whether a `date +%s%N` answer really carries nanoseconds.
+#
+# All-digits is not enough. **BusyBox `date` does not implement `%N` and drops
+# it silently**, exit 0, leaving bare epoch seconds - verified in alpine:
+# `date +%s%N` -> `1789726082`, the same as `date +%s`. That passes a digit
+# check, and trimming six characters off it yields `1789`, which the gate would
+# then publish as milliseconds. A two-second verification measured zero.
+#
+# So the answer is checked against `date +%s`: nine more characters, and no
+# more, is what an expanded `%N` looks like.
+nanoseconds() {
+  # Prefixed because `config.sh` is sourced into this shell and `seconds` is a
+  # name a project could plausibly be using.
+  probe_seconds=$(date '+%s' 2>/dev/null) || probe_seconds=""
+  digits "$probe_seconds" || return 1
+  digits "${1:-}" || return 1
+  [ "${#1}" -eq "$(( ${#probe_seconds} + 9 ))" ]
+}
+
+probe_clock() {
+  if nanoseconds "$(date '+%s%N' 2>/dev/null)"; then CLOCK_SOURCE=realtime_ns; return 0; fi
+  if digits "$(monotonic_ms)"; then CLOCK_SOURCE=monotonic; return 0; fi
+  CLOCK_SOURCE=realtime_s
+  return 0
+}
+
 # Record the outcome of this verification against the run context, when there is
 # one. Three properties this must never lose, in order of how expensive losing
 # them is:
@@ -63,15 +176,29 @@ record_outcome() {
   [ -x "$ROOT/scripts/harness/run" ] || return 0
   if [ "$rc" -eq 0 ]; then outcome=pass; else outcome=fail; fi
   set +e
-  if [ "$RECORD_STARTED" -gt 0 ] 2>/dev/null; then
-    "$ROOT/scripts/harness/run" event verify \
-      mode="$RECORD_MODE" selection="$RECORD_SELECTION" outcome="$outcome" \
-      exit_code="$rc" duration_s="$(( $(date '+%s') - RECORD_STARTED ))" >/dev/null 2>&1
-  else
-    "$ROOT/scripts/harness/run" event verify \
-      mode="$RECORD_MODE" selection="$RECORD_SELECTION" outcome="$outcome" \
-      exit_code="$rc" >/dev/null 2>&1
+  # `duration_ms` is the measurement; `duration_s` is what consumers written
+  # before this read, kept at its old type and its old truncation so none of
+  # them changes meaning. New readers take duration_ms and leave duration_s
+  # alone: 0 there means "under a second", not "instant".
+  duration=""
+  ended_ms=$(clock_ms)
+  if digits "$RECORD_STARTED_MS" && digits "$ended_ms"; then
+    elapsed_ms=$(( ended_ms - RECORD_STARTED_MS ))
+    # A wall clock can step backwards - NTP, somebody setting the date - and an
+    # interval that ran backwards did not measure a fast verification: it
+    # measured nothing. Neither field is emitted, because neither can be
+    # asserted. CLOCK_MONOTONIC never reaches this branch.
+    if [ "$elapsed_ms" -ge 0 ]; then
+      duration="duration_ms=$elapsed_ms duration_s=$(( elapsed_ms / 1000 ))"
+    fi
+  elif [ "$RECORD_STARTED" -gt 0 ] 2>/dev/null; then
+    elapsed_s=$(( $(date '+%s') - RECORD_STARTED ))
+    [ "$elapsed_s" -ge 0 ] && duration="duration_s=$elapsed_s"
   fi
+  # Unquoted on purpose: `duration` carries nought, one or two whole fields.
+  "$ROOT/scripts/harness/run" event verify \
+    mode="$RECORD_MODE" selection="$RECORD_SELECTION" outcome="$outcome" \
+    exit_code="$rc" duration_clock="$CLOCK_SOURCE" $duration >/dev/null 2>&1
   set -e
   return 0
 }
@@ -82,6 +209,8 @@ record_outcome() {
 record_from() {
   RECORD_MODE=$1
   RECORD_SELECTION=$2
+  probe_clock
+  RECORD_STARTED_MS=$(clock_ms)
   RECORD_STARTED=$(date '+%s' 2>/dev/null || echo 0)
   trap record_outcome EXIT
 }

@@ -54,7 +54,9 @@ It parses every shell file, then runs the whole suite. The selection is recorded
 in the stamp even though the suite is indivisible: a reviewer reads it to know
 what you thought you were covering. With a run open it is recorded in the run's
 evidence log too, with the outcome and the duration - the gate does that itself,
-offline, and it cannot fail a verification.
+offline, and it cannot fail a verification. The duration arrives as `duration_ms`
+with the clock that produced it; `duration_s` stays for the readers that predate
+it. `docs/01-architecture.md` has the table.
 
 `--docs-only` refuses the moment the change touches `bin/`, `core/`, `profiles/`,
 `skills/`, `templates/`, `test/` or `scripts/`, and the hook refuses code

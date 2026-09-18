@@ -459,6 +459,306 @@ assert_eq "a broken 'run' costs a record, never a verification" "$RC" 0
 assert_file "the stamp is written regardless" "$R/.harness/verified"
 done_repo
 
+# ------------------------------------------------- the gate's own clock -------
+echo ""
+echo "how long a verification took"
+
+# A PATH entry that forces the gate onto one clock source, so these tests do not
+# depend on what the machine running them happens to have. Each stub answers the
+# probe the gate makes, and nothing else.
+stub_clock() {
+  mkdir -p "$R/stubbin"
+  TICKS="$R/stubbin/ticks"; export TICKS
+  # Three reads per gate run, not two: the probe that picks the source spends
+  # one before the interval even starts. The first two answer the same value so
+  # the measured interval is the third minus the second.
+  cat > "$R/stubbin/tick" <<'TICK'
+#!/bin/sh
+n=0
+[ -f "$TICKS" ] && n=$(cat "$TICKS")
+n=$((n + 1))
+echo "$n" > "$TICKS"
+echo "$n"
+TICK
+  chmod +x "$R/stubbin/tick"
+  # A BSD date with no %N prints the letter, which is why the probe reads the
+  # answer for digits instead of checking the platform. Every source below perl
+  # needs this, because `date` is now tried first.
+  cat > "$R/stubbin/no_ns_date" <<'DATE'
+#!/bin/sh
+case ${1:-} in
+  +%s%N) echo 1700000000N ;;
+  *) exec /bin/date "$@" ;;
+esac
+DATE
+  case $1 in
+    realtime_ns)
+      # perl leaves a mark if it is ever run. It must not be: `date` answered.
+      cat > "$R/stubbin/perl" <<'PERL'
+#!/bin/sh
+touch "$(dirname "$0")/perl-was-run"
+exit 1
+PERL
+      chmod +x "$R/stubbin/perl"
+      cat > "$R/stubbin/date" <<'DATE'
+#!/bin/sh
+case ${1:-} in
+  +%s%N)
+    case $(sh "$(dirname "$0")/tick") in
+      1|2) echo 1700000000000000000 ;;
+      *) echo 1700000000347000000 ;;
+    esac
+    ;;
+  *) exec /bin/date "$@" ;;
+esac
+DATE
+      chmod +x "$R/stubbin/date"
+      ;;
+    monotonic)
+      cp "$R/stubbin/no_ns_date" "$R/stubbin/date"; chmod +x "$R/stubbin/date"
+      # 1000 ms, then 1347 ms: 347 ms elapsed, and it cannot go backwards.
+      cat > "$R/stubbin/perl" <<'PERL'
+#!/bin/sh
+case $(sh "$(dirname "$0")/tick") in
+  1|2) echo 1000 ;;
+  *) echo 1347 ;;
+esac
+PERL
+      chmod +x "$R/stubbin/perl"
+      ;;
+    realtime_s)
+      cp "$R/stubbin/no_ns_date" "$R/stubbin/date"; chmod +x "$R/stubbin/date"
+      printf '#!/bin/sh\nexit 1\n' > "$R/stubbin/perl"
+      chmod +x "$R/stubbin/perl"
+      ;;
+    perl_dies)
+      cp "$R/stubbin/no_ns_date" "$R/stubbin/date"; chmod +x "$R/stubbin/date"
+      # Answers the probe, then fails. `clock_ms` runs inside `record_from`,
+      # where `set -e` is armed, so before this was guarded a clock that broke
+      # between the probe and the first read killed the whole verification.
+      cat > "$R/stubbin/perl" <<'PERL'
+#!/bin/sh
+case $(sh "$(dirname "$0")/tick") in
+  1) echo 1000 ;;
+  *) exit 1 ;;
+esac
+PERL
+      chmod +x "$R/stubbin/perl"
+      ;;
+    busybox)
+      printf '#!/bin/sh\nexit 1\n' > "$R/stubbin/perl"
+      chmod +x "$R/stubbin/perl"
+      # BusyBox does not implement %N and drops it without complaining: the
+      # answer is bare epoch seconds, all digits, exit 0. Verified in alpine.
+      # Trimming six characters off that yields 1789, which the gate would
+      # publish as milliseconds while a two-second run measured zero.
+      cat > "$R/stubbin/date" <<'DATE'
+#!/bin/sh
+case ${1:-} in
+  +%s%N|+%s) echo 1789726082 ;;
+  *) exec /bin/date "$@" ;;
+esac
+DATE
+      chmod +x "$R/stubbin/date"
+      ;;
+    date_dies)
+      printf '#!/bin/sh\nexit 1\n' > "$R/stubbin/perl"
+      chmod +x "$R/stubbin/perl"
+      # Answers the probe, then fails outright. `clock_ms` runs inside
+      # `record_from` before any `set +e`, so a bare `ns=$(date ...)` hands
+      # date's status to a live `set -e` and ends the verification.
+      cat > "$R/stubbin/date" <<'DATE'
+#!/bin/sh
+case ${1:-} in
+  +%s%N)
+    case $(sh "$(dirname "$0")/tick") in
+      1) echo 1700000000000000000 ;;
+      *) exit 1 ;;
+    esac
+    ;;
+  *) exec /bin/date "$@" ;;
+esac
+DATE
+      chmod +x "$R/stubbin/date"
+      ;;
+    backwards)
+      printf '#!/bin/sh\nexit 1\n' > "$R/stubbin/perl"
+      chmod +x "$R/stubbin/perl"
+      # The wall clock steps back between the two reads, which is what NTP does.
+      cat > "$R/stubbin/date" <<'DATE'
+#!/bin/sh
+case ${1:-} in
+  +%s%N)
+    case $(sh "$(dirname "$0")/tick") in
+      1|2) echo 1700000005000000000 ;;
+      *) echo 1700000000000000000 ;;
+    esac
+    ;;
+  *) exec /bin/date "$@" ;;
+esac
+DATE
+      chmod +x "$R/stubbin/date"
+      ;;
+    near_epoch)
+      printf '#!/bin/sh\nexit 1\n' > "$R/stubbin/perl"
+      chmod +x "$R/stubbin/perl"
+      # A clock inside the first second of 1970 - no RTC battery, no NTP yet -
+      # makes `date +%s%N` start with a zero, and `$(( 0985000000 / 1000000 ))`
+      # is a fatal "value too great for base", not a non-zero status.
+      cat > "$R/stubbin/date" <<'DATE'
+#!/bin/sh
+case ${1:-} in
+  +%s%N)
+    case $(sh "$(dirname "$0")/tick") in
+      1|2) echo 0985000000 ;;
+      *) echo 1332000000 ;;
+    esac
+    ;;
+  # The seconds have to agree with the nanoseconds: the gate measures one
+  # against the other to catch a %N that was never expanded.
+  +%s) echo 0 ;;
+  *) exec /bin/date "$@" ;;
+esac
+DATE
+      chmod +x "$R/stubbin/date"
+      ;;
+  esac
+}
+
+# the gate, on a stubbed clock
+staged_gate() {
+  set +e
+  OUT=$(PATH="$R/stubbin:$PATH" sh scripts/harness/verify "$@" 2>&1)
+  RC=$?
+  set -e
+}
+
+new_repo; with_gate; with_run
+git switch -qc clock-demo
+sh scripts/harness/run start clock-demo >/dev/null
+gate unit
+EVENT=$(cat .harness/run-events.jsonl)
+assert_has "the record says which clock measured it" "$EVENT" '"duration_clock"'
+assert_eq "and it is one of the three the gate knows" \
+  "$(printf '%s' "$EVENT" | sed -n 's/.*"duration_clock": "\([a-z_]*\)".*/\1/p' \
+     | grep -cE '^(monotonic|realtime_ns|realtime_s)$')" "1"
+done_repo
+
+new_repo; with_gate; with_run
+git switch -qc clock-demo
+stub_clock realtime_ns
+sh scripts/harness/run start clock-demo >/dev/null
+staged_gate unit
+assert_eq "a date that does nanoseconds is what the gate reaches for first" \
+  "$(sed -n 's/.*"duration_clock": "\([a-z_]*\)".*/\1/p' .harness/run-events.jsonl)" "realtime_ns"
+assert_has "and a verification under a second leaves a usable measurement" \
+  "$(cat .harness/run-events.jsonl)" '"duration_ms": 347'
+assert_has "with the legacy field truncated to whole seconds, as it always was" \
+  "$(cat .harness/run-events.jsonl)" '"duration_s": 0'
+assert_no "and no quotes around either: they are numbers, not strings" \
+  "$(cat .harness/run-events.jsonl)" '"duration_ms": "'
+assert_nofile "and perl is never spawned, which is the point of that order" \
+  "$R/stubbin/perl-was-run"
+done_repo
+
+new_repo; with_gate; with_run
+git switch -qc clock-demo
+stub_clock monotonic
+sh scripts/harness/run start clock-demo >/dev/null
+staged_gate unit
+assert_eq "a date without %N is what sends the gate to the monotonic clock" \
+  "$(sed -n 's/.*"duration_clock": "\([a-z_]*\)".*/\1/p' .harness/run-events.jsonl)" "monotonic"
+assert_has "which measures the same sub-second run" \
+  "$(cat .harness/run-events.jsonl)" '"duration_ms": 347'
+done_repo
+
+new_repo; with_gate; with_run
+git switch -qc clock-demo
+stub_clock realtime_s
+sh scripts/harness/run start clock-demo >/dev/null
+staged_gate unit
+assert_eq "with neither, only whole seconds are left" \
+  "$(sed -n 's/.*"duration_clock": "\([a-z_]*\)".*/\1/p' .harness/run-events.jsonl)" "realtime_s"
+assert_no "and then there is no precise duration to report" \
+  "$(cat .harness/run-events.jsonl)" '"duration_ms"'
+assert_has "the legacy field survives, which is what consumers already read" \
+  "$(cat .harness/run-events.jsonl)" '"duration_s"'
+done_repo
+
+new_repo; with_gate; with_run
+git switch -qc clock-demo
+stub_clock backwards
+sh scripts/harness/run start clock-demo >/dev/null
+staged_gate unit
+assert_eq "a wall clock that stepped back is not a fast verification" "$RC" 0
+assert_no "so no precise duration is invented" \
+  "$(cat .harness/run-events.jsonl)" '"duration_ms"'
+assert_no "and no coarse one either: a negative interval measures nothing" \
+  "$(cat .harness/run-events.jsonl)" '"duration_s"'
+assert_has "the verification itself is recorded, as it must be" \
+  "$(cat .harness/run-events.jsonl)" '"outcome": "pass"'
+done_repo
+
+new_repo; with_gate; with_run
+git switch -qc clock-demo
+stub_clock perl_dies
+sh scripts/harness/run start clock-demo >/dev/null
+staged_gate unit
+assert_eq "a clock that breaks after the probe costs a measurement, not the gate" "$RC" 0
+assert_file "and the stamp is written" "$R/.harness/verified"
+assert_has "the verification is still recorded" \
+  "$(cat .harness/run-events.jsonl)" '"outcome": "pass"'
+assert_no "without a precise duration nobody measured" \
+  "$(cat .harness/run-events.jsonl)" '"duration_ms"'
+done_repo
+
+new_repo; with_gate; with_run
+git switch -qc clock-demo
+stub_clock near_epoch
+sh scripts/harness/run start clock-demo >/dev/null
+staged_gate unit
+assert_eq "a clock still in 1970 does not crash the gate on an octal numeral" "$RC" 0
+assert_has "and its interval is measured all the same" \
+  "$(cat .harness/run-events.jsonl)" '"duration_ms": 347'
+assert_no "with no shell diagnostic leaking into the output" "$OUT" "value too great"
+assert_no "nor dash's wording for the same thing" "$OUT" "Illegal number"
+done_repo
+
+new_repo; with_gate; with_run
+git switch -qc clock-demo
+stub_clock busybox
+sh scripts/harness/run start clock-demo >/dev/null
+staged_gate unit
+assert_eq "a date that swallowed %N is not mistaken for a nanosecond clock" \
+  "$(sed -n 's/.*"duration_clock": "\([a-z_]*\)".*/\1/p' .harness/run-events.jsonl)" "realtime_s"
+assert_no "so it never publishes epoch seconds as milliseconds" \
+  "$(cat .harness/run-events.jsonl)" '"duration_ms"'
+done_repo
+
+new_repo; with_gate; with_run
+git switch -qc clock-demo
+stub_clock date_dies
+sh scripts/harness/run start clock-demo >/dev/null
+staged_gate unit
+assert_eq "a date that fails after the probe costs a measurement, not the gate" "$RC" 0
+assert_file "and the stamp is written" "$R/.harness/verified"
+assert_has "the verification is still recorded" \
+  "$(cat .harness/run-events.jsonl)" '"outcome": "pass"'
+assert_no "without a precise duration nobody measured" \
+  "$(cat .harness/run-events.jsonl)" '"duration_ms"'
+done_repo
+
+
+new_repo; with_gate; with_run
+git switch -qc clock-demo
+stub_clock realtime_ns
+sh scripts/harness/run start clock-demo >/dev/null
+printf '#!/bin/sh\nexit 9\n' > scripts/harness/run
+staged_gate unit
+assert_eq "measuring the duration still cannot cost a verification" "$RC" 0
+assert_file "and the stamp is written regardless" "$R/.harness/verified"
+done_repo
+
 # ---------------------------------------------------------- the hook ----------
 echo ""
 echo "the pre-commit hook"
