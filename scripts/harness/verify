@@ -22,6 +22,7 @@ harness: name the tests that touch this task.
   scripts/harness/verify <test target> [more targets...]
   scripts/harness/verify --full            # only for cross-cutting changes
   scripts/harness/verify --docs-only       # the change touches no code at all
+  scripts/harness/verify --floor           # only report what may lower the bar
 
 Naming the selection is part of the step: a reviewer must be able to tell
 whether you picked the right subset.
@@ -215,6 +216,160 @@ record_from() {
   trap record_outcome EXIT
 }
 
+# The floor guard: the moves that turn a red check green without making the code
+# work. A test made easier, a checker silenced, a stub standing in for the work,
+# the gate's own config edited. Faced with a red check, an agent takes the
+# cheapest road to green, and every one of these roads ends with the check
+# passing - which is why the gate itself is the place to look for them.
+#
+# It warns and records; it refuses nothing. A test can legitimately change when
+# the specification did, and a heuristic that blocks on a false positive teaches
+# people `--no-verify`. The record is what tells us, later, whether it is precise
+# enough to block.
+#
+# It reads the change against the point where this branch left the default one -
+# committed, staged, unstaged and untracked alike - so what the base already had
+# is never this change's doing.
+#
+# Every pattern below is written so it cannot match its own source: `[e]` where
+# `e` would do. A project can put this file inside a code path - norma does - and
+# a guard that reports itself is a guard people learn to ignore.
+FLOOR_TEST='(^|/)(test|tests|spec|specs|__tests__|integration_test|androidTest)/|(^|/)test_[^/]*\.py$|_test\.[^/]+$|\.(test|spec)\.[^/]+$|_spec\.rb$|(Test|Tests|Spec)\.(java|kt|cs|swift|scala|php|groovy)$'
+FLOOR_SKIP='\.(ski[p]|onl[y])\(|(^|[^A-Za-z0-9_.])(xi[t]|xdescrib[e]|xtes[t]|fdescrib[e]|fi[t])\(|@pytest\.mark\.(ski[p]|xfai[l])|pytest\.ski[p]\(|@unittest\.ski[p]|[^A-Za-z]ski[p]: *(tru[e]|['"'"'"])|t\.Ski[p](Now|f)?\(|#\[ignor[e]\]|@(Disable[d]|Ignor[e])([^A-Za-z]|$)|markTestSkippe[d]'
+FLOOR_SUPPRESS='@ts-(ignor[e]|nochec[k]|expect-erro[r])|eslint-disabl[e]|biome-ignor[e]|# *noq[a]|# *type: *ignor[e]|pylint: *disabl[e]|// *ignore(_for_fil[e])?:|#!?\[allo[w]\(|@Suppres[s](Warnings)?\(|#pragma warning disabl[e]|nolin[t]|(istanbul|c8|v8) ignor[e]|pragma: *no cove[r]|rubocop:disabl[e]|@phpstan-ignor[e]|@psalm-suppres[s]|shellcheck disabl[e]|NOSONA[R]|nosemgre[p]|gitleaks:allo[w]|swiftlint:disabl[e]'
+FLOOR_STUB='[Nn]ot [Ii]mplemente[d]|NotImplemente[d](Error|Exception)|unimplemente[d]!|tod[o]!\(|UnimplementedErro[r]|catc[h] *(\([^)]*\))? *\{ *\}|excep[t][^:]*: *pass *$'
+FLOOR_ASSERT='expec[t]\(|expect \{|asser[t]|\.shoul[d]|shoul[d]\(|t\.(erro[r]|fata[l])\(|require\.|refut[e]|verif[y]\('
+
+# The commit this branch left the default branch at, or nothing.
+floor_base() {
+  floor_origin=$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null) || floor_origin=""
+  for floor_ref in $floor_origin origin/main origin/master main master; do
+    git rev-parse -q --verify "$floor_ref^{commit}" >/dev/null 2>&1 || continue
+    git merge-base "$floor_ref" HEAD 2>/dev/null && return 0
+  done
+  return 1
+}
+
+# One finding per line, tab-separated: kind, file, line - or, for removed
+# assertions, the net count. Fails when the change cannot be read at all.
+floor_findings() {
+  floor_base=$(floor_base) || return 3
+  floor_code=$(printf '%s\n' $HARNESS_CODE_PATHS | sed 's,/*$,,; s,[].^$*+?(){}|[\\],\\&,g' | paste -sd'|' -)
+  # The prefixes and the quoting are pinned: a user's `diff.mnemonicPrefix` or
+  # `diff.noprefix` reshapes every path, and the default `core.quotepath` turns a
+  # non-ASCII name into an octal-escaped string no path pattern can match. Names
+  # holding a tab, a quote or a newline stay quoted, and are missed - accepted.
+  floor_git() { git -c core.quotepath=false diff --no-color --no-ext-diff --unified=0 --src-prefix=a/ --dst-prefix=b/ "$@"; }
+  floor_diff=$(floor_git -M "$floor_base" --) || return 1
+  # `git diff` cannot see a file nobody added. `--no-index` exits 1 whenever the
+  # two sides differ, which for a new file is always, so only 2 and above fail.
+  floor_new=$(git ls-files --others --exclude-standard) || return 1
+  floor_untracked=""
+  # Read line by line rather than split on spaces: a file name can hold one.
+  while IFS= read -r floor_f; do
+    [ -n "$floor_f" ] || continue
+    floor_one=$(floor_git --no-index -- /dev/null "$floor_f" 2>/dev/null) && floor_rc=0 || floor_rc=$?
+    [ "$floor_rc" -le 1 ] || return 1
+    floor_untracked="$floor_untracked
+$floor_one"
+  done <<FLOOR_NEW
+$floor_new
+FLOOR_NEW
+  printf '%s\n%s\n' "$floor_diff" "$floor_untracked" | \
+    FLOOR_CODE="^($floor_code)(/|\$)" FLOOR_TEST="$FLOOR_TEST" FLOOR_SKIP="$FLOOR_SKIP" \
+    FLOOR_SUPPRESS="$FLOOR_SUPPRESS" FLOOR_STUB="$FLOOR_STUB" FLOOR_ASSERT="$FLOOR_ASSERT" \
+    awk '
+      # `---` and `+++` are headers only between a `diff` line and its first
+      # hunk. Inside one, an added `++n` shows as `+++n` and is content.
+      /^diff / { head = 1; file = ""; old = ""; from = ""; dl = $0; next }
+      # A deletion is named here, not by its ---/+++ pair: an empty or a binary
+      # file has none. `diff --git a/P b/P` - both halves are the same path.
+      head && /^deleted file mode/ {
+        rest = substr(dl, 12); p = substr(rest, 3, (length(rest) - 1) / 2 - 2)
+        if (p ~ ENVIRON["FLOOR_TEST"]) { deleted[p] = 1; print "deleted_test\t" p "\t-" }
+        next
+      }
+      # A test renamed out of the test names stops running exactly as a deleted
+      # one does, and a pure rename has no ---/+++ lines either.
+      head && /^rename from / { from = substr($0, 13); next }
+      head && /^rename to / {
+        if (from ~ ENVIRON["FLOOR_TEST"] && substr($0, 11) !~ ENVIRON["FLOOR_TEST"]) {
+          deleted[from] = 1; print "deleted_test\t" from "\t-"
+        }
+        next
+      }
+      head && /^--- / { old = substr($0, 5); sub(/^a\//, "", old); next }
+      head && /^\+\+\+ / {
+        new = substr($0, 5); sub(/^b\//, "", new)
+        gone = (new == "/dev/null"); file = gone ? old : new
+        test = file ~ ENVIRON["FLOOR_TEST"]
+        code = file ~ ENVIRON["FLOOR_CODE"] && file !~ /\.md$/
+        # A config.sh that did not exist before cannot have lowered anything.
+        if (!gone && old != "/dev/null" && file == "scripts/harness/config.sh")
+          print "gate_config\t" file "\t-"
+        next
+      }
+      /^@@/ { head = 0; split($0, h, " "); n = h[3]; sub(/^\+/, "", n); sub(/,.*/, "", n); line = n + 0; next }
+      head || file == "" { next }
+      /^\+/ {
+        t = substr($0, 2)
+        if (test && t ~ ENVIRON["FLOOR_SKIP"]) print "skip\t" file "\t" line
+        if (code && t ~ ENVIRON["FLOOR_SUPPRESS"]) print "suppression\t" file "\t" line
+        if (code && !test && t ~ ENVIRON["FLOOR_STUB"]) print "stub\t" file "\t" line
+        if (test && tolower(t) ~ ENVIRON["FLOOR_ASSERT"]) added[file]++
+        line++
+        next
+      }
+      /^-/ { if (test && tolower(substr($0, 2)) ~ ENVIRON["FLOOR_ASSERT"]) removed[file]++; next }
+      END {
+        for (f in removed)
+          if (!(f in deleted) && removed[f] - added[f] > 0)
+            print "assertions\t" f "\t" (removed[f] - added[f])
+      }'
+}
+
+# Prints the report and answers 0 clean, 1 weakened, 2 could not check. With a
+# mode, it also records the outcome against the run - the gate does, `--floor`
+# does not: that one is the reviewer's, and the run is the author's.
+floor_report() {
+  floor_out=$(floor_findings) || {
+    if [ $? -eq 3 ]; then
+      echo "harness: floor - could not check this change: no base branch to compare with (main, master or origin's HEAD)"
+    else
+      echo "harness: floor - could not check this change: git could not read it"
+    fi
+    [ -z "${1:-}" ] || "$ROOT/scripts/harness/run" event floor outcome=unchecked >/dev/null 2>&1 || :
+    return 2
+  }
+  if [ -z "$floor_out" ]; then
+    [ -z "${1:-}" ] || "$ROOT/scripts/harness/run" event floor outcome=clean findings=0 >/dev/null 2>&1 || :
+    return 0
+  fi
+  echo ""
+  echo "harness: floor - this change may lower the bar. Not a refusal: justify each"
+  echo "  one in the report with the requirement behind it, or undo it."
+  printf '%s\n' "$floor_out" | while IFS='	' read -r floor_kind floor_file floor_at; do
+    case $floor_kind in
+      skip)         echo "  $floor_file:$floor_at  skip or focus marker added" ;;
+      suppression)  echo "  $floor_file:$floor_at  checker suppressed" ;;
+      stub)         echo "  $floor_file:$floor_at  unfinished work" ;;
+      deleted_test) echo "  $floor_file  test file deleted, or renamed out of the test names" ;;
+      assertions)   echo "  $floor_file  $floor_at assertion(s) removed, net, from a test that stayed" ;;
+      gate_config)  echo "  $floor_file  the gate's own config changed - check no gate was removed" ;;
+    esac
+  done
+  if [ -n "${1:-}" ]; then
+    floor_count() { printf '%s\n' "$floor_out" | grep -c "^$1	" || :; }
+    "$ROOT/scripts/harness/run" event floor outcome=weakened \
+      findings="$(printf '%s\n' "$floor_out" | wc -l | tr -d ' ')" \
+      skip="$(floor_count skip)" suppression="$(floor_count suppression)" \
+      stub="$(floor_count stub)" deleted_test="$(floor_count deleted_test)" \
+      assertions="$(floor_count assertions)" gate_config="$(floor_count gate_config)" \
+      >/dev/null 2>&1 || :
+  fi
+  return 1
+}
+
 if [ ! -r "$CONFIG" ]; then
   echo "harness: missing $CONFIG - run 'norma install' or 'norma doctor'" >&2
   exit 2
@@ -233,6 +388,11 @@ if [ -z "${HARNESS_CODE_PATHS:-}" ]; then
 fi
 
 [ $# -eq 0 ] && usage
+
+# The guard on its own, for the reviewer: no tests, no stamp, no record.
+if [ "$1" = "--floor" ]; then
+  floor_report && exit 0 || exit $?
+fi
 
 stamp() {
   mkdir -p "$ROOT/.harness"
@@ -284,5 +444,9 @@ if [ "$1" = "--full" ]; then
 else
   harness_test_selected "$@"
 fi
+
+# Only once the tests are green: that is when a lowered bar matters, and a
+# warning printed above a failure scrolls away unread. It can never fail this.
+floor_report record || :
 
 stamp "$*"
