@@ -96,6 +96,77 @@ A successful run writes `.harness/verified` - the **stamp** - containing the
 timestamp, the branch and the exact selection. The stamp is runtime state: it is
 gitignored, and it is the only channel between the gate and the hook.
 
+#### The floor guard
+
+Once the tests are green, the gate reads the change for the moves that make a
+check pass without making the code work, prints them, and records them against the
+run. It refuses nothing.
+
+| kind | what it looks for | where |
+|---|---|---|
+| `skip` | a skip or focus marker added: `.skip(`, `.only(`, `xit(`, `@pytest.mark.skip`, `t.Skip(`, `#[ignore]`, `@Disabled`... | test files |
+| `suppression` | a suppression comment added: `@ts-ignore`, `eslint-disable`, `# noqa`, `// ignore:`, `#[allow(`, `istanbul ignore`... | `HARNESS_CODE_PATHS`, Markdown excluded |
+| `stub` | "not implemented", `NotImplementedError`, `todo!()`, a one-line empty `catch`, `except: pass` | the same, test files excluded |
+| `deleted_test` | a test file removed - empty and binary ones included - or renamed to a name that no longer reads as a test, which stops it running just the same | test files |
+| `assertions` | more assertion lines removed than added, net, in a test file that stayed | test files |
+| `gate_config` | `scripts/harness/config.sh` modified - the one place a gate can be removed | that file |
+
+A **test file** is recognised by name - a `test/`, `tests/`, `spec/` or
+`__tests__/` directory, `*_test.*`, `*.test.*`, `*.spec.*`, `test_*.py`,
+`*Test.java` and its siblings - because nothing in the config contract says where
+tests live, and adding a field for it would ask every consumer for a decision to
+save a heuristic a few misses.
+
+Four decisions, each one load-bearing:
+
+- **It warns; it does not refuse.** A test can change legitimately when the
+  specification did, and a heuristic that blocks on a false positive is how a
+  team learns `--no-verify`. The events it records are what will say whether it
+  is precise enough to block. Measured on 2026-10-07, before it shipped, against 28 merged pull
+  requests of tally, grodar and aqorin: three of them reported anything, five
+  findings in all, and every one a real move - three `eslint-disable-next-line`,
+  a modified `config.sh`, and a test file that lost 54 assertions net when they
+  moved into a helper the name heuristic does not count as a test. Real is not
+  the same as wrong: that last one is a refactor, and only a reader can tell.
+  When it does block, a lowering will be accepted with
+  `verify --accept-weakening "<reason>"`, recorded in the stamp and the run - a
+  reason cannot live on the line, because a deleted file has no line to carry it.
+- **Against the branch point, not the last commit.** The base is the merge base
+  with `origin/HEAD`, `origin/main`, `origin/master`, `main` or `master`, first
+  that exists, and the change is everything since it: committed, staged,
+  unstaged and untracked. What the default branch already had is not this
+  change's doing. With no base at all it says *could not check* and records
+  `outcome=unchecked` - never a clean result it did not earn.
+- **The patterns live in the gate, not in the profiles.** A profile becomes the
+  project's `config.sh` on the first write and never receives an upgrade, so
+  patterns kept there would never reach a project installed before them. In the
+  gate they arrive with `norma upgrade`, like every other fix to it.
+- **Its patterns cannot match their own source.** Each one is written `ski[p]`
+  where `skip` would do. norma keeps the gate inside a code path, and so may any
+  project; a guard that reports itself is a guard people learn to skim.
+
+What it misses, known and accepted while it only warns:
+
+- **Tests the name heuristic does not see** - Rust unit tests inside `src/*.rs`,
+  Python's `tests.py` and `conftest.py` - so a skip marker there goes unread, and
+  assertions moved into a helper count as removed.
+- **Markers with no pattern yet** - Dart's `@Skip(`, Playwright's `test.fixme(`,
+  `@unittest.expectedFailure`. Adding one is a line in the gate and a test.
+- **The assertion count is lexical.** Any line in a test file mentioning
+  `assert` counts, a comment included, so the net figure is a prompt to look,
+  not a measurement.
+- **A file name holding a tab, a quote or a newline** stays quoted in the diff
+  and matches nothing. Spaces and non-ASCII names are read: the diff's prefixes
+  and `core.quotepath` are pinned, so a user's git config cannot reshape it.
+- **Cost grows with the change.** One `git diff` for the branch plus one per
+  untracked file, after the tests. It cannot change the verdict; on a tree with
+  thousands of unignored files it can make the gate slower.
+
+`scripts/harness/verify --floor` runs the guard alone: no gates, no tests, no
+stamp and no record, exiting 0 clean, 1 with findings and 2 when it could not
+check. It exists for the adversarial review, which may not read the author's
+run log but can ask the diff the same question.
+
 ### `core/pre-commit` - the enforcement
 
 Four rules, in order. Each exists because of a specific failure:

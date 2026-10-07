@@ -1,7 +1,7 @@
 ---
 name: adversarial-review
 description: Use after an implementation passes its own tests and verification, before committing or archiving a change - an independent red-team pass that assumes the work is wrong and tries to break it. Also use when the user asks for a devil's advocate, red-team or independent review.
-version: 1.2.0
+version: 1.3.0
 ---
 
 # adversarial-review
@@ -28,6 +28,8 @@ your own view - they anchor you to the same assumptions. Read them last, if at a
 `.harness/run-events.jsonl` is one of those: it holds what the author's runs
 already concluded. `scripts/harness/run status` is not - it carries an identity and
 no judgement, which is why the step below can use it without breaking this boundary.
+Neither is `scripts/harness/verify --floor`: it reads the diff, not the author's
+runs, and it answers the same way whoever asks - dimension 10 starts from it.
 
 Run this in a fresh session, and prefer a different model from the one that wrote
 the code.
@@ -100,7 +102,11 @@ If the change carries no identifiable risk, write that instead of padding the li
 10. **A weakened bar.** Faced with a red check, an agent takes the cheapest road
     to green, and every one of these roads ends with the check passing. Read the
     **removed** lines as carefully as the added ones - that is where all of them
-    show:
+    show. Start from `scripts/harness/verify --floor`, which lists what a pattern
+    can find - markers, suppressions, deleted test files, assertions removed, the
+    gate's config touched - without running a test. It is the starting list, not
+    the boundary: a loosened expected value or a lowered threshold has no pattern,
+    and those are yours to find.
     - **A test got easier.** A skip or focus marker added, a test file deleted, an
       assertion removed or loosened in a test that stayed, an expected value
       rewritten to match what the code now returns.
