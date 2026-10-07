@@ -1,7 +1,7 @@
 ---
 name: adversarial-review
 description: Use after an implementation passes its own tests and verification, before committing or archiving a change - an independent red-team pass that assumes the work is wrong and tries to break it. Also use when the user asks for a devil's advocate, red-team or independent review.
-version: 1.1.0
+version: 1.2.0
 ---
 
 # adversarial-review
@@ -97,6 +97,29 @@ If the change carries no identifiable risk, write that instead of padding the li
    datum held as truth in two places. Report only what the project actually
    adopted - the adoption map says which rules apply here, and a rule listed as not
    applicable is not a finding.
+10. **A weakened bar.** Faced with a red check, an agent takes the cheapest road
+    to green, and every one of these roads ends with the check passing. Read the
+    **removed** lines as carefully as the added ones - that is where all of them
+    show:
+    - **A test got easier.** A skip or focus marker added, a test file deleted, an
+      assertion removed or loosened in a test that stayed, an expected value
+      rewritten to match what the code now returns.
+    - **A checker got silenced.** A new suppression comment - `@ts-ignore`,
+      `eslint-disable`, `# noqa`, `# type: ignore`, `// ignore:`, `#[allow]`,
+      `@SuppressWarnings` - or one that drops code from coverage instead of
+      testing it.
+    - **A threshold moved.** A coverage or performance budget lowered, a lint rule
+      turned off or down a severity, a step removed from `harness_gates` in
+      `scripts/harness/config.sh`, a path taken out of `HARNESS_CODE_PATHS`.
+    - **Work is unfinished.** A stub that throws "not implemented", an empty
+      `catch` turning a failure into silence, a `TODO` standing where the
+      implementation should be.
+
+    None of these is wrong by itself: a test can legitimately change when the
+    specification did. What makes it a finding is the missing justification. Each
+    one is **blocking** unless the change's own report names it and quotes the
+    requirement that backs it - the same bar `run-task` sets for a check it calls
+    wrong. Tightening the bar needs no justification; loosening it always does.
 
 Cross-file findings are part of the job: an inconsistency between two files in the
 change, an update applied to one caller and not the other, a contract broken on one
