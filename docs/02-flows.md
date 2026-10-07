@@ -276,6 +276,11 @@ the day that changed, the documented bootstrap would break.
 commit being prepared, so an unrelated dirty tree does not block a documentation
 commit - and the whole change when nothing is staged.
 
+The **floor guard** that runs after the tests is not on this list on purpose: it
+reports a lowered bar and refuses nothing, for the reasons in
+[`01-architecture.md`](01-architecture.md). Making it a refusal is a decision
+that waits for its own records to show it is precise enough.
+
 **None of the three reaches the run's evidence log**, and the gate is written so
 that it cannot: the recording is armed only once the gate is about to do real
 work. These are the harness being pointed at the wrong thing, not a verification

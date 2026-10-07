@@ -143,6 +143,15 @@ and you justify it in the report. `--docs-only` is for a change that touches no 
 at all - it runs the static gates and refuses the moment it sees a code file, so it
 is not a way around the tests.
 
+Once the tests are green the gate also prints the **floor guard**: what in this
+change may lower the bar - a skip or focus marker, a suppression comment, a stub,
+a deleted test file, assertions removed from a test that stayed, a change to
+`config.sh`. It is a warning, not a refusal, and the stamp is written either way.
+Each line it prints is either undone or justified in the report with the
+requirement behind it, the same bar as a check you call wrong below. The reviewer
+runs the same list with `scripts/harness/verify --floor`, so a line left
+unexplained is a finding waiting for them.
+
 Then follow `.agents/skills/openspec-verify-change/SKILL.md` to contrast the work
 against the artifacts - completeness, correctness, coherence with the recorded
 decisions.

@@ -759,6 +759,211 @@ assert_eq "measuring the duration still cannot cost a verification" "$RC" 0
 assert_file "and the stamp is written regardless" "$R/.harness/verified"
 done_repo
 
+# ------------------------------------------------- the floor guard ------------
+echo ""
+echo "the floor guard"
+
+# The markers below are assembled from pieces on purpose. This file is a test
+# file inside a code path, so writing them out literally would make this very
+# suite trip the guard it is testing on every change that touches it.
+SK=skip; ON=only; TSI="@ts-""ignore"; NOQ="# no""qa"; NI="not ""implemented"
+
+# A repository whose harness is committed on master, on a branch with a run open:
+# the shape of a real project mid-task, so nothing the guard sees is setup noise.
+floor_repo() {
+  new_repo; with_gate; with_run
+  mkdir -p src spec
+  printf 'export const a = 1;\n' > src/a.ts
+  printf 'it("adds", () => {\n  expect(add(1, 1)).toBe(2);\n  expect(add(2, 2)).toBe(4);\n});\n' > spec/a.test.ts
+  printf 'it("subtracts", () => {\n  expect(sub(2, 1)).toBe(1);\n});\n' > spec/b.test.ts
+  git add . && git commit -qm harness
+  git switch -qc phase-17-floor
+  sh scripts/harness/run start phase-17-floor >/dev/null
+}
+
+floor_repo
+printf 'export const b = 2;\n' > src/b.ts
+gate unit
+assert_eq "a change that lowers nothing passes" "$RC" 0
+assert_no "and the guard says nothing" "$OUT" "harness: floor"
+assert_has "the guard records that it looked" "$(cat .harness/run-events.jsonl)" '"outcome": "clean"'
+done_repo
+
+floor_repo
+printf 'it.%s("adds", () => {});\n' "$SK" >> spec/a.test.ts
+gate unit
+assert_eq "a skipped test does not fail the gate - the guard only warns" "$RC" 0
+assert_file "and the stamp is written" "$R/.harness/verified"
+assert_has "it names the file and the line" "$OUT" "spec/a.test.ts:5"
+assert_has "and what the move was" "$OUT" "skip or focus marker"
+assert_has "it records the move against the run" "$(cat .harness/run-events.jsonl)" '"outcome": "weakened"'
+assert_has "counted by kind" "$(cat .harness/run-events.jsonl)" '"skip": 1'
+done_repo
+
+floor_repo
+printf 'it.%s("x", () => {});\n' "$SK" > "spec/with space.test.ts"
+gate unit
+assert_has "an untracked file whose name holds a space is still read" "$OUT" "spec/with space.test.ts:1"
+done_repo
+
+floor_repo
+printf 'describe.%s("all", () => {});\n' "$ON" > spec/c.test.ts
+gate unit
+assert_has "a focus marker silences every other test, and a new file is read too" \
+  "$OUT" "spec/c.test.ts:1"
+done_repo
+
+floor_repo
+printf '// %s\nexport const b: number = "x";\n' "$TSI" > src/b.ts
+printf 'Never write %s in this project.\n' "$TSI" >> README.md
+gate unit
+assert_has "a suppression in code is reported" "$OUT" "src/b.ts:1"
+assert_has "as a silenced checker" "$OUT" "checker suppressed"
+assert_no "the same words in a document are not code" "$OUT" "README.md"
+done_repo
+
+floor_repo
+printf 'x = 1  %s\n' "$NOQ" > src/c.py
+printf 'export function b() { throw new Error("%s"); }\n' "$NI" > src/b.ts
+gate unit
+assert_has "a python suppression is one too" "$OUT" "src/c.py:1"
+assert_has "a stub standing in for the work is reported" "$OUT" "src/b.ts:1"
+assert_has "as unfinished" "$OUT" "unfinished work"
+done_repo
+
+floor_repo
+git rm -q spec/b.test.ts
+gate unit
+assert_has "a deleted test file is reported" "$OUT" "spec/b.test.ts"
+assert_has "as what it is" "$OUT" "test file deleted"
+done_repo
+
+floor_repo
+printf 'it("adds", () => {\n  expect(add(1, 1)).toBe(2);\n});\n' > spec/a.test.ts
+gate unit
+assert_has "an assertion removed from a test that stayed is reported" "$OUT" "spec/a.test.ts"
+assert_has "with the net count" "$OUT" "1 assertion(s) removed"
+done_repo
+
+floor_repo
+printf 'it("adds", () => {\n  expect(add(1, 1)).toEqual(2);\n  expect(add(2, 2)).toEqual(4);\n});\n' > spec/a.test.ts
+gate unit
+assert_no "an assertion rewritten, not removed, is not a lowered bar" "$OUT" "harness: floor"
+done_repo
+
+floor_repo
+printf 'harness_gates() { :; }\n' >> scripts/harness/config.sh
+gate unit
+assert_has "a change to the gate's own config is reported" "$OUT" "scripts/harness/config.sh"
+assert_has "as the one place a gate can be removed" "$OUT" "gate's own config changed"
+done_repo
+
+floor_repo
+printf 'it.%s("pre-existing", () => {});\n' "$SK" > spec/old.test.ts
+git switch -q master && git add spec/old.test.ts && git commit -qm old && git switch -q phase-17-floor
+git merge -q --ff-only master
+printf 'export const b = 2;\n' > src/b.ts
+gate unit
+assert_no "what the base branch already had is not this change's doing" "$OUT" "spec/old.test.ts"
+done_repo
+
+# A line added to a hunk that starts with `++` shows as `+++` in the diff, which
+# is the shape of a file header. The parser must not take it for one.
+floor_repo
+printf '++n;\nit.%s("x", () => {});\n' "$SK" >> spec/a.test.ts
+gate unit
+assert_has "a +++ inside a hunk is content, not a header" "$OUT" "spec/a.test.ts:6"
+done_repo
+
+# The guard's own patterns live in core/verify. Written out plainly, they would
+# match themselves the day a project puts the gate inside a code path - norma does.
+floor_repo
+cp "$HOME_DIR/core/verify" src/verify.sh
+gate unit
+assert_no "the gate does not trip on its own patterns" "$OUT" "src/verify.sh"
+done_repo
+
+floor_repo
+printf 'it.%s("adds", () => {});\n' "$SK" >> spec/a.test.ts
+gate --floor
+assert_eq "--floor alone exits 1 when the bar was lowered" "$RC" 1
+assert_has "printing the same report" "$OUT" "spec/a.test.ts:5"
+assert_no "it runs no test" "$OUT" "STUB"
+assert_nofile "it writes no stamp" "$R/.harness/verified"
+assert_eq "and records nothing - the reviewer reads it, the author's run does not" \
+  "$(wc -l < .harness/run-events.jsonl | tr -d ' ')" "0"
+done_repo
+
+floor_repo
+gate --floor
+assert_eq "--floor exits 0 on a clean change" "$RC" 0
+done_repo
+
+floor_repo
+git branch -qm master trunk
+printf 'it.%s("adds", () => {});\n' "$SK" >> spec/a.test.ts
+gate --floor
+assert_eq "--floor exits 2 when there is no base to compare with" "$RC" 2
+assert_has "and says so instead of reading as clean" "$OUT" "could not check"
+gate unit
+assert_eq "the gate still passes when the guard cannot look" "$RC" 0
+assert_has "but it says so" "$OUT" "could not check"
+assert_has "and records it" "$(cat .harness/run-events.jsonl)" '"outcome": "unchecked"'
+done_repo
+
+# Found by review: a user's git config reshapes the diff the parser reads. With
+# mnemonic prefixes every path arrived as `w/src/...` and no code path matched;
+# with the default quotepath a non-ASCII name arrived quoted and matched nothing.
+floor_repo
+git config diff.mnemonicPrefix true
+printf '// %s\n' "$TSI" >> src/a.ts
+gate --floor
+assert_has "a user's diff prefixes do not hide a suppression" "$OUT" "src/a.ts:2"
+done_repo
+
+floor_repo
+printf '// %s\n' "$TSI" > "src/$(printf '\303\251').ts"
+git add . && git commit -qm accent
+gate --floor
+assert_has "a non-ASCII file name is read, not quoted past the patterns" "$OUT" "src/$(printf '\303\251').ts:1"
+done_repo
+
+# A rename out of the test names stops the test running exactly as a deletion
+# does, and a pure rename carries no ---/+++ lines at all.
+floor_repo
+git mv spec/b.test.ts src/b.txt
+gate --floor
+assert_has "a test renamed out of the test names reads as deleted" "$OUT" "spec/b.test.ts"
+done_repo
+
+floor_repo
+: > spec/empty.test.ts
+git add . && git commit -qm empty
+git switch -q master && git merge -q --ff-only phase-17-floor && git switch -q phase-17-floor
+git rm -q spec/empty.test.ts
+gate --floor
+assert_has "deleting an empty test file is still a deletion" "$OUT" "spec/empty.test.ts"
+done_repo
+
+floor_repo
+git branch -qm master trunk
+gate --floor
+assert_has "with no base it names that as the reason" "$OUT" "no base branch"
+done_repo
+
+# The reviewer may not read the author's run log, so the one exception has to be
+# written where the reviewer looks, and the author has to be told to answer it.
+assert_has "the review is allowed the guard's list, and only that" \
+  "$(cat "$HOME_DIR/skills/adversarial-review/SKILL.md")" 'Neither is `scripts/harness/verify --floor`'
+assert_has "run-task tells the author each floor line needs a reason" \
+  "$(cat "$HOME_DIR/skills/run-task/SKILL.md")" "**floor guard**"
+
+floor_repo
+printf 'it.%s("adds", () => {});\n' "$SK" >> spec/a.test.ts
+gate --docs-only
+assert_no "--docs-only refuses before the guard ever runs" "$OUT" "harness: floor"
+done_repo
+
 # ---------------------------------------------------------- the hook ----------
 echo ""
 echo "the pre-commit hook"

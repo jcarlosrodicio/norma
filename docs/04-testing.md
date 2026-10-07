@@ -5,10 +5,10 @@ scripts/harness/verify <what you were verifying>   # the gate: parse + the suite
 test/run.sh                                        # the suite alone, while iterating
 ```
 
-One suite, currently 419 tests, a couple of seconds. The gate runs it whole - it
+One suite, currently 468 tests, a couple of seconds. The gate runs it whole - it
 is indivisible, so there is nothing to select - after parsing every shell file. It covers the gate's real
 behaviour, the config contract, the hook's four refusals, the run context and what
-the gate records through it, every stack profile and
+the gate records through it, the floor guard, every stack profile and
 the detection that chooses one, the shape of the skill library, and `start`,
 `install`, `upgrade` and `doctor`.
 
