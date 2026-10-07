@@ -1077,6 +1077,11 @@ assert_has "and reporting the coverage beside the verdict" "$adv" "Open with the
 assert_has "it fact-checks its findings before reporting them" "$adv" "## 4. Fact-check your own findings"
 assert_has "dropping one only on the two grounds the diff can prove" "$adv" "exactly two grounds"
 assert_has "and never on the subjects where being wrong costs most" "$adv" "Never drop a finding"
+# Unsupervised, "make it green" is the dominant failure, and every road to it
+# ends with the check passing. The removed lines are where it shows.
+assert_has "it attacks a bar lowered to get to green" "$adv" "**A weakened bar.**"
+assert_has "reading the removed lines, not only the added ones" "$adv" "**removed** lines"
+assert_has "and blocks a loosening nobody justified" "$adv" "loosening it always does"
 # Unsupervised, the archive has to travel inside the pull request: there is no
 # second branch because there is nobody to remember it.
 auto=$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")
