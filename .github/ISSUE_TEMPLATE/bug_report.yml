@@ -1,0 +1,33 @@
+name: Bug report
+description: norma, the gate or the hook did something it should not have, or refused something it should not have.
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: norma version
+      description: Output of `norma version`, and `scripts/harness/VERSION` in the affected project.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, and what /bin/sh is (dash, bash, zsh...). The profile in use, if it matters.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The commands you ran, in order. A throwaway repository is the best reproduction.
+      render: sh
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened instead
+      description: Paste the exact output. Remove credentials and private paths first.
+    validations:
+      required: true

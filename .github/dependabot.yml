@@ -1,0 +1,7 @@
+version: 2
+updates:
+  # The only dependencies this repository has are the actions CI uses.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

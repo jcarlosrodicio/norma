@@ -123,7 +123,7 @@ Four decisions, each one load-bearing:
   specification did, and a heuristic that blocks on a false positive is how a
   team learns `--no-verify`. The events it records are what will say whether it
   is precise enough to block. Measured on 2026-10-07, before it shipped, against 28 merged pull
-  requests of tally, grodar and aqorin: three of them reported anything, five
+  requests of three consumer repositories: three of them reported anything, five
   findings in all, and every one a real move - three `eslint-disable-next-line`,
   a modified `config.sh`, and a test file that lost 54 assertions net when they
   moved into a helper the name heuristic does not count as a test. Real is not

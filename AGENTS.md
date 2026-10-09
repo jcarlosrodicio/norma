@@ -96,10 +96,6 @@ repository, which is what `doctor` requires.
 
 ## Consumers
 
-Four repositories install this: `tally` (flutter), `grodar` (pnpm-turbo),
-`aqorin` (node) and `agent-observability` (node, `node --test`). Propagation rules
-- including when **not** to propagate - are in `docs/02-flows.md`.
-
-Count them before quoting the number anywhere: this section said three for as long
-as it took somebody to notice, and a consumer nobody lists is a consumer nobody
-upgrades.
+A repository that installs norma picks up a new version with `norma upgrade`. This
+repository does not list its consumers. Propagation rules - including when **not**
+to propagate - are in `docs/02-flows.md`.
