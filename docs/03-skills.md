@@ -127,5 +127,6 @@ before adding or renaming anything.
    land as real files; extend it if the new skill deserves the same guarantee.
 
 Third-party skills - `writing-skills`, `code-auditing`, `using-git-worktrees` -
-came from outside. Keep local edits minimal and confined to statements that would
-otherwise be wrong inside a vendored copy, such as where skills live.
+came from outside, and [`NOTICE.md`](../NOTICE.md) says where from. Keep local
+edits minimal and confined to statements that would otherwise be wrong inside a
+vendored copy, such as where skills live.

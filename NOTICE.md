@@ -17,6 +17,7 @@ any of them.
   Copyright (c) 2025 Jesse Vincent, in a copy modified by LIDR.co (the `author`
   field in its front matter). Its license travels with it as
   [`skills/using-git-worktrees/LICENSE`](skills/using-git-worktrees/LICENSE).
+- **`skills/code-auditing/`** - from LIDR.co workshop material.
 
 ## Adapted ideas
 
