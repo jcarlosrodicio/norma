@@ -1,8 +1,7 @@
 name: CI
 
-# Hasta ahora este repositorio no tenía CI. La suite tarda dos segundos y corre
-# sólo si alguien se acuerda - y lo que este repositorio publica es el gate que
-# obliga a los demás a no olvidarse. Predicar y no cumplir.
+# The suite takes two seconds and used to run only when somebody remembered - and
+# what this repository publishes is the gate that stops everybody else forgetting.
 
 on:
   push:
@@ -15,20 +14,24 @@ on:
       - 'docs/**'
       - '**.md'
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   gate:
-    # El mismo runner autoalojado que los demás repositorios: aquí no se gastan
-    # minutos de GitHub. La suite es POSIX sh y no instala nada.
-    runs-on: [self-hosted, vps-hetzner]
+    # A GitHub-hosted runner: a public repository must never run pull requests
+    # from forks on a self-hosted machine. Its /bin/sh is dash, which is also the
+    # strictest POSIX check this suite gets. Nothing is installed.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
-      # El propio gate del harness, no una llamada suelta a la suite: si CI
-      # ejecutara algo distinto de lo que ejecuta la persona, un día uno pasaría y
-      # el otro no y nadie sabría cuál tiene razón.
-      - name: Gate completo
+      # The harness's own gate, not a bare call to the suite: if CI ran something
+      # different from what a person runs, one day one would pass and the other
+      # would not, and nobody would know which one is right.
+      - name: Full gate
         run: scripts/harness/verify --full
