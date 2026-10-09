@@ -49,10 +49,10 @@ Two lines, once, at the start. Not a disclaimer - a working agreement.
 whether your model could in principle. If it cannot, say so where it matters, which is
 the design conversation:
 
-> No puedo ver imágenes en esta sesión. Mándame las referencias como **enlaces** que
-> pueda abrir, o descríbemelas: qué producto te gusta y qué te gusta de él. Escribiré el
-> brief con eso y dejaré anotado que se recogió sin ver imágenes, para que quien diseñe
-> de verdad lo sepa.
+> I cannot see images in this session. Send me the references as **links** I can
+> open, or describe them: which product you like and what you like about it. I will
+> write the brief from that and note that it was gathered without seeing images, so
+> whoever actually designs it knows.
 
 And write that same line into the design document. Never discuss a screenshot you did
 not see: a brief written from an image nobody looked at is worse than one that admits
@@ -281,7 +281,7 @@ Now the founding commit:
 
 ```sh
 git add docs AGENTS.md CLAUDE.md README.md scripts .githooks .agents openspec .gitignore
-git -c core.hooksPath=.git/hooks commit -m "docs: qué es esto, y las fases en que se construye"
+git -c core.hooksPath=.git/hooks commit -m "docs: what this is, and the phases it is built in"
 ```
 
 `-c` overrides the hook for that one command only: nothing is unset, nothing has to be
@@ -325,9 +325,9 @@ else. Report:
 - what `doctor` says;
 - and the one instruction that starts the work:
 
-> El arnés está instalado y el repositorio tiene su primer commit. La fase 0 va por el
-> bucle normal: dile a un agente que siga `.agents/skills/run-task/SKILL.md` con
-> `docs/roadmap/phase-00-<slug>.md`.
+> The harness is installed and the repository has its first commit. Phase 0 goes
+> through the normal loop: tell an agent to follow `.agents/skills/run-task/SKILL.md`
+> with `docs/roadmap/phase-00-<slug>.md`.
 
 ## Reporting honestly
 

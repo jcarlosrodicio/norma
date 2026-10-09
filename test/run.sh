@@ -41,11 +41,11 @@ new_repo() {
   cd "$HOME_DIR"
   R=$(mktemp -d)
   cd "$R"
-  # `-b master` explícito, no el defecto de la máquina. Media docena de
-  # aserciones de esta suite nombran `master` como la rama por defecto, y el
-  # primer CI lo dijo: el runner tiene `init.defaultBranch=main` y el hook
-  # refusaba nombrando `main`, correctamente. La suite era la que daba por hecho
-  # la configuración de git de quien la ejecuta.
+  # `-b master` explicitly, not the machine default. Half a dozen assertions in
+  # this suite name `master` as the default branch, and the first CI run said so:
+  # the runner had `init.defaultBranch=main` and the hook refused naming `main`,
+  # correctly. It was the suite that took the git config of whoever runs it for
+  # granted.
   git init -q -b master
   git config user.email t@example.com
   git config user.name Test
@@ -225,13 +225,13 @@ assert_eq "but refuses the moment the code itself is staged" "$RC" 2
 assert_has "naming it" "$OUT" "src/wip.ts"
 done_repo
 
-# El veredicto es el estado del comando, y nada entre medias puede cambiarlo.
-# Medido el 17-sep-2026 en grodar: `rtk pnpm typecheck` salía 0 donde
-# `pnpm typecheck` salía 1, así que la verificación pasó con el typecheck roto,
-# el hook dejó commitear y el fallo apareció en CI un minuto después. El envoltorio
-# que recorta la salida no puede opinar sobre si algo pasó. Aquí se simula con un
-# `rtk` de mentira que siempre sale 0: si el gate lo consultara, este test pasaría
-# en verde con el comando fallando.
+# The verdict is the command's exit status, and nothing in between may change it.
+# Measured on 17-sep-2026 in a consumer: `rtk pnpm typecheck` exited 0 where
+# `pnpm typecheck` exited 1, so verification passed with the typecheck broken, the
+# hook let the commit through and the failure showed up in CI a minute later. A
+# wrapper that trims the output has no say in whether something passed. A fake
+# `rtk` that always exits 0 simulates it here: if the gate consulted it, this test
+# would go green with the command failing.
 new_repo; with_gate
 cat > scripts/harness/config.sh <<'CFG'
 HARNESS_CODE_PATHS="src spec"
