@@ -1,22 +1,143 @@
 # norma
 
-The task harness, extracted so it can be installed into any repository. One loop,
-one verification gate, one set of skills - identical whichever agent is driving,
-because everything is referenced **by file path** and enforced by **git**, not by
-any single agent's hook system.
+<p align="center">
+  <a href="https://github.com/jcarlosrodicio/norma/actions/workflows/ci.yml"><img src="https://github.com/jcarlosrodicio/norma/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/jcarlosrodicio/norma" alt="License"></a>
+  <a href="https://github.com/sponsors/jcarlosrodicio"><img src="https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-ea4aaa?logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub"></a>
+</p>
+
+**One task loop, one verification gate, one skill library - for every coding agent,
+enforced by git.**
+
+norma installs and maintains a task harness in a repository. Whatever agent is
+driving - Claude Code, Codex, OpenCode, Cursor or the next one - it follows the same
+procedure, read **by file path** from the repository, and it cannot commit until the
+same gate has passed. The enforcement lives in a git hook, not in any one agent's
+hook system, so switching agents changes nothing.
+
+**MIT · POSIX sh · Agent-agnostic · No runtime dependencies**
+
+> [!NOTE]
+> norma is not an agent, an orchestrator or a hosted service. It is the set of
+> files and the one hook that make several agents work the same way in your
+> repository, and the CLI that keeps those files current.
+
+## Why this exists
+
+A repository worked on by coding agents tends to grow its process by accident:
+
+- A prompt here, a rule file there, a slash command only one agent understands.
+- "Run the tests" as an instruction rather than a check - followed when remembered.
+- A different procedure per agent, so the result depends on who was driving.
+- The same gate and the same tests hand-built again in every repository, drifting
+  apart a little more with each copy.
+
+norma is that process extracted once, made portable, and made binding:
+
+- **One loop** for any change - orient, enrich, branch, plan, implement, verify,
+  review, document, hand over - with three explicit stops where a human decides.
+- **One gate**, byte-identical in every project, that runs what the project says
+  its checks are and writes a stamp the hook demands before a commit.
+- **One skill library**, vendored as plain files, so any agent can follow it
+  without a skill system of its own.
+- **One CLI** to install it, upgrade it without touching your decisions, and
+  diagnose what is missing.
+
+## What you get
+
+| Capability | What it gives you |
+|---|---|
+| The loop | `run-task`: a whole change from a vague request to verified code waiting for review, stopping three times for the human |
+| Unattended phases | `auto-run-task`: the same loop with nobody watching, each stop replaced by a decision it writes down, ending at an open pull request |
+| A binding gate | `scripts/harness/verify` runs your static checks and the tests for what changed, and stamps the result |
+| A hook that enforces it | `.githooks/pre-commit` refuses the default branch, a missing or stale stamp, and code committed against a docs-only stamp |
+| Independent review | `adversarial-review`: a red-team pass that assumes the work is wrong, fact-checks its findings and treats a lowered bar as blocking |
+| Runtime verification | `runtime-verification`: proof that the change works in the running system, not just that the tests pass |
+| Task runs | `scripts/harness/run`: one identity across the several sessions a task takes, with the evidence each stage recorded |
+| Guided setup | `harness-setup`: an interview that fills the decisions the installer cannot infer |
+| Projects from nothing | `norma start` and `start-project`: from "I want to build X" to founding documents, a roadmap and an installed harness |
+| Sixteen stack profiles | A starting `config.sh` for Node, pnpm/Turbo, Next, Flutter, Swift, Go, Rust, Maven, Gradle, Python, Django, Laravel, Rails, Phoenix, .NET and Terraform |
+| Safe upgrades | `norma upgrade` replaces only what the harness owns and reports local edits instead of clobbering them |
+
+## Who this is for
+
+- You use more than one coding agent, or expect to, and want them to work the same way.
+- You want "the tests passed" to be something git checks, not something an agent says.
+- You maintain several repositories and are tired of hand-copying the same process.
+- You want the process in plain files you can read, diff and change.
+
+## Who this is not for
+
+- You want an agent runtime, a multi-agent orchestrator or a hosted platform.
+- You want every request fully automated with no human review.
+- Your repository cannot run its checks from a shell.
+
+## How it works
+
+```
+orient → enrich → branch → plan → implement → verify → review → document → close → deliver
+         ^stop             ^stop                                                   ^stop
+```
+
+Every stage is a document in `.agents/skills/`, referenced by path, so an agent that
+knows nothing about skills can still follow it. The **verify** stage is the gate:
 
 ```sh
-git clone <this repo> ~/Nasito/Desarrollo/norma
-ln -s ~/Nasito/Desarrollo/norma/bin/norma ~/.local/bin/norma
+scripts/harness/verify <what you were verifying>   # static gates + the selected tests
+scripts/harness/verify --full                      # everything, as CI runs it
+scripts/harness/verify --docs-only                 # refuses if code changed
+```
 
+It runs the commands your project declares in `scripts/harness/config.sh` and, on
+success, writes a stamp of what it verified. The pre-commit hook refuses a commit
+whose stamp is missing, stale or docs-only against code - so a step that was skipped
+shows up as a refused commit, not as a review comment three days later. Run the same
+gate in CI to close the one hole the hook cannot, `git commit --no-verify`.
+
+Every refusal and the reason it exists are listed in
+[`docs/02-flows.md`](docs/02-flows.md).
+
+## Quick start
+
+### Requirements
+
+- `git` and a POSIX `sh`. Nothing else is needed to install, upgrade or run the gate.
+- [OpenSpec](https://github.com/Fission-AI/OpenSpec) for the full loop: the plan,
+  apply and archive stages of `run-task` follow its skills.
+- Optional: [rtk](https://github.com/rtk-ai/rtk), which the gate uses to trim the
+  output that reaches an agent's context when it is installed. `doctor` also looks
+  for `tgrep` and `codegraph`.
+
+### Install norma
+
+```sh
+git clone https://github.com/jcarlosrodicio/norma.git ~/.local/share/norma
+ln -s ~/.local/share/norma/bin/norma ~/.local/bin/norma
+```
+
+Any location works: `norma home` prints wherever it lives.
+
+### Add the harness to a repository
+
+```sh
 cd ~/some/project
 norma install --dry-run    # see what it would do
 norma install              # do it
 norma doctor               # what is still missing, and what you must fill in
-norma home                 # where norma itself lives
-
-norma start mi-proyecto    # ...or begin one that does not exist yet
 ```
+
+Then ask your agent to follow `.agents/skills/harness-setup/SKILL.md` (in Claude Code,
+`/harness-setup`) to fill in the decisions `install` cannot infer. From then on, any
+change starts with `.agents/skills/run-task/SKILL.md`.
+
+### Or start a project that does not exist yet
+
+```sh
+norma start my-project     # creates the directory and leaves the note
+cd my-project              # open your agent here and say what you want to build
+```
+
+### Stack profiles
 
 `install` detects the stack from its manifest, or takes `--profile`. Sixteen are
 shipped:
@@ -43,8 +164,8 @@ repository root is invisible to the code-path check.
 ## Starting from nothing: `norma start`
 
 ```sh
-norma start mi-proyecto     # crea el directorio y deja la nota
-cd mi-proyecto              # abre tu agente aquí y dile qué quieres construir
+norma start my-project     # creates the directory and leaves the note
+cd my-project              # open your agent here and say what you want to build
 ```
 
 That is the whole entry point. `start` writes an `AGENTS.md` pointing at the
@@ -249,29 +370,6 @@ newly added skill needs, repairing one that points at a skill that moved, and
 refusing to overwrite a real directory someone put in the way. Every other
 repository gets copies, which is what makes them survive a clone.
 
-## Tests
-
-```sh
-test/run.sh
-```
-
-419 tests over the gate's real behaviour - its refusals above all - over the run
-context and what the gate records through it, over every
-profile and the detection that picks one, over the shape of the skill library, and
-over `install`, `upgrade` and `doctor`, each in a throwaway git repository with a
-stub stack adapter. They live here, once, because the gate is the same file everywhere:
-before this repository existed the same eight tests were duplicated across three
-projects in two languages.
-
-## Working on norma itself
-
-[`AGENTS.md`](AGENTS.md) is the index for that, and it is what an agent should read
-first: the ownership boundary in [`docs/01-architecture.md`](docs/01-architecture.md),
-the flows and every refusal in [`docs/02-flows.md`](docs/02-flows.md), the skill
-library in [`docs/03-skills.md`](docs/03-skills.md), and the suite in
-[`docs/04-testing.md`](docs/04-testing.md). `CLAUDE.md` is a symlink to `AGENTS.md`,
-because Claude Code autoloads only the latter.
-
 ## Not per project
 
 Some things are user-level and `install` deliberately does not touch them; `doctor`
@@ -280,3 +378,60 @@ reports on them:
 - **OpenSpec's workflow set** lives in `~/.config/openspec/config.json`. It is global
   configuration, not per project.
 - `tgrep`, `rtk` and `codegraph` are tools on your `PATH`.
+
+## Engineering quality
+
+```sh
+test/run.sh
+```
+
+468 tests over the gate's real behaviour - its refusals above all - over the run
+context and what the gate records through it, over every
+profile and the detection that picks one, over the shape of the skill library, and
+over `install`, `upgrade` and `doctor`, each in a throwaway git repository with a
+stub stack adapter. They live here, once, because the gate is the same file everywhere:
+before this repository existed the same eight tests were duplicated across three
+projects in two languages.
+
+The suite runs in a couple of seconds, under dash in CI, and norma installs its own
+harness: every change to this repository passes the same gate and the same hook it
+installs elsewhere.
+
+## Documentation
+
+- [`docs/01-architecture.md`](docs/01-architecture.md) - the pieces, and the
+  ownership boundary the whole design rests on.
+- [`docs/02-flows.md`](docs/02-flows.md) - what `install`, `upgrade` and `doctor` do
+  step by step, and every refusal with its reason.
+- [`docs/03-skills.md`](docs/03-skills.md) - the skill library and how to add to it.
+- [`docs/04-testing.md`](docs/04-testing.md) - the suite and its conventions.
+
+## Compatibility and scope
+
+- `bin/` and `core/` are POSIX sh with no bashisms; CI runs the suite under dash, and
+  it is developed on macOS.
+- The gate works with any stack whose checks run from a shell; the profiles are
+  starting points, not tested support (see above).
+- Agent-agnostic by construction: everything is a file referenced by path. Claude
+  Code additionally gets the skills as `/slash` commands through `.claude/skills/`.
+- Native Windows is not supported; WSL is untested.
+
+## Contributing
+
+Contributions are welcome. Found a bug or have an idea?
+[Open an issue](https://github.com/jcarlosrodicio/norma/issues).
+
+[`AGENTS.md`](AGENTS.md) is the index for working on norma itself, for humans and
+agents alike, and [`CONTRIBUTING.md`](CONTRIBUTING.md) has the rules and the
+checklist. `CLAUDE.md` is a symlink to `AGENTS.md`, because Claude Code autoloads
+only the latter.
+
+## License
+
+Licensed under the [MIT License](LICENSE). Some skills come from other projects;
+[NOTICE.md](NOTICE.md) lists them with their licenses.
+
+## Disclaimer
+
+norma is not affiliated with Anthropic, OpenAI, OpenSpec or any agent vendor it
+works with.
