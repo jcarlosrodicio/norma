@@ -24,7 +24,7 @@ jobs:
     # strictest POSIX check this suite gets. Nothing is installed.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # The harness's own gate, not a bare call to the suite: if CI ran something
       # different from what a person runs, one day one would pass and the other
