@@ -59,7 +59,7 @@ with the clock that produced it; `duration_s` stays for the readers that predate
 it. `docs/01-architecture.md` has the table.
 
 `--docs-only` refuses the moment the change touches `bin/`, `core/`, `profiles/`,
-`skills/`, `templates/`, `test/` or `scripts/`, and the hook refuses code
+`skills/`, `templates/`, `test/`, `scripts/` or `install.sh`, and the hook refuses code
 committed against a docs-only stamp.
 
 shellcheck is deliberately not in the gates - it is not installed here, and

@@ -1,5 +1,25 @@
 # 02 · Flows
 
+## Installing norma itself: `install.sh` and Homebrew
+
+Two routes put the CLI on a machine, and both install a **release tag**, never
+whatever `master` holds that day.
+
+- **Homebrew** - `brew install jcarlosrodicio/tap/norma`, from the
+  [tap](https://github.com/jcarlosrodicio/homebrew-tap). Its launcher execs
+  through `opt/norma/libexec`, not the versioned Cellar path, because `norma start`
+  writes its own home into a new project's `AGENTS.md` and a Cellar path dies with
+  the next upgrade. The tap's daily `brew bump` workflow opens a pull request when
+  a newer release exists here.
+- **`install.sh`** - clones the latest release, or `NORMA_VERSION`, into
+  `NORMA_HOME` (default `~/.local/share/norma`) and links `bin/norma` from
+  `NORMA_BIN_DIR` (default `~/.local/bin`). Run again, it fetches and checks out
+  the requested release in the same checkout. "Latest" is decided by version, not
+  by text order, and only tags shaped `X.Y.Z` count. Needs git and nothing else.
+
+A release, then, is a tag plus a GitHub release. Nothing reaches users until
+both exist.
+
 ## `norma start [<directory>]`
 
 The front door of a project that does not exist yet. It needs no repository and
@@ -295,6 +315,18 @@ three times when it verified once.
 | No stamp | Nothing was verified. |
 | Stamp older than a staged file | Code was edited after being verified. The refusal prints the previous selection, ready to paste. |
 | `docs-only` stamp with staged code | Rule 3 cannot catch code edited *before* that run, and a docs-only run vouches for no test at all. |
+
+### `install.sh`
+
+| Refusal | Exit | Why |
+|---|---|---|
+| A `norma` link in `NORMA_BIN_DIR` that points anywhere else | 1 | It is somebody's working copy - a development clone, another install - and repointing it changes what they run without telling them. |
+| A file, not a link, where the link would go | 1 | It is not ours to overwrite. |
+| A `NORMA_HOME` that exists and is not a git checkout | 1 | It holds somebody's files. |
+| No release found, or the repository unreachable | 1 | Installing an untagged `master` is the thing the script exists to avoid. |
+
+Every refusal is decided **before** anything is cloned or linked, so a refused run
+leaves the machine as it found it.
 
 ### The run context
 

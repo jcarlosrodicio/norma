@@ -1749,6 +1749,88 @@ assert_has "and how to end it" "$OUT" "run close"
 assert_eq "as a warning, not a blocking problem" "$RC" 0
 done_repo
 
+# ------------------------------------------------------- the install script ----
+echo ""
+echo "install.sh"
+
+# A release repository whose newest version is not the newest as text - 0.10.0
+# sorts before 0.2.0 that way - plus a tag that is not a version at all.
+new_repo
+SRC=$R
+mkdir bin
+# Resolves its own link, as the real one does, to find VERSION.
+printf '#!/bin/sh\nme=$(readlink "$0" || echo "$0")\necho "norma $(cat "$(dirname "$me")/../VERSION")"\n' > bin/norma
+chmod +x bin/norma
+for v in 0.2.0 0.10.0 0.9.0 nightly; do
+  echo "$v" > VERSION
+  git add -A && git commit -qm "$v" && git tag "$v"
+done
+cd "$HOME_DIR"
+
+# Runs install.sh against $SRC into the throwaway directory $I, with any extra
+# environment given as arguments.
+inst() {
+  set +e
+  OUT=$(env NORMA_REPO="$SRC" NORMA_HOME="$I/norma" NORMA_BIN_DIR="$I/bin" "$@" \
+    sh "$HOME_DIR/install.sh" 2>&1)
+  RC=$?
+  set -e
+}
+
+I=$(mktemp -d)
+inst
+assert_eq "installs" "$RC" 0
+assert_eq "the latest release by version, not by string order" "$("$I/bin/norma")" "norma 0.10.0"
+assert_has "and says where it went" "$OUT" "$I/norma"
+assert_has "and that the link directory is not on PATH" "$OUT" "Add $I/bin to your PATH"
+inst NORMA_VERSION=0.2.0
+assert_eq "running it again moves the install to a pinned release" "$("$I/bin/norma")" "norma 0.2.0"
+rm -rf "$I"
+
+# A link to another checkout is somebody's working copy - the maintainer's
+# development clone, for one - and repointing it would change what they run.
+I=$(mktemp -d)
+mkdir "$I/bin"
+ln -s /elsewhere/bin/norma "$I/bin/norma"
+inst
+assert_eq "refuses a norma link that points elsewhere" "$RC" 1
+assert_has "naming where it points" "$OUT" "/elsewhere/bin/norma"
+assert_nofile "before cloning anything" "$I/norma"
+assert_eq "and leaves the link alone" "$(readlink "$I/bin/norma")" "/elsewhere/bin/norma"
+rm -rf "$I"
+
+I=$(mktemp -d)
+mkdir "$I/norma"
+touch "$I/norma/somebodys-file"
+inst
+assert_eq "refuses a NORMA_HOME that is not a norma checkout" "$RC" 1
+assert_has "and says how to get past it" "$OUT" "set NORMA_HOME"
+assert_nofile "without linking anything" "$I/bin/norma"
+rm -rf "$I"
+
+I=$(mktemp -d)
+mkdir "$I/bin"
+echo "somebody's script" > "$I/bin/norma"
+inst
+assert_eq "refuses a file where the link would go" "$RC" 1
+assert_eq "and leaves it as it was" "$(cat "$I/bin/norma")" "somebody's script"
+rm -rf "$I"
+
+# Without a release there is nothing to pin, and installing master is what the
+# script exists to avoid. The non-version tag must not count as one.
+cd "$SRC"
+git tag -d 0.2.0 0.10.0 0.9.0 >/dev/null
+cd "$HOME_DIR"
+I=$(mktemp -d)
+inst
+assert_eq "refuses a repository with no release" "$RC" 1
+assert_has "saying so" "$OUT" "found no release"
+assert_nofile "without cloning" "$I/norma"
+rm -rf "$I"
+
+cd "$SRC"
+done_repo
+
 # --------------------------------------------------------------------- end ----
 echo ""
 printf '%s passed, %s failed\n' "$pass" "$fail"
