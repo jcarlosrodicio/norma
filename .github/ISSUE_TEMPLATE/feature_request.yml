@@ -1,0 +1,22 @@
+name: Feature request
+description: A change to the loop, the gate, a skill, a profile or the CLI.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What goes wrong, or takes work, without this. A concrete case beats a general one.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+      description: If it touches what the harness owns or what the project owns, say which side - docs/01-architecture.md has the boundary.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
