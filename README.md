@@ -110,12 +110,33 @@ Every refusal and the reason it exists are listed in
 
 ### Install norma
 
+With Homebrew, on macOS or Linux:
+
 ```sh
-git clone https://github.com/jcarlosrodicio/norma.git ~/.local/share/norma
+brew install jcarlosrodicio/tap/norma
+```
+
+Or with the install script, which needs only git:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jcarlosrodicio/norma/master/install.sh | sh
+```
+
+It clones the latest release into `~/.local/share/norma` and links `norma` from
+`~/.local/bin`. `NORMA_VERSION=0.21.0` pins a release, and `NORMA_HOME` and
+`NORMA_BIN_DIR` move either location. Run it again to move to another release. It
+refuses rather than overwrite a `norma` that is already there.
+
+Or by hand, from a release tag:
+
+```sh
+git clone --branch 0.21.0 https://github.com/jcarlosrodicio/norma.git ~/.local/share/norma
 ln -s ~/.local/share/norma/bin/norma ~/.local/bin/norma
 ```
 
-Any location works: `norma home` prints wherever it lives.
+All three install a tagged release, never `master`. `norma home` prints where it
+lives. Updating norma itself is `brew upgrade norma`, the script run again, or
+`git checkout` of a newer tag; bringing a project up to it is `norma upgrade`.
 
 ### Add the harness to a repository
 
@@ -385,7 +406,7 @@ reports on them:
 test/run.sh
 ```
 
-468 tests over the gate's real behaviour - its refusals above all - over the run
+485 tests over the gate's real behaviour - its refusals above all - over the run
 context and what the gate records through it, over every
 profile and the detection that picks one, over the shape of the skill library, and
 over `install`, `upgrade` and `doctor`, each in a throwaway git repository with a

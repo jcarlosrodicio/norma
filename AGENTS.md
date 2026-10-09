@@ -28,6 +28,7 @@ disagree, the documentation wins and the disagreement is a finding to report.
 
 ```
 bin/norma          the CLI: start | install | upgrade | doctor | home | version
+install.sh         installs the CLI itself from a release tag; Homebrew is the other route
 core/verify        the verification gate, vendored into projects unchanged
 core/run           the task run context: one identity across the sessions a task takes
 core/pre-commit    the git hook that makes the gate binding

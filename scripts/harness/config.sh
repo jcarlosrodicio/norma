@@ -7,9 +7,9 @@
 
 # Everything that ships or is tested. `docs/`, `README.md`, `AGENTS.md` and
 # `VERSION` are outside, so a documentation commit can use --docs-only.
-HARNESS_CODE_PATHS="bin core profiles skills templates test scripts"
+HARNESS_CODE_PATHS="bin core profiles skills templates test scripts install.sh"
 
-SHELL_FILES="bin/norma core/verify core/run core/pre-commit test/run.sh test/fixtures/config.sh scripts/harness/config.sh"
+SHELL_FILES="install.sh bin/norma core/verify core/run core/pre-commit test/run.sh test/fixtures/config.sh scripts/harness/config.sh"
 
 harness_gates() {
   echo "harness: static gates"
