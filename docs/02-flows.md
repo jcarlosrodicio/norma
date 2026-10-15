@@ -47,8 +47,8 @@ Run inside the target repository. `--dry-run` prints the plan and writes nothing
 use it first on a repository that already has content.
 
 1. Require a git repository, and resolve the profile - detected or `--profile`.
-2. Vendor `core/verify` → `scripts/harness/verify` (0755) and `core/run` →
-   `scripts/harness/run` (0755).
+2. Vendor `core/verify` → `scripts/harness/verify` (0755), `core/run` →
+   `scripts/harness/run` (0755) and `core/land` → `scripts/harness/land` (0755).
 3. Write `profiles/<p>.sh` → `scripts/harness/config.sh` **only if absent**.
 4. Vendor `core/pre-commit` → `.githooks/pre-commit` (0755), and
    `git config core.hooksPath .githooks`.
@@ -70,8 +70,8 @@ Installing twice changes nothing - there is a test for it.
 
 ## `norma upgrade [--force]`
 
-Re-vendors only what the harness owns: the gate, the run context, the hook, the
-skills, the version stamp, and the `AGENTS.md` block **when the markers are
+Re-vendors only what the harness owns: the gate, the run context, the land
+script, the hook, the skills, the version stamp, and the `AGENTS.md` block **when the markers are
 there**. It never
 touches `config.sh`, the documents or `openspec/config.yaml`.
 
@@ -158,6 +158,7 @@ Changes nothing; exits non-zero when something is blocking. It reports:
   branch** - the gate does not refuse for that, deliberately, so this is the only
   place a human hears that the next task is about to collect its evidence under
   somebody else's identity;
+- `scripts/harness/land` present and executable;
 - the config contract complete, and whether it still has `TODO`;
 - the hook present and `core.hooksPath` armed;
 - `CLAUDE.md` → `AGENTS.md`, and that `AGENTS.md` points at `run-task` and the gate;
@@ -342,6 +343,32 @@ a failure, `event` without one writes nothing and exits 0, `close` with nothing 
 close says so and exits 0. The absence of a run is a **normal, supported state**:
 it is what a project that upgrades and never adopts this sees, and what any agent
 working outside a repository sees.
+
+### The land script
+
+| Refusal | Exit | Why |
+|---|---|---|
+| No pull request, more than one companion, a companion not written `<owner>/<repo>#<n>`, or the pull request named as its own companion | 2 | A typo would land the wrong pull request. |
+| `HARNESS_LAND_METHOD` other than `merge`, `squash` or `rebase` | 2 | Decided before GitHub is asked anything. |
+| A `!` negation in `HARNESS_LAND_NO_CI` | 2 | Half-honouring it could skip the wait for a path CI does run on. |
+| The pull request or the companion not open | 1 | Checked for both before anything merges, so a closed companion never leaves half a delivery. |
+| The pull request does not merge cleanly, or GitHub never settles whether it does | 1 | A conflicting pull request gets no CI run, so there is nothing to wait for. Bring the base branch in and run it again. |
+| A head commit that cannot be read | 1 | Every merge is pinned to it; without it the merge would be unpinned. |
+| The pull request's files cannot be listed, or `HARNESS_LAND_NO_CI` holds a pattern that cannot be read | 1 | An error would otherwise read as "touches nothing CI runs on" and skip the wait. |
+| CI red, or no check at all on a pull request that touches a path CI runs on | 1 | No check is not a pass. A pull request touching only `HARNESS_LAND_NO_CI` paths is the one exception, because its checks never come. |
+| New checks still appearing after five rounds of green | 1 | Something keeps registering workflows; green is not settled. |
+| GitHub refuses the merge - the head moved after the checks passed | 1 | The merge is pinned to the commit that went green; a later push is code no check ran on. |
+| The companion does not merge cleanly, or its merge fails - a push to it since `land` started among the reasons | 1 | The first pull request is already merged and the message says so, so whoever reads it knows exactly which half is missing. |
+
+Every refusal before the first merge leaves both pull requests as they were. After
+a merge, a branch that something still depends on is kept rather than deleted -
+not a refusal, the merge stands, but `land` says which pull request holds it.
+
+`land --landing` refuses nothing but extra arguments: whatever it cannot read is
+`owner`, said on stderr, because a reader that fails closed is the only kind an
+agent about to merge should be handed. It reads the default branch, not the
+working tree, so a branch that rewrites the line changes nothing until the owner
+merges that change.
 
 Soften none of these without reading the reason and replacing it with something
 stronger.

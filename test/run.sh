@@ -1051,6 +1051,334 @@ assert_eq "refuses on the default branch" "$RC" 1
 assert_has "naming the branch it refused" "$OUT" "master"
 done_repo
 
+# --------------------------------------------------------- the land script ----
+echo ""
+echo "the land script"
+
+# land talks to GitHub only through gh, so a fake gh on PATH stands in for it: it
+# logs every call and answers from the environment - MAIN_* for the pull request
+# being landed, CO_* for the companion in a repository named */site. sleep and
+# osascript are stubbed too, so the polling costs nothing and no notification
+# reaches the desktop of whoever runs the suite.
+FAKE_BIN=$(mktemp -d)
+cat > "$FAKE_BIN/gh" <<'EOF'
+#!/bin/sh
+echo "$* token=${GH_TOKEN:-none}" >> "$FAKE_LOG"
+case "$1 $2" in
+  "auth token") [ "$4" = "${FAKE_ACCOUNT:-me}" ] && [ -n "${FAKE_TOKEN:-}" ] && echo "$FAKE_TOKEN" && exit 0; exit 1 ;;
+  "api --paginate")
+    [ -z "${FILES_FAIL:-}" ] || exit 1
+    [ -z "${FILES-src/a.ts}" ] || echo "${FILES-src/a.ts}" | tr , '\n' ;;
+  "pr view")
+    p=MAIN; case "$5" in */site) p=CO ;; esac
+    case "$7" in
+      state) eval "echo \${${p}_STATE:-OPEN}" ;;
+      mergeable) eval "echo \${${p}_MERGEABLE:-MERGEABLE}" ;;
+      headRefOid) echo "${HEAD_SHA-abcdef0123456789}" ;;
+      headRefName) echo feature ;;
+      baseRefName) echo master ;;
+    esac ;;
+  "pr checks")
+    [ "${CHECKS:-pass}" = pass ] && exit 0
+    # late: green, then a slower workflow registers a pending check, then green
+    if [ "$CHECKS" = late ]; then
+      case "$*" in *--watch*) exit 0 ;; esac
+      n=$(( $(cat "$FAKE_LOG.n" 2>/dev/null || echo 0) + 1 )); echo $n > "$FAKE_LOG.n"
+      [ $n -eq 2 ] && exit 8
+      exit 0
+    fi
+    case "$*" in *--watch*) exit 1 ;; esac
+    [ "${CHECKS:-pass}" = pending ] && exit 8
+    exit 1 ;;
+  "pr list") [ -z "${LIST_FAIL:-}" ] || exit 1; [ -z "${CHILDREN:-}" ] || echo "$CHILDREN" | tr , '\n' ;;
+  "pr edit") [ -z "${EDIT_FAIL:-}" ] || exit 1 ;;
+  "api -X") exit 0 ;;
+  "pr merge")
+    case "$*" in *--match-head-commit*) [ -z "${HEAD_MOVED:-}" ] || exit 1 ;; esac
+    exit 0 ;;
+esac
+EOF
+printf '#!/bin/sh\nexit 0\n' > "$FAKE_BIN/sleep"
+cp "$FAKE_BIN/sleep" "$FAKE_BIN/osascript"
+chmod +x "$FAKE_BIN"/*
+
+with_land() {
+  mkdir -p scripts/harness
+  cp "$HOME_DIR/core/land" scripts/harness/land
+  chmod +x scripts/harness/land
+  cp "$HOME_DIR/test/fixtures/config.sh" scripts/harness/config.sh
+  git remote add origin git@github.com:me/app.git
+}
+
+# run land with $LAND_ENV (space-separated VAR=value) on top of the fake gh,
+# capturing stdout+stderr in $OUT, the exit code in $RC and gh's calls in $LOG
+landing() {
+  : > "$R/gh.log"; rm -f "$R/gh.log.n"
+  set +e
+  OUT=$(env GH_TOKEN= $LAND_ENV FAKE_LOG="$R/gh.log" PATH="$FAKE_BIN:$PATH" \
+    sh scripts/harness/land "$@" 2>&1)
+  RC=$?
+  set -e
+  LOG=$(cat "$R/gh.log")
+}
+
+new_repo; with_land
+LAND_ENV=""
+landing
+assert_eq "refuses to run without a pull request" "$RC" 2
+assert_has "and says how it is called" "$OUT" "usage: scripts/harness/land <pr>"
+landing 7 site#3
+assert_eq "refuses a companion that names no repository" "$RC" 2
+landing 7 me/site#x
+assert_eq "and one whose number is not a number" "$RC" 2
+landing 7 me/site#3 me/other#4
+assert_eq "refuses more than one companion" "$RC" 2
+landing 7 me/app#7
+assert_eq "refuses the pull request as its own companion" "$RC" 2
+landing 7 ME/App#7
+assert_eq "however it is capitalised" "$RC" 2
+
+landing 7
+assert_eq "lands a green pull request" "$RC" 0
+assert_has "merging exactly the commit that went green" "$LOG" \
+  "pr merge 7 -R me/app --merge --match-head-commit abcdef0123456789"
+assert_has "and says so" "$OUT" "merged me/app#7"
+assert_has "having waited on its checks" "$LOG" "pr checks 7 -R me/app --watch"
+
+assert_has "deletes the merged branch" "$LOG" "api -X DELETE repos/me/app/git/refs/heads/feature"
+
+# GitHub closes an open pull request whose base branch is deleted - it does not
+# retarget it - so a stacked pull request is moved down before its base goes.
+LAND_ENV="CHILDREN=8,9"
+landing 7
+assert_eq "lands the bottom of a stack" "$RC" 0
+assert_has "moving the pull requests stacked on it onto its base" "$LOG" "pr edit 8 -R me/app --base master"
+assert_has "every one of them" "$LOG" "pr edit 9 -R me/app --base master"
+edit_at=$(grep -n "pr edit 9" "$R/gh.log" | cut -d: -f1)
+del_at=$(grep -n "api -X DELETE" "$R/gh.log" | cut -d: -f1)
+assert_eq "before deleting the branch they were based on" \
+  "$([ -n "$edit_at" ] && [ -n "$del_at" ] && [ "$edit_at" -lt "$del_at" ] && echo yes)" "yes"
+LAND_ENV="CHILDREN=8 EDIT_FAIL=1"
+landing 7
+assert_eq "still lands when a stacked pull request cannot be moved" "$RC" 0
+assert_no "but keeps the branch it depends on" "$LOG" "api -X DELETE"
+assert_has "and says what to do" "$OUT" "kept branch feature, still the base of #8"
+LAND_ENV="LIST_FAIL=1"
+landing 7
+assert_no "and keeps it when it cannot tell what depends on it" "$LOG" "api -X DELETE"
+
+LAND_ENV="CHECKS=late"
+landing 7
+assert_eq "lands once a check that appeared after the first green is green too" "$RC" 0
+assert_eq "watching again for it rather than merging on the first green" \
+  "$(grep -c "pr checks 7 -R me/app --watch" "$R/gh.log")" "2"
+
+LAND_ENV="HEAD_SHA="
+landing 7
+assert_eq "refuses when the head commit cannot be read" "$RC" 1
+assert_no "rather than merging unpinned" "$LOG" "pr merge"
+
+LAND_ENV="MAIN_STATE=MERGED"
+landing 7
+assert_eq "refuses a pull request that is not open" "$RC" 1
+assert_has "saying which one" "$OUT" "me/app#7 is not open"
+assert_no "and merges nothing" "$LOG" "pr merge"
+
+LAND_ENV="CO_STATE=CLOSED"
+landing 7 me/site#3
+assert_eq "refuses when the companion is not open" "$RC" 1
+assert_no "before merging either of them" "$LOG" "pr merge"
+
+LAND_ENV="MAIN_MERGEABLE=CONFLICTING"
+landing 7
+assert_eq "refuses a pull request that conflicts with its base" "$RC" 1
+assert_has "and says what to do about it" "$OUT" "bring the base branch into it first"
+# A conflicting pull request gets no CI run, so waiting for one would wait forever.
+assert_no "without waiting for a CI that will never run" "$LOG" "pr checks"
+assert_no "and merges nothing" "$LOG" "pr merge"
+
+LAND_ENV="MAIN_MERGEABLE=UNKNOWN"
+landing 7
+assert_eq "refuses when GitHub never settles whether it merges" "$RC" 1
+assert_no "and merges nothing then either" "$LOG" "pr merge"
+
+LAND_ENV="CHECKS=fail"
+landing 7
+assert_eq "refuses on red CI" "$RC" 1
+assert_no "deleting no branch either" "$LOG" "api -X DELETE"
+assert_has "saying nothing was merged" "$OUT" "CI is not green on me/app#7 - nothing merged"
+assert_no "and merging nothing" "$LOG" "pr merge"
+
+LAND_ENV="CHECKS=none"
+landing 7
+assert_eq "refuses a pull request that never gets checks" "$RC" 1
+assert_no "rather than merging it untested" "$LOG" "pr merge"
+
+LAND_ENV="CHECKS=pending"
+landing 7
+assert_eq "refuses checks that are still pending when the watch gives up" "$RC" 1
+
+LAND_ENV="HEAD_MOVED=1"
+landing 7
+assert_eq "refuses when the head moved after the checks passed" "$RC" 1
+assert_has "and says nothing was merged" "$OUT" "nothing merged"
+
+LAND_ENV=""
+landing 7 me/site#3
+assert_eq "lands the companion after the pull request" "$RC" 0
+assert_has "pinned to the head it had when land started" "$LOG" \
+  "pr merge 3 -R me/site --merge --match-head-commit abcdef0123456789"
+main_at=$(grep -n "pr merge 7 " "$R/gh.log" | cut -d: -f1)
+co_at=$(grep -n "pr merge 3 -R me/site" "$R/gh.log" | cut -d: -f1)
+assert_eq "in that order" "$([ -n "$main_at" ] && [ -n "$co_at" ] && [ "$main_at" -lt "$co_at" ] && echo yes)" "yes"
+
+LAND_ENV="CO_MERGEABLE=CONFLICTING"
+landing 7 me/site#3
+assert_eq "stops when the companion conflicts" "$RC" 1
+assert_has "saying the first one merged and the second did not" "$OUT" "me/app#7 merged, but me/site#3 does not merge cleanly"
+assert_no "and leaving the companion alone" "$LOG" "pr merge 3"
+
+# The paths CI ignores are the project's to name: without them, every pull request
+# waits for checks, and a docs-only one would wait for checks that never come.
+# The patterns are GitHub's paths-ignore syntax, not the shell's: ** crosses a
+# directory and * does not. Read the shell's way, *.md would skip the wait for a
+# src/README.md that GitHub does run CI for.
+echo 'HARNESS_LAND_NO_CI="docs/** *.md"' >> scripts/harness/config.sh
+LAND_ENV="CHECKS=none FILES=docs/guide/a.md,README.md"
+landing 7
+assert_eq "lands a pull request that only touches paths CI does not run on" "$RC" 0
+assert_no "without waiting for checks it will never get" "$LOG" "pr checks"
+assert_has "and says why" "$OUT" "no checks to wait for"
+LAND_ENV="CHECKS=none FILES=docs/a.md,src/b.ts"
+landing 7
+assert_eq "but one file outside them is enough to wait for CI" "$RC" 1
+assert_no "and not to merge without it" "$LOG" "pr merge"
+LAND_ENV="CHECKS=none FILES=src/README.md"
+landing 7
+assert_eq "a single * does not cross a directory, as in GitHub's paths-ignore" "$RC" 1
+assert_no "so that file waits for CI" "$LOG" "pr merge"
+LAND_ENV="CHECKS=none FILES_FAIL=1"
+landing 7
+assert_eq "refuses when the files cannot be listed" "$RC" 1
+assert_has "saying so" "$OUT" "could not list the files of me/app#7"
+assert_no "instead of reading the silence as nothing CI runs on" "$LOG" "pr merge"
+LAND_ENV="CHECKS=none FILES="
+landing 7
+assert_eq "an empty file list waits for CI like any other" "$RC" 1
+assert_no "and merges nothing without it" "$LOG" "pr merge"
+touch README.md docs.md
+LAND_ENV="CHECKS=none FILES=other.md"
+landing 7
+assert_eq "the patterns are not expanded against the working tree" "$RC" 0
+for bad in '[' 'a\\'; do
+  sed -i.bak '/HARNESS_LAND_NO_CI/d' scripts/harness/config.sh
+  echo "HARNESS_LAND_NO_CI='$bad'" >> scripts/harness/config.sh
+  LAND_ENV="CHECKS=none FILES=src/a.ts"
+  landing 7
+  assert_eq "refuses a pattern that cannot be read: $bad" "$RC" 1
+  assert_no "instead of reading it as nothing CI runs on: $bad" "$LOG" "pr merge"
+done
+echo 'HARNESS_LAND_NO_CI="docs/** !docs/api/**"' >> scripts/harness/config.sh
+LAND_ENV=""
+landing 7
+assert_eq "refuses a negation it cannot honour" "$RC" 2
+assert_no "before asking GitHub anything" "$LOG" "pr "
+sed -i.bak '/HARNESS_LAND_NO_CI/d' scripts/harness/config.sh
+
+echo 'HARNESS_LAND_METHOD=squash' >> scripts/harness/config.sh
+LAND_ENV=""
+landing 7
+assert_has "merges with the method the project configured" "$LOG" "pr merge 7 -R me/app --squash"
+echo 'HARNESS_LAND_METHOD=fast-forward' >> scripts/harness/config.sh
+landing 7
+assert_eq "refuses a method gh does not have" "$RC" 2
+assert_no "before touching GitHub" "$LOG" "pr "
+
+# A machine with a work and a personal gh account: the active one may not see the
+# repository, and the one named like its owner does.
+sed -i.bak '/HARNESS_LAND_METHOD/d' scripts/harness/config.sh
+LAND_ENV="FAKE_TOKEN=personal"
+landing 7
+assert_has "asks gh for the account named like the owner" "$LOG" "auth token --user me"
+assert_has "and uses its token" "$LOG" "pr merge 7 -R me/app --merge --match-head-commit abcdef0123456789 token=personal"
+LAND_ENV="FAKE_TOKEN=personal FAKE_ACCOUNT=somebody-else"
+landing 7
+assert_has "and leaves gh's own choice when there is no such account" "$LOG" "pr merge 7 -R me/app --merge --match-head-commit abcdef0123456789 token=none"
+LAND_ENV="FAKE_TOKEN=personal GH_TOKEN=given"
+landing 7
+assert_has "but never overrides a token it was given" "$LOG" "token=given"
+LAND_ENV="FAKE_TOKEN=personal GITHUB_TOKEN=given"
+landing 7
+assert_no "in either of the variables gh reads" "$LOG" "auth token"
+git remote set-url origin https://github.com/me/app.git/
+LAND_ENV=""
+landing 7
+assert_has "reads the repository from a remote with a trailing slash" "$LOG" "pr merge 7 -R me/app "
+done_repo
+rm -rf "$FAKE_BIN"
+
+# Who lands is read by this, not by an agent interpreting the loop's prose at the
+# moment it wants to merge. Only one exact line says agent; every doubt is owner.
+# And it is read from the default branch as origin has it: the branch asking to be
+# merged is the one place that cannot be trusted to say who may merge it.
+new_repo; with_land
+who() {
+  set +e
+  OUT=$(sh scripts/harness/land --landing 2>"$R/who.err"); RC=$?
+  ERR=$(cat "$R/who.err")
+  set -e
+}
+# commits the loop to master and points origin/HEAD at it, as a clone would
+landing_doc() {
+  mkdir -p docs/harness
+  printf '# Loop\n\n%b\n' "$1" > docs/harness/mandatory-steps.md
+  git add docs/harness/mandatory-steps.md && git commit -qm loop --no-verify
+  git update-ref refs/remotes/origin/master HEAD
+  git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/master
+}
+who
+assert_eq "--landing reads a repository with no default branch on origin as owner" "$OUT" "owner"
+assert_has "and says how to give it one" "$ERR" "git remote set-head origin -a"
+landing_doc 'No such section here.'; who
+assert_eq "reads a loop without the section as owner" "$OUT" "owner"
+landing_doc '### Landing\n\nLanding: owner'; who
+assert_eq "reads Landing: owner as owner" "$OUT" "owner"
+assert_eq "without complaint" "$ERR" ""
+landing_doc '### Landing\n\nLanding: agent\n\nWho merges.'; who
+assert_eq "reads exactly Landing: agent under the heading as agent" "$OUT" "agent"
+assert_eq "and exits 0 either way" "$RC" "0"
+landing_doc '### Landing\n\nLanding: agent\r'; who
+assert_eq "a file saved with CRLF endings reads the same" "$OUT" "agent"
+for odd in 'Landing: Agent' 'Landing: agent # maybe' 'Landing: agent ' 'Landing:agent' 'Landing: agents' 'Who merges.'; do
+  landing_doc "### Landing\n\n$odd"; who
+  assert_eq "reads '$odd' as owner" "$OUT" "owner"
+  assert_has "and says it could not read it: '$odd'" "$ERR" "cannot read"
+done
+landing_doc '### Landing\n\nLanding: agent\n\n### Landing\n\nLanding: agent'; who
+assert_eq "reads two Landing sections as owner, even when both say agent" "$OUT" "owner"
+assert_has "and says why" "$ERR" "2 Landing sections"
+landing_doc 'Landing: agent\n\n### Landing\n\nLanding: owner'; who
+assert_eq "a Landing line anywhere but under the heading counts for nothing" "$OUT" "owner"
+landing_doc '### Landing\n\nLanding: owner\n\n```\nLanding: agent\n```'; who
+assert_eq "nor does one further down the section" "$OUT" "owner"
+landing_doc '### Landing\n\nLanding: owner'
+git switch -q -c feature
+printf '### Landing\n\nLanding: agent\n' > docs/harness/mandatory-steps.md
+git commit -qam "grant myself the merge" --no-verify
+who
+assert_eq "a branch that rewrites the line does not grant itself the merge" "$OUT" "owner"
+assert_has "and is told the default branch decides" "$ERR" "origin/master decides"
+git switch -q master
+landing_doc '### Landing\n\nLanding: agent'
+git switch -q feature
+git checkout -q master -- docs/harness/mandatory-steps.md
+printf '### Landing\n\nLanding: owner\n' > docs/harness/mandatory-steps.md
+who
+assert_eq "and the default branch's agent stands while the branch says otherwise" "$OUT" "agent"
+set +e; OUT=$(sh scripts/harness/land --landing extra 2>&1); RC=$?; set -e
+assert_eq "--landing takes nothing else" "$RC" "2"
+done_repo
+
 # ---------------------------------------------------------- the installer ----
 echo ""
 echo "norma install"
@@ -1063,6 +1391,9 @@ assert_file "vendors the gate" scripts/harness/verify
 assert_file "vendors the run context beside it" scripts/harness/run
 assert_eq "executable, because the gate and the adapters call it" \
   "$([ -x scripts/harness/run ] && echo yes)" "yes"
+assert_file "vendors the land script" scripts/harness/land
+assert_eq "executable too, because the loop tells agents to run it" \
+  "$([ -x scripts/harness/land ] && echo yes)" "yes"
 assert_file "writes a config from the profile" scripts/harness/config.sh
 assert_file "vendors the hook" .githooks/pre-commit
 assert_file "vendors run-task as a real directory" .agents/skills/run-task/SKILL.md
@@ -1562,11 +1893,12 @@ echo '{}' > package.json
 echo "# MINE" > scripts/harness/config.sh
 echo "broken" > scripts/harness/verify
 printf '# Mine\n\n## Harness\n\nMy notes: run-task, scripts/harness/verify.\n' > AGENTS.md
-rm -f scripts/harness/run
+rm -f scripts/harness/run scripts/harness/land
 "$NORMA" upgrade --force >/dev/null 2>&1
 assert_eq "upgrade restores the gate it owns" "$(head -1 scripts/harness/verify)" "#!/bin/sh"
 assert_file "and brings the run context to a project installed before it existed" \
   scripts/harness/run
+assert_file "and the land script to one installed before that" scripts/harness/land
 assert_eq "and leaves config.sh alone" "$(cat scripts/harness/config.sh)" "# MINE"
 assert_has "and never touches an AGENTS.md that carries no markers" "$(cat AGENTS.md)" "My notes"
 assert_no "not even to append a block to it" "$(cat AGENTS.md)" "harness:begin"
@@ -1718,6 +2050,13 @@ OUT=$("$NORMA" doctor 2>&1); RC=$?
 set -e
 assert_eq "passes on a fresh install" "$RC" 0
 assert_has "warning about the templates it cannot fill" "$OUT" "TODO(harness)"
+assert_has "and checking the land script is there" "$OUT" "ok  scripts/harness/land present and executable"
+rm scripts/harness/land
+set +e
+OUT=$("$NORMA" doctor 2>&1); RC=$?
+set -e
+assert_eq "fails when the land script is missing" "$RC" 1
+assert_has "and says how to bring it back" "$OUT" "scripts/harness/land present and executable - run 'norma upgrade'"
 done_repo
 
 new_repo

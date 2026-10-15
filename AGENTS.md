@@ -31,6 +31,7 @@ bin/norma          the CLI: start | install | upgrade | doctor | home | version
 install.sh         installs the CLI itself from a release tag; Homebrew is the other route
 core/verify        the verification gate, vendored into projects unchanged
 core/run           the task run context: one identity across the sessions a task takes
+core/land          lands a pull request once its CI is green, and its companion after it
 core/pre-commit    the git hook that makes the gate binding
 profiles/*.sh      prefab config.sh per stack: flutter, node, pnpm-turbo, python
 skills/            the canonical skill library, vendored into projects as real dirs

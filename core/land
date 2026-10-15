@@ -1,0 +1,236 @@
+#!/bin/sh
+# Lands a pull request the moment its CI is green, and then the companion pull
+# request in another repository that goes with it - the documentation site, say.
+# Vendored by norma: edit it upstream, not here.
+#
+#   scripts/harness/land <pr> [<owner>/<repo>#<pr>]
+#   scripts/harness/land --landing      prints who lands: owner or agent
+#
+# Who may run it is the project's decision, recorded in docs/harness/mandatory-steps.md
+# step 9 as one line under `### Landing`: `Landing: owner` or `Landing: agent`.
+# --landing is how an agent reads it, so that nobody interprets prose at the moment
+# they want to merge. It reads the default branch as origin has it - never the
+# working tree, which the branch being merged could have changed - and prints
+# `agent` only when the first line under the one `### Landing` heading is exactly
+# `Landing: agent`. Everything else prints `owner`, saying why on stderr.
+#
+# It merges exactly the commit that went green - a push after the checks passed makes
+# the merge refuse rather than land code nobody tested - and stops with nothing merged
+# on red CI or a conflict. Two settings come from scripts/harness/config.sh:
+#
+#   HARNESS_LAND_NO_CI    space-separated patterns of the paths CI does not run on -
+#                         its paths-ignore, in GitHub's syntax: ** crosses directories,
+#                         * and ? do not; no ! negation. A pull request touching only
+#                         those has no checks and never will; one touching anything
+#                         else waits for them. Unset: every pull request waits for CI.
+#   HARNESS_LAND_METHOD   merge (the default), squash or rebase.
+set -eu
+
+usage() { echo "usage: scripts/harness/land <pr> [<owner>/<repo>#<pr>] | --landing" >&2; exit 2; }
+
+if [ "${1:-}" = --landing ]; then
+  [ $# -eq 1 ] || usage
+  cd "$(git rev-parse --show-toplevel)"
+  # The value: the first non-blank line under the one heading `### Landing`, which
+  # must be exactly `Landing: agent` to be agent. A missing or repeated heading,
+  # or any other line, is owner - said on stderr when something was there.
+  read_landing() {
+    awk '
+      { sub(/\r$/, "") }
+      $0 == "### Landing" { h++; want = 1; next }
+      want && /^[ \t]*$/ { next }
+      want { if (h == 1) line = $0; want = 0 }
+      END {
+        if (h == 1 && line == "Landing: agent") { print "agent"; exit }
+        print "owner"
+        if (h > 1) print "land: " h " Landing sections in docs/harness/mandatory-steps.md - reading it as owner" > "/dev/stderr"
+        else if (h == 1 && line != "Landing: owner") print "land: cannot read \"" line "\" - reading it as owner" > "/dev/stderr"
+      }'
+  }
+  # Read from the default branch as origin has it, never from the working tree: a
+  # branch can say anything, and the branch about to be merged is the one asking.
+  base=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
+  if [ -z "$base" ]; then
+    for b in origin/main origin/master; do
+      if git rev-parse -q --verify "$b" >/dev/null; then base=$b; break; fi
+    done
+  fi
+  if [ -z "$base" ]; then
+    echo owner
+    echo "land: no default branch of origin to read the Landing line from - reading it as owner (git remote set-head origin -a)" >&2
+    exit 0
+  fi
+  if ! doc=$(git show "$base:docs/harness/mandatory-steps.md" 2>/dev/null); then echo owner; exit 0; fi
+  who=$(printf '%s\n' "$doc" | read_landing)
+  echo "$who"
+  if [ -f docs/harness/mandatory-steps.md ]; then
+    here=$(read_landing < docs/harness/mandatory-steps.md 2>/dev/null)
+    [ "$here" = "$who" ] || echo "land: this branch says $here, $base says $who - $base decides" >&2
+  fi
+  exit 0
+fi
+[ $# -ge 1 ] && [ $# -le 2 ] || usage
+PR=$1
+case "$PR" in ''|*[!0-9]*) usage ;; esac
+CO_REPO=""
+CO_PR=""
+if [ $# -eq 2 ]; then
+  CO_REPO=${2%#*}
+  CO_PR=${2##*#}
+  case "$2" in */*'#'*) ;; *) usage ;; esac
+  case "$CO_PR" in ''|*[!0-9]*) usage ;; esac
+fi
+
+cd "$(git rev-parse --show-toplevel)"
+HARNESS_LAND_NO_CI=""
+HARNESS_LAND_METHOD=merge
+# config.sh only defines settings and functions; nothing in it runs when sourced.
+if [ -f scripts/harness/config.sh ]; then . scripts/harness/config.sh; fi
+case "$HARNESS_LAND_METHOD" in
+  merge|squash|rebase) ;;
+  *) echo "land: HARNESS_LAND_METHOD must be merge, squash or rebase, not '$HARNESS_LAND_METHOD'" >&2; exit 2 ;;
+esac
+case " $HARNESS_LAND_NO_CI" in
+  *" !"*) echo "land: HARNESS_LAND_NO_CI cannot hold a ! negation - list only the paths CI ignores" >&2; exit 2 ;;
+esac
+
+REPO=$(git remote get-url origin | sed -E 's#/+$##; s#\.git$##; s#^.*[:/]([^/]+/[^/]+)$#\1#')
+OWNER=${REPO%%/*}
+# GitHub names are case-insensitive, so the comparison is too.
+[ "$(printf '%s' "$CO_REPO#$CO_PR" | tr 'A-Z' 'a-z')" != "$(printf '%s' "$REPO#$PR" | tr 'A-Z' 'a-z')" ] || usage
+# The active gh account may be another one - a work account beside a personal one.
+# The token of the account named like the owner is the one that can see the
+# repository; when there is none, or a token was given, gh's own choice stands.
+if [ -z "${GH_TOKEN:-}" ] && [ -z "${GITHUB_TOKEN:-}" ]; then
+  GH_TOKEN=$(gh auth token --user "$OWNER" 2>/dev/null || true)
+  if [ -n "$GH_TOKEN" ]; then export GH_TOKEN; else unset GH_TOKEN; fi
+fi
+
+say() { printf 'land: %s\n' "$1"; }
+notify() {
+  command -v osascript >/dev/null 2>&1 || return 0
+  m=$(printf '%s' "$1" | tr -d '"\\')
+  osascript -e "display notification \"$m\" with title \"land $REPO#$PR\"" >/dev/null 2>&1 || true
+}
+fail() { say "$1" >&2; notify "$1"; exit 1; }
+
+field() { gh pr view "$1" -R "$2" --json "$3" -q ".$3"; }
+mergeable() {
+  # GitHub computes this lazily: UNKNOWN right after a push, settled seconds later.
+  for _ in 1 2 3 4 5 6; do
+    m=$(field "$1" "$2" mergeable)
+    [ "$m" != UNKNOWN ] && { echo "$m"; return; }
+    sleep 5
+  done
+  echo UNKNOWN
+}
+
+[ "$(field "$PR" "$REPO" state)" = OPEN ] || fail "$REPO#$PR is not open - nothing merged"
+if [ -n "$CO_PR" ]; then
+  [ "$(field "$CO_PR" "$CO_REPO" state)" = OPEN ] || fail "$CO_REPO#$CO_PR is not open - nothing merged"
+fi
+# A conflicting pull request gets no CI run at all, so this is checked first.
+[ "$(mergeable "$PR" "$REPO")" = MERGEABLE ] \
+  || fail "$REPO#$PR does not merge cleanly - bring the base branch into it first; nothing merged"
+
+# Both heads are read now and every merge is pinned to them: a push after this point
+# is code nobody looked at, and GitHub refuses the merge instead of landing it.
+head_of() {
+  h=$(field "$1" "$2" headRefOid || true)
+  case "$h" in ''|*[!0-9a-f]*) fail "could not read the head commit of $2#$1 - nothing merged" ;; esac
+  echo "$h"
+}
+HEAD=$(head_of "$PR" "$REPO") || exit 1
+CO_HEAD=""
+if [ -n "$CO_PR" ]; then CO_HEAD=$(head_of "$CO_PR" "$CO_REPO") || exit 1; fi
+
+# HARNESS_LAND_NO_CI as one extended regular expression, in GitHub's path syntax.
+no_ci_regex() {
+  set -f
+  printf '%s\n' $HARNESS_LAND_NO_CI | sed -e 's/[.+(){}|^$\]/\\&/g' \
+    -e 's#\*\*/#@ANYDIR@#g' -e 's/\*\*/@ANY@/g' -e 's#\*#[^/]*#g' -e 's#?#[^/]#g' \
+    -e 's#@ANYDIR@#(.*/)?#g' -e 's/@ANY@/.*/g' | paste -sd'|' -
+  set +f
+}
+
+# Succeeds when the pull request needs CI: no list of ignored paths, a file list
+# that came back empty, or one file outside the list. A list that cannot be read
+# refuses - silence from gh is not "nothing CI runs on".
+needs_ci() {
+  [ -n "$HARNESS_LAND_NO_CI" ] || return 0
+  files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename') \
+    || fail "could not list the files of $REPO#$PR - nothing merged"
+  [ -n "$files" ] || return 0
+  set +e; printf '%s\n' "$files" | grep -Evq "^($(no_ci_regex))\$"; rc=$?; set -e
+  # grep says 1 only when every file matched; 2 is a pattern it could not read,
+  # which must not pass for "nothing CI runs on".
+  [ $rc -eq 0 ] && return 0
+  [ $rc -eq 1 ] && return 1
+  fail "HARNESS_LAND_NO_CI holds a pattern that cannot be read - nothing merged"
+}
+
+if needs_ci; then
+  say "waiting for CI on $REPO#$PR at ${HEAD%"${HEAD#???????}"}"
+  # The run appears a few seconds after the push that triggers it.
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24; do
+    set +e; gh pr checks "$PR" -R "$REPO" >/dev/null 2>&1; rc=$?; set -e
+    [ $rc -eq 0 ] || [ $rc -eq 8 ] && break
+    sleep 5
+  done
+  # A slower workflow can register its checks after a fast one went green, and the
+  # watch only sees the checks that exist when it starts. So it is green only if it
+  # is still green, with nothing new pending, a little after the watch said so.
+  for _ in 1 2 3 4 5; do
+    gh pr checks "$PR" -R "$REPO" --watch --fail-fast --interval 20 \
+      || fail "CI is not green on $REPO#$PR - nothing merged"
+    sleep 30
+    set +e; gh pr checks "$PR" -R "$REPO" >/dev/null 2>&1; rc=$?; set -e
+    [ $rc -eq 0 ] && break
+    [ $rc -eq 8 ] || fail "CI is not green on $REPO#$PR - nothing merged"
+  done
+  [ $rc -eq 0 ] || fail "checks on $REPO#$PR kept appearing - nothing merged"
+else
+  say "$REPO#$PR touches only paths CI does not run on - no checks to wait for"
+fi
+
+# Merges a pull request pinned to a head, then deletes its branch - after moving
+# every open pull request based on that branch onto this one's base. GitHub closes,
+# rather than retargets, an open pull request whose base branch is deleted, and a
+# closed one cannot even be reopened until the branch is pushed back. So a stack is
+# moved down first, and a branch anything still depends on is kept.
+merge_pinned() {
+  head_ref=$(field "$1" "$2" headRefName || true)
+  base_ref=$(field "$1" "$2" baseRefName || true)
+  gh pr merge "$1" -R "$2" "--$HARNESS_LAND_METHOD" --match-head-commit "$3" || return 1
+  [ -n "$head_ref" ] && [ -n "$base_ref" ] || { say "merged $2#$1; its branch was not deleted"; return 0; }
+  if ! children=$(gh pr list -R "$2" --base "$head_ref" --state open --json number -q '.[].number'); then
+    say "merged $2#$1; kept branch $head_ref - could not tell which pull requests are based on it"
+    return 0
+  fi
+  kept=""
+  for c in $children; do
+    gh pr edit "$c" -R "$2" --base "$base_ref" >/dev/null 2>&1 || kept="$kept #$c"
+  done
+  if [ -n "$kept" ]; then
+    say "merged $2#$1; kept branch $head_ref, still the base of$kept - move it onto $base_ref, then delete the branch"
+    return 0
+  fi
+  [ -z "$children" ] || say "moved$(printf ' #%s' $children) onto $base_ref"
+  gh api -X DELETE "repos/$2/git/refs/heads/$head_ref" >/dev/null 2>&1 \
+    || say "merged $2#$1; could not delete branch $head_ref"
+}
+
+merge_pinned "$PR" "$REPO" "$HEAD" \
+  || fail "GitHub refused to merge $REPO#$PR (a push after the checks passed?) - nothing merged"
+say "merged $REPO#$PR"
+
+if [ -n "$CO_PR" ]; then
+  [ "$(mergeable "$CO_PR" "$CO_REPO")" = MERGEABLE ] \
+    || fail "$REPO#$PR merged, but $CO_REPO#$CO_PR does not merge cleanly - bring its base in and merge it by hand"
+  merge_pinned "$CO_PR" "$CO_REPO" "$CO_HEAD" \
+    || fail "$REPO#$PR merged, but $CO_REPO#$CO_PR did not (a push to it since land started?)"
+  say "merged $CO_REPO#$CO_PR"
+  notify "merged, with $CO_REPO#$CO_PR"
+else
+  notify "merged"
+fi
