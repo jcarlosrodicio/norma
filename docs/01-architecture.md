@@ -385,7 +385,22 @@ The decisions inside it:
   happened on a stack of four. So `land` merges without `--delete-branch`, moves
   every open pull request based on the merged branch onto that pull request's
   base, and only then deletes the branch. One it cannot move, or not knowing
-  which depend on it, keeps the branch and says so.
+  which depend on it, keeps the branch and says so. A repository that deletes
+  merged branches itself has already done it; a failed delete is reported only
+  when the branch is really still there.
+- **A pull request behind its base is brought up to date, not refused.** A
+  repository that merges only up-to-date branches refuses one whose base moved -
+  before the wait, or during it, when another pull request lands first, which with
+  several agents is the normal case. `land` runs `gh pr update-branch`, and the
+  update is a new head: pinned and waited for like the first. Three updates and it
+  stops - the base is moving faster than CI. It waits for the update commit to
+  become the reported head before pinning it, so the pin never names the old one.
+  Any other refused merge says only that GitHub refused it, with GitHub's own
+  message above, rather than guessing why. Two limits: the companion is not brought
+  up to date - in a repository that requires it, a moved base stops `land` with the
+  first pull request merged, saying so; and an update made with a token that
+  GitHub does not let start workflows (`GITHUB_TOKEN`, a bot) gets no CI, which
+  ends in "CI is not green" after the discovery wait - closed, but slow.
 
 What it does not do: resolve a conflict, retry a red check, or decide anything a
 human or the loop should. Those belong to whoever runs it. And one limit it

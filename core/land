@@ -169,29 +169,31 @@ needs_ci() {
   fail "HARNESS_LAND_NO_CI holds a pattern that cannot be read - nothing merged"
 }
 
-if needs_ci; then
-  say "waiting for CI on $REPO#$PR at ${HEAD%"${HEAD#???????}"}"
-  # The run appears a few seconds after the push that triggers it.
-  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24; do
-    set +e; gh pr checks "$PR" -R "$REPO" >/dev/null 2>&1; rc=$?; set -e
-    [ $rc -eq 0 ] || [ $rc -eq 8 ] && break
-    sleep 5
-  done
-  # A slower workflow can register its checks after a fast one went green, and the
-  # watch only sees the checks that exist when it starts. So it is green only if it
-  # is still green, with nothing new pending, a little after the watch said so.
-  for _ in 1 2 3 4 5; do
-    gh pr checks "$PR" -R "$REPO" --watch --fail-fast --interval 20 \
-      || fail "CI is not green on $REPO#$PR - nothing merged"
-    sleep 30
-    set +e; gh pr checks "$PR" -R "$REPO" >/dev/null 2>&1; rc=$?; set -e
-    [ $rc -eq 0 ] && break
-    [ $rc -eq 8 ] || fail "CI is not green on $REPO#$PR - nothing merged"
-  done
-  [ $rc -eq 0 ] || fail "checks on $REPO#$PR kept appearing - nothing merged"
-else
-  say "$REPO#$PR touches only paths CI does not run on - no checks to wait for"
-fi
+wait_for_ci() {
+  if needs_ci; then
+    say "waiting for CI on $REPO#$PR at ${HEAD%"${HEAD#???????}"}"
+    # The run appears a few seconds after the push that triggers it.
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24; do
+      set +e; gh pr checks "$PR" -R "$REPO" >/dev/null 2>&1; rc=$?; set -e
+      [ $rc -eq 0 ] || [ $rc -eq 8 ] && break
+      sleep 5
+    done
+    # A slower workflow can register its checks after a fast one went green, and the
+    # watch only sees the checks that exist when it starts. So it is green only if it
+    # is still green, with nothing new pending, a little after the watch said so.
+    for _ in 1 2 3 4 5; do
+      gh pr checks "$PR" -R "$REPO" --watch --fail-fast --interval 20 \
+        || fail "CI is not green on $REPO#$PR - nothing merged"
+      sleep 30
+      set +e; gh pr checks "$PR" -R "$REPO" >/dev/null 2>&1; rc=$?; set -e
+      [ $rc -eq 0 ] && break
+      [ $rc -eq 8 ] || fail "CI is not green on $REPO#$PR - nothing merged"
+    done
+    [ $rc -eq 0 ] || fail "checks on $REPO#$PR kept appearing - nothing merged"
+  else
+    say "$REPO#$PR touches only paths CI does not run on - no checks to wait for"
+  fi
+}
 
 # Merges a pull request pinned to a head, then deletes its branch - after moving
 # every open pull request based on that branch onto this one's base. GitHub closes,
@@ -216,12 +218,49 @@ merge_pinned() {
     return 0
   fi
   [ -z "$children" ] || say "moved$(printf ' #%s' $children) onto $base_ref"
+  # A repository that deletes merged branches itself has already done this one, so
+  # a failed delete is reported only when the branch is really still there.
+  # Only a 404 counts as gone: a 403 or a network error says nothing about it.
   gh api -X DELETE "repos/$2/git/refs/heads/$head_ref" >/dev/null 2>&1 \
+    || gh api "repos/$2/git/ref/heads/$head_ref" 2>&1 >/dev/null | grep -q '(HTTP 404)' \
     || say "merged $2#$1; could not delete branch $head_ref"
 }
 
-merge_pinned "$PR" "$REPO" "$HEAD" \
-  || fail "GitHub refused to merge $REPO#$PR (a push after the checks passed?) - nothing merged"
+# A repository that merges only branches that are up to date refuses a pull request
+# whose base moved - before the wait, or during it, when another pull request lands
+# first. Bringing it up to date makes a new head, which is pinned and waited for
+# like the first; three updates and the base is moving faster than CI.
+behind() {
+  # UNKNOWN right after a push or a refused merge; settled seconds later.
+  for _ in 1 2 3 4 5 6; do
+    st=$(field "$PR" "$REPO" mergeStateStatus 2>/dev/null || true)
+    [ "$st" = UNKNOWN ] || break
+    sleep 5
+  done
+  [ "$st" = BEHIND ]
+}
+updates=0
+while :; do
+  if behind; then
+    [ $updates -lt 3 ] || fail "$REPO#$PR is still behind its base after three updates - nothing merged"
+    updates=$((updates + 1))
+    say "$REPO#$PR is behind its base, and this repository merges only branches that are up to date - updating it"
+    gh pr update-branch "$PR" -R "$REPO" >/dev/null \
+      || fail "could not bring $REPO#$PR up to date with its base - nothing merged"
+    # The update commit takes a moment to become the head GitHub reports; until it
+    # does, the old sha would be pinned while CI runs on the new one.
+    was=$HEAD
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+      HEAD=$(head_of "$PR" "$REPO") || exit 1
+      [ "$HEAD" = "$was" ] || break
+      sleep 5
+    done
+    [ "$HEAD" != "$was" ] || fail "updated $REPO#$PR, but its new head never appeared - nothing merged"
+  fi
+  wait_for_ci
+  if merge_pinned "$PR" "$REPO" "$HEAD"; then break; fi
+  behind || fail "GitHub refused to merge $REPO#$PR - nothing merged"
+done
 say "merged $REPO#$PR"
 
 if [ -n "$CO_PR" ]; then
