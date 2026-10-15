@@ -320,7 +320,14 @@ protection and so no native auto-merge to hand that wait to; this is that, in th
 same POSIX sh as the rest, with nothing to install but `gh`.
 
 Who may run it is **not** decided here. It is the project's decision, recorded in
-its own `docs/harness/mandatory-steps.md`; this file only does the landing.
+its own `docs/harness/mandatory-steps.md` as one line, `Landing: owner` or
+`Landing: agent`. What this file decides is how that line is **read**:
+`land --landing` prints `agent` only for exactly one line that is exactly
+`Landing: agent`, at the start of a line and outside any code block, and `owner`
+for everything else - no line, another word or case, anything after the word, two
+lines - saying on stderr when a line was there but unreadable. An agent asks this
+instead of interpreting the document, because the moment it reads the line is the
+moment it wants to merge, and every doubt has to fall on the side nobody granted.
 
 The decisions inside it:
 

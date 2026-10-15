@@ -216,9 +216,11 @@ Deploying and publishing stay with the human in both modes; merging follows
 
 Landing: owner
 
-Who merges a pull request once its CI is green. The line above is read by the
-skills, so it holds exactly one of two words, and changing it is the owner's
-decision - `harness-setup` asks.
+Who merges a pull request once its CI is green. The line above is read by
+`scripts/harness/land --landing`, never by eye: exactly `Landing: agent`, alone on
+its line, is `agent`; anything else - another word or case, a comment after it, a
+second line - is `owner`. Changing it is the owner's decision, and `harness-setup`
+asks.
 
 - **`Landing: owner`** - the owner merges, with `scripts/harness/land <pr> [<owner>/<repo>#<n>]`:
   it waits for CI, merges exactly the commit that went green, then the companion

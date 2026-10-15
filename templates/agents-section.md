@@ -43,6 +43,7 @@
 - The loop stops before delivery: no commit, push, pull request, publish or deploy
   until the human approves. An unsupervised run under `auto-run-task` is the single
   exception, and it still stops at the open pull request. Deploying and publishing
-  are never the agent's. Merging is the agent's only when the `Landing:` line in
-  `docs/harness/mandatory-steps.md` says `agent`, and then only through
-  `scripts/harness/land`; with no such line, or `owner`, the merge is the human's.
+  are never the agent's. Merging is the agent's only when
+  `scripts/harness/land --landing` prints `agent` - it reads the `Landing:` line in
+  `docs/harness/mandatory-steps.md` - and then only through `scripts/harness/land`;
+  with no such line, or `owner`, the merge is the human's.

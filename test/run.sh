@@ -1289,6 +1289,43 @@ assert_has "reads the repository from a remote with a trailing slash" "$LOG" "pr
 done_repo
 rm -rf "$FAKE_BIN"
 
+# Who lands is read by this, not by an agent interpreting the loop's prose at the
+# moment it wants to merge. Only one exact line says agent; every doubt is owner.
+new_repo; with_land
+who() {
+  set +e
+  OUT=$(sh scripts/harness/land --landing 2>"$R/who.err"); RC=$?
+  ERR=$(cat "$R/who.err")
+  set -e
+}
+who
+assert_eq "--landing reads a project with no loop as owner" "$OUT" "owner"
+mkdir -p docs/harness
+landing_doc() { printf '# Loop\n\n%s\n' "$1" > docs/harness/mandatory-steps.md; }
+landing_doc 'Landing: owner'; who
+assert_eq "reads Landing: owner as owner" "$OUT" "owner"
+assert_eq "without complaint" "$ERR" ""
+landing_doc 'Landing: agent'; who
+assert_eq "reads exactly Landing: agent as agent" "$OUT" "agent"
+assert_eq "and exits 0 either way" "$RC" "0"
+landing_doc 'No such line here.'; who
+assert_eq "reads a loop without the line as owner" "$OUT" "owner"
+for odd in 'Landing: Agent' 'Landing: agent # maybe' 'Landing: agent ' 'Landing:agent' 'Landing: agents'; do
+  landing_doc "$odd"; who
+  assert_eq "reads '$odd' as owner" "$OUT" "owner"
+  assert_has "and says it could not read it: '$odd'" "$ERR" "cannot read"
+done
+printf 'Landing: agent\nLanding: agent\n' > docs/harness/mandatory-steps.md; who
+assert_eq "reads two lines as owner, even when both say agent" "$OUT" "owner"
+assert_has "and says why" "$ERR" "2 Landing: lines"
+printf 'Landing: owner\n\n```\nLanding: agent\n```\n' > docs/harness/mandatory-steps.md; who
+assert_eq "ignores a Landing line inside a code block" "$OUT" "owner"
+printf '`Landing: agent` means the agent lands.\n> Landing: agent\nLanding: owner\n' > docs/harness/mandatory-steps.md; who
+assert_eq "and one that is quoted or mentioned in prose" "$OUT" "owner"
+set +e; OUT=$(sh scripts/harness/land --landing extra 2>&1); RC=$?; set -e
+assert_eq "--landing takes nothing else" "$RC" "2"
+done_repo
+
 # ---------------------------------------------------------- the installer ----
 echo ""
 echo "norma install"
@@ -1515,6 +1552,13 @@ assert_has "the loop template records who lands a pull request" "$ms" "Landing: 
 assert_eq "exactly once, so there is one answer to read" \
   "$(grep -c '^Landing: ' "$HOME_DIR/templates/mandatory-steps.md")" "1"
 assert_has "and names the command that does it" "$ms" "scripts/harness/land <pr>"
+assert_has "and the one that reads the line, so nobody reads it by eye" "$ms" "scripts/harness/land --landing"
+# The template mentions both values in its own prose; the reader must still find
+# exactly one line, the shipped one, and complain about nothing.
+new_repo; with_land; mkdir -p docs/harness
+cp "$HOME_DIR/templates/mandatory-steps.md" docs/harness/mandatory-steps.md
+assert_eq "land --landing reads the shipped template as owner" "$(sh scripts/harness/land --landing 2>&1)" "owner"
+done_repo
 assert_has "and what the other answer commits the agent to" "$ms" "Landing: agent"
 assert_has "including when an agent must stop trying" "$ms" "attempts at the same failure"
 assert_no "and no longer reserves every merge for the human" "$ms" "Merging, deploying and publishing stay with the human"
@@ -1522,6 +1566,7 @@ assert_no "and no longer reserves every merge for the human" "$ms" "Merging, dep
 # predates the line. It has to read their silence as the safe answer.
 ag=$(cat "$HOME_DIR/templates/agents-section.md")
 assert_has "the AGENTS.md block points an agent at that line" "$ag" "Landing:"
+assert_has "through the command that reads it" "$ag" "scripts/harness/land --landing"
 assert_has "and reads a template without it as the owner's" "$ag" "no such line"
 assert_no "and no longer says merging is never the agent's" "$ag" "merging, deploying and"
 assert_has "update-docs names the roadmap, which no diff points at" \
