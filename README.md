@@ -54,6 +54,7 @@ norma is that process extracted once, made portable, and made binding:
 | Independent review | `adversarial-review`: a red-team pass that assumes the work is wrong, fact-checks its findings and treats a lowered bar as blocking |
 | Runtime verification | `runtime-verification`: proof that the change works in the running system, not just that the tests pass |
 | Task runs | `scripts/harness/run`: one identity across the several sessions a task takes, with the evidence each stage recorded |
+| Landing | `scripts/harness/land`: waits for a pull request's CI, merges exactly the commit that went green, then its companion in another repository |
 | Guided setup | `harness-setup`: an interview that fills the decisions the installer cannot infer |
 | Projects from nothing | `norma start` and `start-project`: from "I want to build X" to founding documents, a roadmap and an installed harness |
 | Sixteen stack profiles | A starting `config.sh` for Node, pnpm/Turbo, Next, Flutter, Swift, Go, Rust, Maven, Gradle, Python, Django, Laravel, Rails, Phoenix, .NET and Terraform |
@@ -326,6 +327,7 @@ or your projects drift apart.
 |---|---|
 | `scripts/harness/verify` | `scripts/harness/config.sh` |
 | `scripts/harness/run` | `.harness/` - runtime state, gitignored, nobody's to keep |
+| `scripts/harness/land` | |
 | `.githooks/pre-commit` | `docs/harness/mandatory-steps.md` |
 | `.agents/skills/<vendored>` | `docs/harness/architecture-rules.md` |
 | `scripts/harness/VERSION` | `openspec/config.yaml` |

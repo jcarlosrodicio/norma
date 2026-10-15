@@ -298,6 +298,7 @@ cmd_install() {
 
   install_owned "$HOME_DIR/core/verify" scripts/harness/verify 755
   install_owned "$HOME_DIR/core/run" scripts/harness/run 755
+  install_owned "$HOME_DIR/core/land" scripts/harness/land 755
   install_kept  "$HOME_DIR/profiles/$PROFILE.sh" scripts/harness/config.sh
   install_owned "$HOME_DIR/core/pre-commit" .githooks/pre-commit 755
   install_owned "$HOME_DIR/VERSION" scripts/harness/VERSION 644
@@ -380,6 +381,7 @@ cmd_upgrade() {
   say "norma $was -> $VERSION in $REPO"
   install_owned "$HOME_DIR/core/verify" scripts/harness/verify 755
   install_owned "$HOME_DIR/core/run" scripts/harness/run 755
+  install_owned "$HOME_DIR/core/land" scripts/harness/land 755
   install_owned "$HOME_DIR/core/pre-commit" .githooks/pre-commit 755
   vendor_skills
   inject_agents_block
@@ -419,6 +421,9 @@ cmd_doctor() {
 
   [ -x scripts/harness/run ] && st=0 || st=1
   check $st "scripts/harness/run present and executable" "run 'norma install'"
+
+  [ -x scripts/harness/land ] && st=0 || st=1
+  check $st "scripts/harness/land present and executable" "run 'norma upgrade'"
 
   # A run left open on another branch is the failure this reports: the next task
   # would collect its evidence against somebody else's identity. The gate does

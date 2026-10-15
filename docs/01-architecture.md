@@ -49,6 +49,7 @@ project's decisions, or the consumers drift apart until the harness means nothin
 |---|---|
 | `scripts/harness/verify` | `scripts/harness/config.sh` |
 | `scripts/harness/run` | `.harness/` (runtime state, gitignored, nobody's to keep) |
+| `scripts/harness/land` | |
 | `.githooks/pre-commit` | `docs/harness/mandatory-steps.md` |
 | `.agents/skills/<vendored>` | `docs/harness/architecture-rules.md` |
 | `scripts/harness/VERSION` | `openspec/config.yaml` |
@@ -301,6 +302,68 @@ Two limits, both found by review and neither closed:
   a 32-bit shell would not hold it. Every platform this installs on today is
   64-bit; the day one is not, the symptom is a wrong duration rather than a
   failed verification.
+
+### `core/land` - landing a green pull request
+
+```sh
+scripts/harness/land <pr> [<owner>/<repo>#<pr>]
+```
+
+Waits for the pull request's CI, merges exactly the commit that went green, then
+the companion pull request in another repository - the documentation site that
+describes the change - and stops with nothing merged on red CI or a conflict.
+
+It exists because, with several agents working at once, the slow part of a change
+stopped being the CI and became the wait between a green check and somebody coming
+back to press merge. A private repository on GitHub's free plan has no branch
+protection and so no native auto-merge to hand that wait to; this is that, in the
+same POSIX sh as the rest, with nothing to install but `gh`.
+
+Who may run it is **not** decided here. It is the project's decision, recorded in
+its own `docs/harness/mandatory-steps.md`; this file only does the landing.
+
+The decisions inside it:
+
+- **`--match-head-commit` with the sha read before the wait**, for the pull
+  request and for its companion. A push after that point would otherwise land a
+  commit no check ran on. GitHub refuses the merge instead, and `land` says so; a
+  head it cannot read refuses before anything, rather than merging unpinned.
+- **Mergeability is checked before CI.** GitHub runs no `pull_request` workflow on
+  a conflicting pull request, so waiting for its checks would wait for nothing.
+- **No checks is not green.** A pull request that never gets a check refuses -
+  unless every file it touches matches `HARNESS_LAND_NO_CI` in `config.sh`, the
+  project's copy of its own `paths-ignore`. The list lives with the project
+  because the CI workflow is the project's, and an unset list is the safe
+  reading: everything waits. The patterns are read **in GitHub's syntax**, not the
+  shell's - `**` crosses a directory, `*` and `?` do not - because read the
+  shell's way `*.md` would skip the wait for a `src/README.md` GitHub does run CI
+  for. A `!` negation is refused rather than half-honoured. The file list comes
+  from the paginated API, and a list that cannot be read refuses, as does a
+  pattern the translation cannot turn into a valid expression: silence or an
+  error is never "nothing CI runs on".
+- **Green twice.** `gh pr checks --watch` sees the checks that exist when it
+  starts, and a slower workflow can register its own after a fast one went green.
+  So after the watch passes, `land` looks again thirty seconds later and watches
+  again if something new is pending. Thirty seconds is a grace period, not a
+  guarantee: a workflow that registers later than that is still missed.
+- **The companion goes second, and only after the first merged.** Documentation
+  describing code that was never merged is worse than documentation that lags a
+  minute. A companion that conflicts stops `land` with the first one merged and
+  says exactly that. The companion is pinned but **not CI-gated**: it is the
+  documentation that goes with the change, and the repositories that hold it
+  often run no CI at all, where "no checks is not green" would refuse every one.
+- **The token of the gh account named like the repository's owner**, when there
+  is one and neither `GH_TOKEN` nor `GITHUB_TOKEN` was given. A machine with a
+  work and a personal account otherwise asks GitHub as the wrong one and gets a
+  404. The same token serves the companion, so a companion under another owner
+  fails at its first check, before anything merges.
+
+What it does not do: resolve a conflict, retry a red check, or decide anything a
+human or the loop should. Those belong to whoever runs it. And one limit it
+cannot close: a pull request's CI tests the merge with the base as it was, and
+`--match-head-commit` pins the head, not the base - if the base branch moves
+during the wait, the merged result is one no check ran on. The CI on the base
+branch after the merge is the backstop for that, as it is for any merge.
 
 ### `profiles/*.sh` - stack adapters
 
