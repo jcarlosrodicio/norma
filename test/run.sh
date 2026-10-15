@@ -1508,6 +1508,22 @@ done
 # and invisible, which is the failure the markers were added to stop.
 assert_has "the AGENTS.md block names the run context" \
   "$(cat "$HOME_DIR/templates/agents-section.md")" "scripts/harness/run start"
+# Who merges is the project's decision, so it lives in the template the project
+# owns, as one line a skill can read - and the safe answer is the one it ships with.
+ms=$(cat "$HOME_DIR/templates/mandatory-steps.md")
+assert_has "the loop template records who lands a pull request" "$ms" "Landing: owner"
+assert_eq "exactly once, so there is one answer to read" \
+  "$(grep -c '^Landing: ' "$HOME_DIR/templates/mandatory-steps.md")" "1"
+assert_has "and names the command that does it" "$ms" "scripts/harness/land <pr>"
+assert_has "and what the other answer commits the agent to" "$ms" "Landing: agent"
+assert_has "including when an agent must stop trying" "$ms" "attempts at the same failure"
+assert_no "and no longer reserves every merge for the human" "$ms" "Merging, deploying and publishing stay with the human"
+# The block is refreshed on every upgrade, including in projects whose template
+# predates the line. It has to read their silence as the safe answer.
+ag=$(cat "$HOME_DIR/templates/agents-section.md")
+assert_has "the AGENTS.md block points an agent at that line" "$ag" "Landing:"
+assert_has "and reads a template without it as the owner's" "$ag" "no such line"
+assert_no "and no longer says merging is never the agent's" "$ag" "merging, deploying and"
 assert_has "update-docs names the roadmap, which no diff points at" \
   "$(cat "$HOME_DIR/skills/update-docs/SKILL.md")" "roadmap entry"
 # A review that read two thirds of the diff reads exactly like one that read all
