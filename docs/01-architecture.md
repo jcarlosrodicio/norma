@@ -320,14 +320,28 @@ protection and so no native auto-merge to hand that wait to; this is that, in th
 same POSIX sh as the rest, with nothing to install but `gh`.
 
 Who may run it is **not** decided here. It is the project's decision, recorded in
-its own `docs/harness/mandatory-steps.md` as one line, `Landing: owner` or
-`Landing: agent`. What this file decides is how that line is **read**:
-`land --landing` prints `agent` only for exactly one line that is exactly
-`Landing: agent`, at the start of a line and outside any code block, and `owner`
-for everything else - no line, another word or case, anything after the word, two
-lines - saying on stderr when a line was there but unreadable. An agent asks this
-instead of interpreting the document, because the moment it reads the line is the
-moment it wants to merge, and every doubt has to fall on the side nobody granted.
+its own `docs/harness/mandatory-steps.md` as one line under `### Landing`,
+`Landing: owner` or `Landing: agent`. What this file decides is how that line is
+**read**, and `land --landing` is the only reader:
+
+- **From the default branch as origin has it**, never from the working tree. The
+  branch asking to be merged is the one place that cannot be trusted to say who
+  may merge it: an agent that rewrote the line on its own branch would otherwise
+  grant itself the merge. A branch that disagrees is told the default branch
+  decides; no default branch known to git (`git remote set-head origin -a` fixes
+  that) is `owner`.
+- **The first non-blank line under the one `### Landing` heading**, and it must be
+  exactly `Landing: agent` - a carriage return aside - to be `agent`. Anything
+  else is `owner`: no section, two sections, another word or case, anything after
+  the word, a `Landing:` line anywhere else in the document. It says on stderr
+  when something was there but unreadable. Anchoring on the heading instead of
+  tracking code fences is deliberate: the template quotes both values in its own
+  prose, and a fence parser is one more thing to get wrong in the direction that
+  merges.
+
+An agent asks this instead of interpreting the document, because the moment it
+reads the line is the moment it wants to merge, and every doubt has to fall on
+the side nobody granted.
 
 The decisions inside it:
 

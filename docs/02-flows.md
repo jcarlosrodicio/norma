@@ -366,7 +366,9 @@ Every refusal before the first merge leaves both pull requests as they were.
 
 `land --landing` refuses nothing but extra arguments: whatever it cannot read is
 `owner`, said on stderr, because a reader that fails closed is the only kind an
-agent about to merge should be handed.
+agent about to merge should be handed. It reads the default branch, not the
+working tree, so a branch that rewrites the line changes nothing until the owner
+merges that change.
 
 Soften none of these without reading the reason and replacing it with something
 stronger.

@@ -7,12 +7,12 @@
 #   scripts/harness/land --landing      prints who lands: owner or agent
 #
 # Who may run it is the project's decision, recorded in docs/harness/mandatory-steps.md
-# step 9 as one line, `Landing: owner` or `Landing: agent`. --landing is how an agent
-# reads it, so that nobody interprets prose at the moment they want to merge: it
-# prints `agent` only for exactly one line that is exactly `Landing: agent`, at the
-# start of a line and outside any code block. Everything else - no line, another
-# word, another case, anything after the word, two lines - prints `owner`, and says
-# on stderr when a line was there but could not be read.
+# step 9 as one line under `### Landing`: `Landing: owner` or `Landing: agent`.
+# --landing is how an agent reads it, so that nobody interprets prose at the moment
+# they want to merge. It reads the default branch as origin has it - never the
+# working tree, which the branch being merged could have changed - and prints
+# `agent` only when the first line under the one `### Landing` heading is exactly
+# `Landing: agent`. Everything else prints `owner`, saying why on stderr.
 #
 # It merges exactly the commit that went green - a push after the checks passed makes
 # the merge refuse rather than land code nobody tested - and stops with nothing merged
@@ -30,17 +30,43 @@ usage() { echo "usage: scripts/harness/land <pr> [<owner>/<repo>#<pr>] | --landi
 
 if [ "${1:-}" = --landing ]; then
   [ $# -eq 1 ] || usage
-  steps="$(git rev-parse --show-toplevel)/docs/harness/mandatory-steps.md"
-  [ -f "$steps" ] || { echo owner; exit 0; }
-  awk '
-    /^(```|~~~)/ { fence = !fence; next }
-    !fence && /^Landing:/ { n++; line = $0 }
-    END {
-      if (n == 1 && line == "Landing: agent") { print "agent"; exit }
-      print "owner"
-      if (n > 1) print "land: " n " Landing: lines in docs/harness/mandatory-steps.md - reading it as owner" > "/dev/stderr"
-      else if (n == 1 && line != "Landing: owner") print "land: cannot read \"" line "\" - reading it as owner" > "/dev/stderr"
-    }' "$steps"
+  cd "$(git rev-parse --show-toplevel)"
+  # The value: the first non-blank line under the one heading `### Landing`, which
+  # must be exactly `Landing: agent` to be agent. A missing or repeated heading,
+  # or any other line, is owner - said on stderr when something was there.
+  read_landing() {
+    awk '
+      { sub(/\r$/, "") }
+      $0 == "### Landing" { h++; want = 1; next }
+      want && /^[ \t]*$/ { next }
+      want { if (h == 1) line = $0; want = 0 }
+      END {
+        if (h == 1 && line == "Landing: agent") { print "agent"; exit }
+        print "owner"
+        if (h > 1) print "land: " h " Landing sections in docs/harness/mandatory-steps.md - reading it as owner" > "/dev/stderr"
+        else if (h == 1 && line != "Landing: owner") print "land: cannot read \"" line "\" - reading it as owner" > "/dev/stderr"
+      }'
+  }
+  # Read from the default branch as origin has it, never from the working tree: a
+  # branch can say anything, and the branch about to be merged is the one asking.
+  base=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
+  if [ -z "$base" ]; then
+    for b in origin/main origin/master; do
+      if git rev-parse -q --verify "$b" >/dev/null; then base=$b; break; fi
+    done
+  fi
+  if [ -z "$base" ]; then
+    echo owner
+    echo "land: no default branch of origin to read the Landing line from - reading it as owner (git remote set-head origin -a)" >&2
+    exit 0
+  fi
+  if ! doc=$(git show "$base:docs/harness/mandatory-steps.md" 2>/dev/null); then echo owner; exit 0; fi
+  who=$(printf '%s\n' "$doc" | read_landing)
+  echo "$who"
+  if [ -f docs/harness/mandatory-steps.md ]; then
+    here=$(read_landing < docs/harness/mandatory-steps.md 2>/dev/null)
+    [ "$here" = "$who" ] || echo "land: this branch says $here, $base says $who - $base decides" >&2
+  fi
   exit 0
 fi
 [ $# -ge 1 ] && [ $# -le 2 ] || usage

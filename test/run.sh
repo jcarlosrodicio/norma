@@ -1291,6 +1291,8 @@ rm -rf "$FAKE_BIN"
 
 # Who lands is read by this, not by an agent interpreting the loop's prose at the
 # moment it wants to merge. Only one exact line says agent; every doubt is owner.
+# And it is read from the default branch as origin has it: the branch asking to be
+# merged is the one place that cannot be trusted to say who may merge it.
 new_repo; with_land
 who() {
   set +e
@@ -1298,30 +1300,53 @@ who() {
   ERR=$(cat "$R/who.err")
   set -e
 }
+# commits the loop to master and points origin/HEAD at it, as a clone would
+landing_doc() {
+  mkdir -p docs/harness
+  printf '# Loop\n\n%b\n' "$1" > docs/harness/mandatory-steps.md
+  git add docs/harness/mandatory-steps.md && git commit -qm loop --no-verify
+  git update-ref refs/remotes/origin/master HEAD
+  git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/master
+}
 who
-assert_eq "--landing reads a project with no loop as owner" "$OUT" "owner"
-mkdir -p docs/harness
-landing_doc() { printf '# Loop\n\n%s\n' "$1" > docs/harness/mandatory-steps.md; }
-landing_doc 'Landing: owner'; who
+assert_eq "--landing reads a repository with no default branch on origin as owner" "$OUT" "owner"
+assert_has "and says how to give it one" "$ERR" "git remote set-head origin -a"
+landing_doc 'No such section here.'; who
+assert_eq "reads a loop without the section as owner" "$OUT" "owner"
+landing_doc '### Landing\n\nLanding: owner'; who
 assert_eq "reads Landing: owner as owner" "$OUT" "owner"
 assert_eq "without complaint" "$ERR" ""
-landing_doc 'Landing: agent'; who
-assert_eq "reads exactly Landing: agent as agent" "$OUT" "agent"
+landing_doc '### Landing\n\nLanding: agent\n\nWho merges.'; who
+assert_eq "reads exactly Landing: agent under the heading as agent" "$OUT" "agent"
 assert_eq "and exits 0 either way" "$RC" "0"
-landing_doc 'No such line here.'; who
-assert_eq "reads a loop without the line as owner" "$OUT" "owner"
-for odd in 'Landing: Agent' 'Landing: agent # maybe' 'Landing: agent ' 'Landing:agent' 'Landing: agents'; do
-  landing_doc "$odd"; who
+landing_doc '### Landing\n\nLanding: agent\r'; who
+assert_eq "a file saved with CRLF endings reads the same" "$OUT" "agent"
+for odd in 'Landing: Agent' 'Landing: agent # maybe' 'Landing: agent ' 'Landing:agent' 'Landing: agents' 'Who merges.'; do
+  landing_doc "### Landing\n\n$odd"; who
   assert_eq "reads '$odd' as owner" "$OUT" "owner"
   assert_has "and says it could not read it: '$odd'" "$ERR" "cannot read"
 done
-printf 'Landing: agent\nLanding: agent\n' > docs/harness/mandatory-steps.md; who
-assert_eq "reads two lines as owner, even when both say agent" "$OUT" "owner"
-assert_has "and says why" "$ERR" "2 Landing: lines"
-printf 'Landing: owner\n\n```\nLanding: agent\n```\n' > docs/harness/mandatory-steps.md; who
-assert_eq "ignores a Landing line inside a code block" "$OUT" "owner"
-printf '`Landing: agent` means the agent lands.\n> Landing: agent\nLanding: owner\n' > docs/harness/mandatory-steps.md; who
-assert_eq "and one that is quoted or mentioned in prose" "$OUT" "owner"
+landing_doc '### Landing\n\nLanding: agent\n\n### Landing\n\nLanding: agent'; who
+assert_eq "reads two Landing sections as owner, even when both say agent" "$OUT" "owner"
+assert_has "and says why" "$ERR" "2 Landing sections"
+landing_doc 'Landing: agent\n\n### Landing\n\nLanding: owner'; who
+assert_eq "a Landing line anywhere but under the heading counts for nothing" "$OUT" "owner"
+landing_doc '### Landing\n\nLanding: owner\n\n```\nLanding: agent\n```'; who
+assert_eq "nor does one further down the section" "$OUT" "owner"
+landing_doc '### Landing\n\nLanding: owner'
+git switch -q -c feature
+printf '### Landing\n\nLanding: agent\n' > docs/harness/mandatory-steps.md
+git commit -qam "grant myself the merge" --no-verify
+who
+assert_eq "a branch that rewrites the line does not grant itself the merge" "$OUT" "owner"
+assert_has "and is told the default branch decides" "$ERR" "origin/master decides"
+git switch -q master
+landing_doc '### Landing\n\nLanding: agent'
+git switch -q feature
+git checkout -q master -- docs/harness/mandatory-steps.md
+printf '### Landing\n\nLanding: owner\n' > docs/harness/mandatory-steps.md
+who
+assert_eq "and the default branch's agent stands while the branch says otherwise" "$OUT" "agent"
 set +e; OUT=$(sh scripts/harness/land --landing extra 2>&1); RC=$?; set -e
 assert_eq "--landing takes nothing else" "$RC" "2"
 done_repo
@@ -1557,7 +1582,13 @@ assert_has "and the one that reads the line, so nobody reads it by eye" "$ms" "s
 # exactly one line, the shipped one, and complain about nothing.
 new_repo; with_land; mkdir -p docs/harness
 cp "$HOME_DIR/templates/mandatory-steps.md" docs/harness/mandatory-steps.md
+git add docs && git commit -qm loop --no-verify
+git update-ref refs/remotes/origin/master HEAD
+git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/master
 assert_eq "land --landing reads the shipped template as owner" "$(sh scripts/harness/land --landing 2>&1)" "owner"
+sed -i.bak 's/^Landing: owner$/Landing: agent/' docs/harness/mandatory-steps.md
+git commit -qam agent --no-verify; git update-ref refs/remotes/origin/master HEAD
+assert_eq "and the shipped template with its line set to agent as agent" "$(sh scripts/harness/land --landing 2>/dev/null)" "agent"
 done_repo
 assert_has "and what the other answer commits the agent to" "$ms" "Landing: agent"
 assert_has "including when an agent must stop trying" "$ms" "attempts at the same failure"
