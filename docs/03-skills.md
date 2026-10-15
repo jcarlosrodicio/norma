@@ -58,8 +58,9 @@ unsupervised run reviewable:
   about everything, which is useless, or one that asks about nothing, which is
   dangerous.
 - **The hard limits.** Never `--no-verify`, never edit the gate or the hook to
-  pass, never silence a failing test, never force-push, never merge, deploy,
-  publish or touch a credential. The one about the failing test is the load-bearing
+  pass, never silence a failing test, never force-push, never deploy, publish or
+  touch a credential, and never merge except through `scripts/harness/land` when
+  the project's `Landing:` line says `agent`. The one about the failing test is the load-bearing
   one: with nobody watching, *make it green* is the dominant failure mode, and
   every other rule is downstream of refusing it.
 - **The autonomy log** - `openspec/changes/<change>/reports/autonomy.md`, linked
@@ -73,7 +74,13 @@ The three stops become: triage the open questions instead of asking them, review
 the plan against the roadmap instead of showing it, and deliver to a pull request
 instead of handing over. The end of the run is the pull request, never a merge -
 taking that away would leave the human with no review point at all, which is the
-one thing this mode cannot afford.
+one thing this mode cannot afford. **The one exception is the owner's, never the
+run's:** a project whose loop says `Landing: agent` has moved that review point
+after the merge, standing, and then the run lands its pull request with
+`scripts/harness/land` - two attempts at the same failure, then it stops at the
+pull request like any other run. `run-task` follows the same line once its user
+approves a pull request, and `harness-setup` asks the question, proposing
+`owner`.
 
 ## The one skill that is not vendored
 

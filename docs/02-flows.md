@@ -233,9 +233,11 @@ Three things bound it, and none of them may be softened:
   `tasks.md` where it stopped. Nothing here asks for parallel subagents either, and
   when a run chooses them the ceiling is the provider's concurrency limit minus
   two: one for the agent asking, one spare for whatever else shares the key.
-- **It ends at an open pull request**, never at a merge, a deploy or a publish. That
-  pull request is the human's only review point, so removing it would leave the run
-  reviewed by nobody. A red CI is not a finished run, and the failure is classified
+- **It ends at an open pull request**, never at a deploy or a publish, and at a
+  merge only where the project's `Landing:` line says `agent` - then through
+  `scripts/harness/land`, and nowhere else. That pull request is the human's only
+  review point, so removing it without the owner having said so would leave the
+  run reviewed by nobody. A red CI is not a finished run, and the failure is classified
   before it is touched: caused by this change, fixed and pushed again, twice at
   most; a flake, re-run without spending either attempt; already red on the base
   branch, escalated rather than fixed, because that repair would smuggle work from

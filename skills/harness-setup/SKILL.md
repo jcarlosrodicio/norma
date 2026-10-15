@@ -96,6 +96,30 @@ depend only on domain and ports?" gets a decision.
 6. Whether CI runs the full suite on the pull request. That is the backstop for
    `git commit --no-verify`, the one hole the hook cannot close - if CI does not do
    it, say so, because then the hole is real.
+7. Who lands a pull request once its CI is green - the `Landing:` line in step 9.
+   Propose `owner`: it changes nothing for a project that never thinks about it.
+   `agent` is the owner handing the merge to whichever agent opened the pull
+   request, through `scripts/harness/land`; say what that commits the agent to, as
+   the template does. **`agent` comes only from the owner's explicit word to this
+   question.** No answer, a vague one, or a run with nobody to ask leaves
+   `Landing: owner` exactly as the template ships it - never write `agent` on your
+   own reading of the project.
+
+   Only after an explicit `agent`, ask a **separate** question: whether to add
+   `Bash(scripts/harness/land:*)` to the `allow` list in `.claude/settings.json`,
+   showing the exact JSON you would write. Claude Code's auto mode otherwise
+   refuses the merge as unreviewed, so the decision would be written down and never
+   carried out; but the rule lets any agent in the repository run `land` on any
+   pull request, which is a wider grant than the `Landing:` answer, and the owner
+   says yes to it on its own or not at all.
+8. For `land`, whichever the answer: if the CI workflow has a `paths-ignore`, the
+   same paths go into `HARNESS_LAND_NO_CI` in `config.sh` - in GitHub's syntax, as
+   the workflow writes them - or a pull request touching only those waits for
+   checks that never come. The merge method, if the repository does not merge
+   commits (`HARNESS_LAND_METHOD`). And if CI runs on one shared or slow runner,
+   recommend a `concurrency` group in the workflow that cancels a pull request's
+   superseded runs; on the default branch, let the run in progress finish. With
+   several agents pushing, superseded runs are what the queue is made of.
 
 ### Round 3 - how the project is exercised for real (`docs/harness/mandatory-steps.md`, Step 5)
 
@@ -154,7 +178,12 @@ Now write the answers into the files, replacing every `TODO(harness)` you touche
   `harness_gates`, `harness_test_selected`, `harness_test_all`. Use `run` for every
   command. Keep the comment block at the top.
 - `docs/harness/mandatory-steps.md` - stack-specific, in the project's language and
-  with its real commands. Never leave a generic step that names no command.
+  with its real commands. Never leave a generic step that names no command. The
+  `Landing:` line holds the owner's answer, `owner` or `agent`, nothing else.
+- `.claude/settings.json` - only the `land` permission, and only if the owner said
+  yes to that separate question in round 2. Not on the `Landing:` answer alone. The
+  CI workflow is the owner's to change; propose the `concurrency` block, do not
+  write it.
 - `docs/harness/architecture-rules.md` - the adoption map, including the
   not-applicable section with reasons.
 - `openspec/config.yaml` - the `context` block, if the project uses OpenSpec.

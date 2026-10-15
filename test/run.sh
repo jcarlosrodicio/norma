@@ -1763,8 +1763,35 @@ done
 auto=$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")
 assert_has "auto-run-task delegates the stages to run-task instead of copying them" \
   "$auto" ".agents/skills/run-task/SKILL.md"
-assert_has "auto-run-task ends at a pull request and never merges it" \
-  "$auto" "never merge the pull request"
+# Who merges is the project's line, not the skill's. The skill reads it, lands only
+# through land and only on `agent`, and stops at the pull request on anything else.
+assert_has "auto-run-task reads the project's Landing line" "$auto" "Landing:"
+assert_has "through the reader that fails closed, not by eye" "$auto" "Run \`scripts/harness/land --landing\`"
+assert_has "spending CI attempts once, not again through land" "$auto" "gets no third through"
+assert_has "governing the companion with this repository's line" "$auto" "pass one only if this run opened it"
+assert_has "and reporting a give-up as the escalation it is" "$auto" "escalation
+     reason 6"
+assert_has "lands only through the land script" "$auto" "scripts/harness/land <pr>"
+assert_has "stops at the open pull request on anything --landing does not print as agent" \
+  "$auto" "anything \`--landing\` does not print as \`agent\`"
+assert_has "and never edits the line to grant itself the merge" "$auto" "Never edit the \`Landing:\`"
+assert_has "taking 'leave it open' only from the human in the conversation" "$auto" "in this conversation"
+assert_has "and never merges by any other route" "$auto" "never merge the pull request by any other route"
+assert_has "nor turns on auto-merge" "$auto" "never enable"
+assert_has "and gives up landing after two attempts at the same failure" "$auto" "attempts at the same failure"
+rt_ho=$(sed -n '/^## 9. Hand over/,/^## Reporting honestly/p' "$HOME_DIR/skills/run-task/SKILL.md")
+assert_has "run-task's hand-over follows the Landing line once a pull request exists" "$rt_ho" "Landing:"
+assert_has "read through land --landing too" "$rt_ho" "scripts/harness/land --landing"
+assert_has "and honouring a request to leave it open" "$rt_ho" "to leave it open, it stays open"
+assert_has "and still commits nothing before the human approves" "$rt_ho" "Do not commit, push, open a pull request"
+hs_r2=$(sed -n '/^### Round 2/,/^### Round 3/p' "$HOME_DIR/skills/harness-setup/SKILL.md")
+assert_has "harness-setup asks who lands a pull request" "$hs_r2" "Landing:"
+assert_has "proposing the owner" "$hs_r2" "Propose \`owner\`"
+assert_has "and, for agent, the permission Claude Code needs to run land" "$hs_r2" "Bash(scripts/harness/land:*)"
+assert_has "never writing agent without the owner's explicit word" "$hs_r2" "never write \`agent\` on your"
+assert_has "asking for the permission as a separate question" "$hs_r2" "ask a **separate** question"
+assert_has "and the paths CI ignores, for land" "$hs_r2" "HARNESS_LAND_NO_CI"
+assert_has "and recommends cancelling superseded CI runs" "$hs_r2" "concurrency"
 assert_has "auto-run-task refuses to bypass the hook" "$auto" "--no-verify"
 assert_has "auto-run-task records what it decided instead of asking" \
   "$auto" "reports/autonomy.md"
