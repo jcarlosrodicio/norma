@@ -193,14 +193,41 @@ else
   say "$REPO#$PR touches only paths CI does not run on - no checks to wait for"
 fi
 
-gh pr merge "$PR" -R "$REPO" "--$HARNESS_LAND_METHOD" --delete-branch --match-head-commit "$HEAD" \
+# Merges a pull request pinned to a head, then deletes its branch - after moving
+# every open pull request based on that branch onto this one's base. GitHub closes,
+# rather than retargets, an open pull request whose base branch is deleted, and a
+# closed one cannot even be reopened until the branch is pushed back. So a stack is
+# moved down first, and a branch anything still depends on is kept.
+merge_pinned() {
+  head_ref=$(field "$1" "$2" headRefName || true)
+  base_ref=$(field "$1" "$2" baseRefName || true)
+  gh pr merge "$1" -R "$2" "--$HARNESS_LAND_METHOD" --match-head-commit "$3" || return 1
+  [ -n "$head_ref" ] && [ -n "$base_ref" ] || { say "merged $2#$1; its branch was not deleted"; return 0; }
+  if ! children=$(gh pr list -R "$2" --base "$head_ref" --state open --json number -q '.[].number'); then
+    say "merged $2#$1; kept branch $head_ref - could not tell which pull requests are based on it"
+    return 0
+  fi
+  kept=""
+  for c in $children; do
+    gh pr edit "$c" -R "$2" --base "$base_ref" >/dev/null 2>&1 || kept="$kept #$c"
+  done
+  if [ -n "$kept" ]; then
+    say "merged $2#$1; kept branch $head_ref, still the base of$kept - move it onto $base_ref, then delete the branch"
+    return 0
+  fi
+  [ -z "$children" ] || say "moved$(printf ' #%s' $children) onto $base_ref"
+  gh api -X DELETE "repos/$2/git/refs/heads/$head_ref" >/dev/null 2>&1 \
+    || say "merged $2#$1; could not delete branch $head_ref"
+}
+
+merge_pinned "$PR" "$REPO" "$HEAD" \
   || fail "GitHub refused to merge $REPO#$PR (a push after the checks passed?) - nothing merged"
 say "merged $REPO#$PR"
 
 if [ -n "$CO_PR" ]; then
   [ "$(mergeable "$CO_PR" "$CO_REPO")" = MERGEABLE ] \
     || fail "$REPO#$PR merged, but $CO_REPO#$CO_PR does not merge cleanly - bring its base in and merge it by hand"
-  gh pr merge "$CO_PR" -R "$CO_REPO" "--$HARNESS_LAND_METHOD" --delete-branch --match-head-commit "$CO_HEAD" \
+  merge_pinned "$CO_PR" "$CO_REPO" "$CO_HEAD" \
     || fail "$REPO#$PR merged, but $CO_REPO#$CO_PR did not (a push to it since land started?)"
   say "merged $CO_REPO#$CO_PR"
   notify "merged, with $CO_REPO#$CO_PR"

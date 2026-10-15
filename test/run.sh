@@ -1075,6 +1075,8 @@ case "$1 $2" in
       state) eval "echo \${${p}_STATE:-OPEN}" ;;
       mergeable) eval "echo \${${p}_MERGEABLE:-MERGEABLE}" ;;
       headRefOid) echo "${HEAD_SHA-abcdef0123456789}" ;;
+      headRefName) echo feature ;;
+      baseRefName) echo master ;;
     esac ;;
   "pr checks")
     [ "${CHECKS:-pass}" = pass ] && exit 0
@@ -1088,6 +1090,9 @@ case "$1 $2" in
     case "$*" in *--watch*) exit 1 ;; esac
     [ "${CHECKS:-pass}" = pending ] && exit 8
     exit 1 ;;
+  "pr list") [ -z "${LIST_FAIL:-}" ] || exit 1; [ -z "${CHILDREN:-}" ] || echo "$CHILDREN" | tr , '\n' ;;
+  "pr edit") [ -z "${EDIT_FAIL:-}" ] || exit 1 ;;
+  "api -X") exit 0 ;;
   "pr merge")
     case "$*" in *--match-head-commit*) [ -z "${HEAD_MOVED:-}" ] || exit 1 ;; esac
     exit 0 ;;
@@ -1136,9 +1141,31 @@ assert_eq "however it is capitalised" "$RC" 2
 landing 7
 assert_eq "lands a green pull request" "$RC" 0
 assert_has "merging exactly the commit that went green" "$LOG" \
-  "pr merge 7 -R me/app --merge --delete-branch --match-head-commit abcdef0123456789"
+  "pr merge 7 -R me/app --merge --match-head-commit abcdef0123456789"
 assert_has "and says so" "$OUT" "merged me/app#7"
 assert_has "having waited on its checks" "$LOG" "pr checks 7 -R me/app --watch"
+
+assert_has "deletes the merged branch" "$LOG" "api -X DELETE repos/me/app/git/refs/heads/feature"
+
+# GitHub closes an open pull request whose base branch is deleted - it does not
+# retarget it - so a stacked pull request is moved down before its base goes.
+LAND_ENV="CHILDREN=8,9"
+landing 7
+assert_eq "lands the bottom of a stack" "$RC" 0
+assert_has "moving the pull requests stacked on it onto its base" "$LOG" "pr edit 8 -R me/app --base master"
+assert_has "every one of them" "$LOG" "pr edit 9 -R me/app --base master"
+edit_at=$(grep -n "pr edit 9" "$R/gh.log" | cut -d: -f1)
+del_at=$(grep -n "api -X DELETE" "$R/gh.log" | cut -d: -f1)
+assert_eq "before deleting the branch they were based on" \
+  "$([ -n "$edit_at" ] && [ -n "$del_at" ] && [ "$edit_at" -lt "$del_at" ] && echo yes)" "yes"
+LAND_ENV="CHILDREN=8 EDIT_FAIL=1"
+landing 7
+assert_eq "still lands when a stacked pull request cannot be moved" "$RC" 0
+assert_no "but keeps the branch it depends on" "$LOG" "api -X DELETE"
+assert_has "and says what to do" "$OUT" "kept branch feature, still the base of #8"
+LAND_ENV="LIST_FAIL=1"
+landing 7
+assert_no "and keeps it when it cannot tell what depends on it" "$LOG" "api -X DELETE"
 
 LAND_ENV="CHECKS=late"
 landing 7
@@ -1178,6 +1205,7 @@ assert_no "and merges nothing then either" "$LOG" "pr merge"
 LAND_ENV="CHECKS=fail"
 landing 7
 assert_eq "refuses on red CI" "$RC" 1
+assert_no "deleting no branch either" "$LOG" "api -X DELETE"
 assert_has "saying nothing was merged" "$OUT" "CI is not green on me/app#7 - nothing merged"
 assert_no "and merging nothing" "$LOG" "pr merge"
 
@@ -1199,7 +1227,7 @@ LAND_ENV=""
 landing 7 me/site#3
 assert_eq "lands the companion after the pull request" "$RC" 0
 assert_has "pinned to the head it had when land started" "$LOG" \
-  "pr merge 3 -R me/site --merge --delete-branch --match-head-commit abcdef0123456789"
+  "pr merge 3 -R me/site --merge --match-head-commit abcdef0123456789"
 main_at=$(grep -n "pr merge 7 " "$R/gh.log" | cut -d: -f1)
 co_at=$(grep -n "pr merge 3 -R me/site" "$R/gh.log" | cut -d: -f1)
 assert_eq "in that order" "$([ -n "$main_at" ] && [ -n "$co_at" ] && [ "$main_at" -lt "$co_at" ] && echo yes)" "yes"
@@ -1272,10 +1300,10 @@ sed -i.bak '/HARNESS_LAND_METHOD/d' scripts/harness/config.sh
 LAND_ENV="FAKE_TOKEN=personal"
 landing 7
 assert_has "asks gh for the account named like the owner" "$LOG" "auth token --user me"
-assert_has "and uses its token" "$LOG" "pr merge 7 -R me/app --merge --delete-branch --match-head-commit abcdef0123456789 token=personal"
+assert_has "and uses its token" "$LOG" "pr merge 7 -R me/app --merge --match-head-commit abcdef0123456789 token=personal"
 LAND_ENV="FAKE_TOKEN=personal FAKE_ACCOUNT=somebody-else"
 landing 7
-assert_has "and leaves gh's own choice when there is no such account" "$LOG" "pr merge 7 -R me/app --merge --delete-branch --match-head-commit abcdef0123456789 token=none"
+assert_has "and leaves gh's own choice when there is no such account" "$LOG" "pr merge 7 -R me/app --merge --match-head-commit abcdef0123456789 token=none"
 LAND_ENV="FAKE_TOKEN=personal GH_TOKEN=given"
 landing 7
 assert_has "but never overrides a token it was given" "$LOG" "token=given"

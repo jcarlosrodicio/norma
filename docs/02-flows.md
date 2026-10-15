@@ -362,7 +362,9 @@ working outside a repository sees.
 | GitHub refuses the merge - the head moved after the checks passed | 1 | The merge is pinned to the commit that went green; a later push is code no check ran on. |
 | The companion does not merge cleanly, or its merge fails - a push to it since `land` started among the reasons | 1 | The first pull request is already merged and the message says so, so whoever reads it knows exactly which half is missing. |
 
-Every refusal before the first merge leaves both pull requests as they were.
+Every refusal before the first merge leaves both pull requests as they were. After
+a merge, a branch that something still depends on is kept rather than deleted -
+not a refusal, the merge stands, but `land` says which pull request holds it.
 
 `land --landing` refuses nothing but extra arguments: whatever it cannot read is
 `owner`, said on stderr, because a reader that fails closed is the only kind an
