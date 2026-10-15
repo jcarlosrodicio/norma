@@ -185,7 +185,9 @@ orient → enrich → branch → plan → implement → verify → review → do
 ```
 
 `docs/harness/mandatory-steps.md` in each project is the binding checklist, with
-that project's real commands.
+that project's real commands - and, in its step 9, the `Landing:` line that says
+whether the merge after a green CI is the owner's or the agent's, done with
+`scripts/harness/land` either way.
 
 **`close` is the stage that was missing.** The loop used to end at `document`, so
 closing the phase in the roadmap and archiving the OpenSpec change happened - when

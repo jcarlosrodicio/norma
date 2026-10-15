@@ -209,4 +209,34 @@ before the commit to the pull request itself. Nothing above this step relaxes - 
 gate, the tests, the runtime verification, the adversarial review and the
 documentation are exactly the same, and that procedure additionally requires every
 decision taken without asking to be written down and linked from the pull request.
-Merging, deploying and publishing stay with the human in both modes.
+Deploying and publishing stay with the human in both modes; merging follows
+*Landing* below.
+
+### Landing
+
+Landing: owner
+
+Who merges a pull request once its CI is green. The line above - the first one
+under this heading - is read by `scripts/harness/land --landing`, never by eye, and
+from the default branch, never from the branch being merged: exactly
+`Landing: agent` is `agent`; anything else - another word or case, a comment after
+it - is `owner`. Changing it is the owner's decision, merged like any other change;
+`harness-setup` asks.
+
+- **`Landing: owner`** - the owner merges, with `scripts/harness/land <pr> [<owner>/<repo>#<n>]`:
+  it waits for CI, merges exactly the commit that went green, then the companion
+  pull request in another repository, if there is one. An agent never runs it, and
+  its hand-over ends with that command ready to paste.
+- **`Landing: agent`** - the owner's standing decision that the agent which opened a pull
+  request lands it with that same command, in the background, once it is open.
+  When `land` stops, nothing is merged: a red CI is classified and handled as
+  `auto-run-task` says, a conflict is resolved by bringing the base branch into the
+  branch, running the gate again and pushing, and then `land` runs again. Two
+  attempts at the same failure, as for any fix; after that the pull request stays
+  open and the hand-over says why. Never `--admin`, never a force-push, never a
+  merge around `land`. The owner keeps one pull request open by saying so for that
+  task, and then it is `owner` for that one.
+
+Either way, `land` needs the paths CI ignores in `HARNESS_LAND_NO_CI`
+(`scripts/harness/config.sh`) when the workflow has a `paths-ignore`: without them a
+pull request that touches only those paths waits for checks that never come.

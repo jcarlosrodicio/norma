@@ -434,6 +434,16 @@ See [`03-skills.md`](03-skills.md).
 (the loop), `architecture-rules.md` (the adoption map over the shared
 architectural reference), `openspec-config.yaml`.
 
+**Who merges is the project's, in one line of its loop.** `mandatory-steps.md`
+carries `Landing: owner` or `Landing: agent` in step 9: whether the agent that
+opened a pull request lands it with `scripts/harness/land`, or leaves the merge to
+the owner. It is a decision, so it lives in the file the project owns; it is one
+line rather than prose, so a skill can read it without interpreting a paragraph.
+The template ships `owner`, the answer that changes nothing for a project that
+never thinks about it. The `AGENTS.md` block, which every upgrade refreshes, reads
+a loop with no such line - every project installed before it existed - as
+`owner` too, so an upgrade never hands an agent a merge nobody granted.
+
 ## Decisions, and why - do not undo these without reading the reason
 
 **Vendored, not symlinked.** Skills are copied into `.agents/skills/<name>/` as

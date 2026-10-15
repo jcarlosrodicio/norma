@@ -1598,6 +1598,36 @@ done
 # and invisible, which is the failure the markers were added to stop.
 assert_has "the AGENTS.md block names the run context" \
   "$(cat "$HOME_DIR/templates/agents-section.md")" "scripts/harness/run start"
+# Who merges is the project's decision, so it lives in the template the project
+# owns, as one line a skill can read - and the safe answer is the one it ships with.
+ms=$(cat "$HOME_DIR/templates/mandatory-steps.md")
+assert_has "the loop template records who lands a pull request" "$ms" "Landing: owner"
+assert_eq "exactly once, so there is one answer to read" \
+  "$(grep -c '^Landing: ' "$HOME_DIR/templates/mandatory-steps.md")" "1"
+assert_has "and names the command that does it" "$ms" "scripts/harness/land <pr>"
+assert_has "and the one that reads the line, so nobody reads it by eye" "$ms" "scripts/harness/land --landing"
+# The template mentions both values in its own prose; the reader must still find
+# exactly one line, the shipped one, and complain about nothing.
+new_repo; with_land; mkdir -p docs/harness
+cp "$HOME_DIR/templates/mandatory-steps.md" docs/harness/mandatory-steps.md
+git add docs && git commit -qm loop --no-verify
+git update-ref refs/remotes/origin/master HEAD
+git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/master
+assert_eq "land --landing reads the shipped template as owner" "$(sh scripts/harness/land --landing 2>&1)" "owner"
+sed -i.bak 's/^Landing: owner$/Landing: agent/' docs/harness/mandatory-steps.md
+git commit -qam agent --no-verify; git update-ref refs/remotes/origin/master HEAD
+assert_eq "and the shipped template with its line set to agent as agent" "$(sh scripts/harness/land --landing 2>/dev/null)" "agent"
+done_repo
+assert_has "and what the other answer commits the agent to" "$ms" "Landing: agent"
+assert_has "including when an agent must stop trying" "$ms" "attempts at the same failure"
+assert_no "and no longer reserves every merge for the human" "$ms" "Merging, deploying and publishing stay with the human"
+# The block is refreshed on every upgrade, including in projects whose template
+# predates the line. It has to read their silence as the safe answer.
+ag=$(cat "$HOME_DIR/templates/agents-section.md")
+assert_has "the AGENTS.md block points an agent at that line" "$ag" "Landing:"
+assert_has "through the command that reads it" "$ag" "scripts/harness/land --landing"
+assert_has "and reads a template without it as the owner's" "$ag" "no such line"
+assert_no "and no longer says merging is never the agent's" "$ag" "merging, deploying and"
 assert_has "update-docs names the roadmap, which no diff points at" \
   "$(cat "$HOME_DIR/skills/update-docs/SKILL.md")" "roadmap entry"
 # A review that read two thirds of the diff reads exactly like one that read all
