@@ -379,6 +379,14 @@ The decisions inside it:
   404. The same token serves the companion, so a companion under another owner
   fails at its first check, before anything merges.
 
+- **The branch goes last, after what was stacked on it has moved.** GitHub
+  closes - does not retarget - an open pull request whose base branch is deleted,
+  and a closed one cannot be reopened until the branch is pushed back; this
+  happened on a stack of four. So `land` merges without `--delete-branch`, moves
+  every open pull request based on the merged branch onto that pull request's
+  base, and only then deletes the branch. One it cannot move, or not knowing
+  which depend on it, keeps the branch and says so.
+
 What it does not do: resolve a conflict, retry a red check, or decide anything a
 human or the loop should. Those belong to whoever runs it. And one limit it
 cannot close: a pull request's CI tests the merge with the base as it was, and
