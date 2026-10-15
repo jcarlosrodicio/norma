@@ -209,9 +209,14 @@ merge_pinned() {
     say "merged $2#$1; kept branch $head_ref - could not tell which pull requests are based on it"
     return 0
   fi
+  # A repository that deletes merged branches itself also retargets what was
+  # stacked on them, racing this edit: one that fails is moved if it already
+  # points at the base, and kept only if it does not.
   kept=""
   for c in $children; do
-    gh pr edit "$c" -R "$2" --base "$base_ref" >/dev/null 2>&1 || kept="$kept #$c"
+    gh pr edit "$c" -R "$2" --base "$base_ref" >/dev/null 2>&1 \
+      || [ "$(field "$c" "$2" baseRefName 2>/dev/null || true)" = "$base_ref" ] \
+      || kept="$kept #$c"
   done
   if [ -n "$kept" ]; then
     say "merged $2#$1; kept branch $head_ref, still the base of$kept - move it onto $base_ref, then delete the branch"
