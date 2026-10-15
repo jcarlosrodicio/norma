@@ -1090,7 +1090,9 @@ case "$1 $2" in
           *) echo CLEAN ;;
         esac ;;
       headRefName) echo feature ;;
-      baseRefName) echo master ;;
+      # a stacked pull request (8 or 9) is based on feature until something moves
+      # it; CHILD_BASE says where it already points
+      baseRefName) case "$3" in 8|9) echo "${CHILD_BASE:-feature}" ;; *) echo master ;; esac ;;
     esac ;;
   "pr checks")
     [ "${CHECKS:-pass}" = pass ] && exit 0
@@ -1192,6 +1194,16 @@ assert_has "and says what to do" "$OUT" "kept branch feature, still the base of 
 LAND_ENV="LIST_FAIL=1"
 landing 7
 assert_no "and keeps it when it cannot tell what depends on it" "$LOG" "api -X DELETE"
+# A repository that deletes merged branches itself retargets what was stacked on
+# them too, racing land's own move - which then fails although #8 is already on
+# master and the branch is gone. That is a move, not a pull request left behind.
+LAND_ENV="CHILDREN=8 EDIT_FAIL=1 CHILD_BASE=master DELETE_FAIL=1 REF_GONE=1"
+landing 7
+assert_eq "lands when GitHub moved the stacked pull request first" "$RC" 0
+assert_has "reading where it points after the move failed" "$LOG" "pr view 8 -R me/app --json baseRefName"
+assert_no "and does not claim it kept a branch that is gone" "$OUT" "kept branch"
+assert_has "counting it as moved" "$OUT" "moved #8 onto master"
+assert_no "nor that the delete failed" "$OUT" "could not delete"
 
 # A repository that merges only branches that are up to date refuses a pull request
 # whose base moved - before the wait, or during it, when another one lands first.

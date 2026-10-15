@@ -386,8 +386,10 @@ The decisions inside it:
   every open pull request based on the merged branch onto that pull request's
   base, and only then deletes the branch. One it cannot move, or not knowing
   which depend on it, keeps the branch and says so. A repository that deletes
-  merged branches itself has already done it; a failed delete is reported only
-  when the branch is really still there.
+  merged branches itself has already done it, and has retargeted the stacked pull
+  requests too, racing `land`'s own move: a move that fails counts as done when
+  the pull request already points at the base, and only then. A failed delete is
+  reported only when the branch is really still there.
 - **A pull request behind its base is brought up to date, not refused.** A
   repository that merges only up-to-date branches refuses one whose base moved -
   before the wait, or during it, when another pull request lands first, which with
