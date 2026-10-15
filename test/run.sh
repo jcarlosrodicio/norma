@@ -1074,7 +1074,21 @@ case "$1 $2" in
     case "$7" in
       state) eval "echo \${${p}_STATE:-OPEN}" ;;
       mergeable) eval "echo \${${p}_MERGEABLE:-MERGEABLE}" ;;
-      headRefOid) echo "${HEAD_SHA-abcdef0123456789}" ;;
+      # after an update the new head appears at once, or (HEAD_LAG) two reads later
+      headRefOid)
+        if [ -e "$FAKE_LOG.updated" ]; then
+          k=$(( $(cat "$FAKE_LOG.reads" 2>/dev/null || echo 0) + 1 )); echo $k > "$FAKE_LOG.reads"
+          if [ -n "${HEAD_LAG:-}" ] && [ $k -le 2 ]; then echo abcdef0123456789; else echo "1234567890abcde$(cat "$FAKE_LOG.updated")"; fi
+        else echo "${HEAD_SHA-abcdef0123456789}"; fi ;;
+      # BEHIND: start - behind until updated; late - goes behind at the first
+      # merge attempt, until updated; always - never catches up
+      mergeStateStatus)
+        case "${BEHIND:-}" in
+          start) [ -e "$FAKE_LOG.updated" ] && echo CLEAN || echo BEHIND ;;
+          late) [ -e "$FAKE_LOG.tried" ] && [ ! -e "$FAKE_LOG.updated" ] && echo BEHIND || echo CLEAN ;;
+          always) echo BEHIND ;;
+          *) echo CLEAN ;;
+        esac ;;
       headRefName) echo feature ;;
       baseRefName) echo master ;;
     esac ;;
@@ -1092,9 +1106,21 @@ case "$1 $2" in
     exit 1 ;;
   "pr list") [ -z "${LIST_FAIL:-}" ] || exit 1; [ -z "${CHILDREN:-}" ] || echo "$CHILDREN" | tr , '\n' ;;
   "pr edit") [ -z "${EDIT_FAIL:-}" ] || exit 1 ;;
-  "api -X") exit 0 ;;
+  "api -X") [ -z "${DELETE_FAIL:-}" ] || exit 1 ;;
+  "api repos/"*)
+    [ -z "${REF_GONE:-}" ] || { echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
+    [ -z "${REF_FORBIDDEN:-}" ] || { echo "gh: Forbidden (HTTP 403)" >&2; exit 1; } ;;
+  "pr update-branch")
+    [ -z "${UPDATE_FAIL:-}" ] || exit 1
+    # every update is a new commit, so a new head
+    echo $(( $(cat "$FAKE_LOG.updated" 2>/dev/null || echo 0) + 1 )) > "$FAKE_LOG.updated" ;;
   "pr merge")
     case "$*" in *--match-head-commit*) [ -z "${HEAD_MOVED:-}" ] || exit 1 ;; esac
+    case "${BEHIND:-}" in
+      start) [ -e "$FAKE_LOG.updated" ] || exit 1 ;;
+      late) [ -e "$FAKE_LOG.tried" ] || { touch "$FAKE_LOG.tried"; exit 1; } ;;
+      always) exit 1 ;;
+    esac
     exit 0 ;;
 esac
 EOF
@@ -1113,7 +1139,7 @@ with_land() {
 # run land with $LAND_ENV (space-separated VAR=value) on top of the fake gh,
 # capturing stdout+stderr in $OUT, the exit code in $RC and gh's calls in $LOG
 landing() {
-  : > "$R/gh.log"; rm -f "$R/gh.log.n"
+  : > "$R/gh.log"; rm -f "$R/gh.log.n" "$R/gh.log.updated" "$R/gh.log.tried" "$R/gh.log.reads"
   set +e
   OUT=$(env GH_TOKEN= $LAND_ENV FAKE_LOG="$R/gh.log" PATH="$FAKE_BIN:$PATH" \
     sh scripts/harness/land "$@" 2>&1)
@@ -1166,6 +1192,57 @@ assert_has "and says what to do" "$OUT" "kept branch feature, still the base of 
 LAND_ENV="LIST_FAIL=1"
 landing 7
 assert_no "and keeps it when it cannot tell what depends on it" "$LOG" "api -X DELETE"
+
+# A repository that merges only branches that are up to date refuses a pull request
+# whose base moved - before the wait, or during it, when another one lands first.
+# land brings it up to date, and the update is a new head: pinned and tested again.
+LAND_ENV="BEHIND=start"
+landing 7
+assert_eq "lands a pull request that is behind its base" "$RC" 0
+assert_has "after bringing it up to date" "$LOG" "pr update-branch 7 -R me/app"
+assert_has "and saying why" "$OUT" "merges only branches that are up to date"
+assert_has "pinned to the head the update produced" "$LOG" "pr merge 7 -R me/app --merge --match-head-commit 1234567890abcde1"
+up_at=$(grep -n "pr update-branch" "$R/gh.log" | head -1 | cut -d: -f1)
+# The fake's checks do not know which sha they are for, so "CI for the new head"
+# is proven by order: the first watch comes after the update.
+watch_at=$(grep -n "pr checks 7 -R me/app --watch" "$R/gh.log" | head -1 | cut -d: -f1)
+assert_eq "whose CI it waited for" \
+  "$([ -n "$up_at" ] && [ -n "$watch_at" ] && [ "$up_at" -lt "$watch_at" ] && echo yes)" "yes"
+LAND_ENV="BEHIND=start HEAD_LAG=1"
+landing 7
+assert_eq "waits for the updated head to appear before pinning it" "$RC" 0
+assert_has "and pins the new one, not the one read too early" "$LOG" "--match-head-commit 1234567890abcde1"
+LAND_ENV="BEHIND=late"
+landing 7
+assert_eq "lands one that fell behind while its CI ran" "$RC" 0
+assert_has "updating it after the refused merge" "$LOG" "pr update-branch 7 -R me/app"
+assert_has "and merging the updated head" "$LOG" "--match-head-commit 1234567890abcde1"
+LAND_ENV="BEHIND=always"
+landing 7
+assert_eq "gives up on a base that never stops moving" "$RC" 1
+assert_has "saying so" "$OUT" "still behind its base"
+assert_eq "after three updates" "$(grep -c "pr update-branch" "$R/gh.log")" "3"
+LAND_ENV="BEHIND=start UPDATE_FAIL=1"
+landing 7
+assert_eq "refuses when it cannot bring the pull request up to date" "$RC" 1
+assert_has "and says so" "$OUT" "could not bring me/app#7 up to date"
+assert_no "merging nothing" "$LOG" "pr merge"
+LAND_ENV="HEAD_MOVED=1"
+landing 7
+assert_no "a refused merge does not guess at the reason" "$OUT" "a push after the checks passed?"
+
+# A repository that deletes merged branches itself leaves nothing for land to
+# delete; that is not a failure worth reporting.
+LAND_ENV="DELETE_FAIL=1 REF_GONE=1"
+landing 7
+assert_eq "lands when GitHub already deleted the branch" "$RC" 0
+assert_no "without claiming it could not delete it" "$OUT" "could not delete"
+LAND_ENV="DELETE_FAIL=1"
+landing 7
+assert_has "but says so when the branch is really still there" "$OUT" "could not delete branch feature"
+LAND_ENV="DELETE_FAIL=1 REF_FORBIDDEN=1"
+landing 7
+assert_has "or when it cannot tell, rather than reading an error as gone" "$OUT" "could not delete branch feature"
 
 LAND_ENV="CHECKS=late"
 landing 7
