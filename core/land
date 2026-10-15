@@ -4,9 +4,15 @@
 # Vendored by norma: edit it upstream, not here.
 #
 #   scripts/harness/land <pr> [<owner>/<repo>#<pr>]
+#   scripts/harness/land --landing      prints who lands: owner or agent
 #
 # Who may run it is the project's decision, recorded in docs/harness/mandatory-steps.md
-# step 9, *Landing*: the owner only, or the agent that opened the pull request.
+# step 9 as one line, `Landing: owner` or `Landing: agent`. --landing is how an agent
+# reads it, so that nobody interprets prose at the moment they want to merge: it
+# prints `agent` only for exactly one line that is exactly `Landing: agent`, at the
+# start of a line and outside any code block. Everything else - no line, another
+# word, another case, anything after the word, two lines - prints `owner`, and says
+# on stderr when a line was there but could not be read.
 #
 # It merges exactly the commit that went green - a push after the checks passed makes
 # the merge refuse rather than land code nobody tested - and stops with nothing merged
@@ -20,7 +26,23 @@
 #   HARNESS_LAND_METHOD   merge (the default), squash or rebase.
 set -eu
 
-usage() { echo "usage: scripts/harness/land <pr> [<owner>/<repo>#<pr>]" >&2; exit 2; }
+usage() { echo "usage: scripts/harness/land <pr> [<owner>/<repo>#<pr>] | --landing" >&2; exit 2; }
+
+if [ "${1:-}" = --landing ]; then
+  [ $# -eq 1 ] || usage
+  steps="$(git rev-parse --show-toplevel)/docs/harness/mandatory-steps.md"
+  [ -f "$steps" ] || { echo owner; exit 0; }
+  awk '
+    /^(```|~~~)/ { fence = !fence; next }
+    !fence && /^Landing:/ { n++; line = $0 }
+    END {
+      if (n == 1 && line == "Landing: agent") { print "agent"; exit }
+      print "owner"
+      if (n > 1) print "land: " n " Landing: lines in docs/harness/mandatory-steps.md - reading it as owner" > "/dev/stderr"
+      else if (n == 1 && line != "Landing: owner") print "land: cannot read \"" line "\" - reading it as owner" > "/dev/stderr"
+    }' "$steps"
+  exit 0
+fi
 [ $# -ge 1 ] && [ $# -le 2 ] || usage
 PR=$1
 case "$PR" in ''|*[!0-9]*) usage ;; esac

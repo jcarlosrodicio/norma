@@ -1289,6 +1289,43 @@ assert_has "reads the repository from a remote with a trailing slash" "$LOG" "pr
 done_repo
 rm -rf "$FAKE_BIN"
 
+# Who lands is read by this, not by an agent interpreting the loop's prose at the
+# moment it wants to merge. Only one exact line says agent; every doubt is owner.
+new_repo; with_land
+who() {
+  set +e
+  OUT=$(sh scripts/harness/land --landing 2>"$R/who.err"); RC=$?
+  ERR=$(cat "$R/who.err")
+  set -e
+}
+who
+assert_eq "--landing reads a project with no loop as owner" "$OUT" "owner"
+mkdir -p docs/harness
+landing_doc() { printf '# Loop\n\n%s\n' "$1" > docs/harness/mandatory-steps.md; }
+landing_doc 'Landing: owner'; who
+assert_eq "reads Landing: owner as owner" "$OUT" "owner"
+assert_eq "without complaint" "$ERR" ""
+landing_doc 'Landing: agent'; who
+assert_eq "reads exactly Landing: agent as agent" "$OUT" "agent"
+assert_eq "and exits 0 either way" "$RC" "0"
+landing_doc 'No such line here.'; who
+assert_eq "reads a loop without the line as owner" "$OUT" "owner"
+for odd in 'Landing: Agent' 'Landing: agent # maybe' 'Landing: agent ' 'Landing:agent' 'Landing: agents'; do
+  landing_doc "$odd"; who
+  assert_eq "reads '$odd' as owner" "$OUT" "owner"
+  assert_has "and says it could not read it: '$odd'" "$ERR" "cannot read"
+done
+printf 'Landing: agent\nLanding: agent\n' > docs/harness/mandatory-steps.md; who
+assert_eq "reads two lines as owner, even when both say agent" "$OUT" "owner"
+assert_has "and says why" "$ERR" "2 Landing: lines"
+printf 'Landing: owner\n\n```\nLanding: agent\n```\n' > docs/harness/mandatory-steps.md; who
+assert_eq "ignores a Landing line inside a code block" "$OUT" "owner"
+printf '`Landing: agent` means the agent lands.\n> Landing: agent\nLanding: owner\n' > docs/harness/mandatory-steps.md; who
+assert_eq "and one that is quoted or mentioned in prose" "$OUT" "owner"
+set +e; OUT=$(sh scripts/harness/land --landing extra 2>&1); RC=$?; set -e
+assert_eq "--landing takes nothing else" "$RC" "2"
+done_repo
+
 # ---------------------------------------------------------- the installer ----
 echo ""
 echo "norma install"

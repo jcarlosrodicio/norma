@@ -362,5 +362,9 @@ working outside a repository sees.
 
 Every refusal before the first merge leaves both pull requests as they were.
 
+`land --landing` refuses nothing but extra arguments: whatever it cannot read is
+`owner`, said on stderr, because a reader that fails closed is the only kind an
+agent about to merge should be handed.
+
 Soften none of these without reading the reason and replacing it with something
 stronger.
