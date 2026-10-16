@@ -361,7 +361,11 @@ The decisions inside it:
   for. A `!` negation is refused rather than half-honoured. The file list comes
   from the paginated API, and a list that cannot be read refuses, as does a
   pattern the translation cannot turn into a valid expression: silence or an
-  error is never "nothing CI runs on".
+  error is never "nothing CI runs on". A pull request on which no check appears
+  in the two minutes `land` waits for the first one is told apart from red CI:
+  it says no checks appeared and names `HARNESS_LAND_NO_CI`, because "CI is not
+  green" sent agents looking for a failure on a documentation pull request
+  whose checks were never coming.
 - **Green twice.** `gh pr checks --watch` sees the checks that exist when it
   starts, and a slower workflow can register its own after a fast one went green.
   So after the watch passes, `land` looks again thirty seconds later and watches
@@ -373,6 +377,20 @@ The decisions inside it:
   says exactly that. The companion is pinned but **not CI-gated**: it is the
   documentation that goes with the change, and the repositories that hold it
   often run no CI at all, where "no checks is not green" would refuse every one.
+- **The companion merges the way its own repository takes.** `HARNESS_LAND_METHOD`
+  is this project's decision about this project's repository; the companion's
+  repository has its own, and a documentation site that keeps a linear history
+  refuses a merge commit. So before anything merges, `land` reads which methods
+  the companion's repository allows and which the rules on its base leave - a
+  linear history removes `merge`, a ruleset's allowed methods narrow the rest -
+  and takes `HARNESS_LAND_METHOD` if it is among them, otherwise the first of
+  squash, rebase and merge that is. None left, or a repository it cannot read,
+  refuses with nothing merged. Rules that cannot be read count as none: a private
+  repository on the free plan answers 403 because it has none, and if that
+  reading is wrong the companion's merge is refused, no worse than not asking.
+  Classic branch protection is not read - it needs admin rights to read - and
+  neither is a merge queue's method, so either is still found only at the merge.
+  The method is said when it is not the project's.
 - **The token of the gh account named like the repository's owner**, when there
   is one and neither `GH_TOKEN` nor `GITHUB_TOKEN` was given. A machine with a
   work and a personal account otherwise asks GitHub as the wrong one and gets a
@@ -402,7 +420,7 @@ The decisions inside it:
   up to date - in a repository that requires it, a moved base stops `land` with the
   first pull request merged, saying so; and an update made with a token that
   GitHub does not let start workflows (`GITHUB_TOKEN`, a bot) gets no CI, which
-  ends in "CI is not green" after the discovery wait - closed, but slow.
+  ends in "no checks appeared" after the discovery wait - closed, but slow.
 
 What it does not do: resolve a conflict, retry a red check, or decide anything a
 human or the loop should. Those belong to whoever runs it. And one limit it
