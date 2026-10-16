@@ -1,7 +1,8 @@
 ---
 name: auto-run-task
 description: Use to run a whole roadmap phase end to end with nobody watching - from the phase line to a pushed branch, an open pull request and a green CI, deciding the ambiguities itself and recording every decision it took. Use it when the human hands over a phase and leaves, or says "run phase N", "do it autonomously", "without asking me". Use run-task instead whenever the human wants to see the spec and the task list before code exists.
-version: 1.0.0
+metadata:
+  version: "1.0.0"
 ---
 
 # auto-run-task

@@ -1701,6 +1701,18 @@ for sk in "$HOME_DIR"/skills/*/; do
   fi
 done
 
+# The Agent Skills specification allows six top-level frontmatter fields, and its
+# reference validator rejects a skill with any other; a version or an author goes
+# under metadata instead.
+for sk in "$HOME_DIR"/skills/*/; do
+  [ -f "$sk/SKILL.md" ] || continue
+  sname=$(basename "$sk")
+  extra=$(awk 'NR == 1 && $0 == "---" { f = 1; next } f && $0 == "---" { exit } f' "$sk/SKILL.md" |
+    sed -n 's/^\([A-Za-z_-]*\):.*/\1/p' |
+    grep -vxE 'name|description|license|compatibility|metadata|allowed-tools' || true)
+  assert_eq "$sname uses only the frontmatter fields the spec allows" "$extra" ""
+done
+
 # Everything VENDORED_SKILLS names must exist, or install ships fewer skills than
 # doctor counts from the same list.
 for vs in $(sed -n 's/^VENDORED_SKILLS="\(.*\)"$/\1/p' "$HOME_DIR/bin/norma"); do

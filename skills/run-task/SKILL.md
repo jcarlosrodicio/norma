@@ -1,7 +1,8 @@
 ---
 name: run-task
 description: Use to run a complete implementation task end to end - a roadmap phase item, a feature, a fix or a refactor - from a vague request to code that is verified and waiting for human review. Invoke it whenever the user asks for work to be built rather than just discussed, and follow it in order without skipping stages. It stops three times for the human; use auto-run-task instead when they hand over a whole phase and want it delivered to a pull request without being asked anything.
-version: 1.0.0
+metadata:
+  version: "1.0.0"
 ---
 
 # run-task

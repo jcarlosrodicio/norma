@@ -14,10 +14,15 @@ any of them.
   it is vendored into keeps the notice.
 - **`skills/using-git-worktrees/`** - from
   [`obra/superpowers`](https://github.com/obra/superpowers), MIT License,
-  Copyright (c) 2025 Jesse Vincent, in a copy modified by LIDR.co (the `author`
-  field in its front matter). Its license travels with it as
+  Copyright (c) 2025 Jesse Vincent, in a copy modified by LIDR.co (the
+  `metadata.author` field in its front matter). Its license travels with it as
   [`skills/using-git-worktrees/LICENSE`](skills/using-git-worktrees/LICENSE).
 - **`skills/code-auditing/`** - from LIDR.co workshop material.
+
+The front matter of `using-git-worktrees` and `code-auditing` is edited locally:
+their top-level `author` and `version` fields moved, unchanged, under `metadata`,
+the only place the [Agent Skills specification](https://agentskills.io/specification)
+allows them.
 
 ## Adapted ideas
 
