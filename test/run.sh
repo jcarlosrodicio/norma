@@ -1103,12 +1103,20 @@ case "$1 $2" in
       [ $n -eq 2 ] && exit 8
       exit 0
     fi
+    # none: gh's own words for a pull request no workflow ran on
+    [ "$CHECKS" = none ] && { echo "no checks reported on the 'feature' branch" >&2; exit 1; }
     case "$*" in *--watch*) exit 1 ;; esac
     [ "${CHECKS:-pass}" = pending ] && exit 8
     exit 1 ;;
   "pr list") [ -z "${LIST_FAIL:-}" ] || exit 1; [ -z "${CHILDREN:-}" ] || echo "$CHILDREN" | tr , '\n' ;;
   "pr edit") [ -z "${EDIT_FAIL:-}" ] || exit 1 ;;
   "api -X") [ -z "${DELETE_FAIL:-}" ] || exit 1 ;;
+  # the merge methods the companion's repository allows, and those the rules on
+  # its base leave (CO_RULES_FAIL: the 403 of a private repository on the free plan)
+  "api repos/me/site") [ -z "${CO_REPO_FAIL:-}" ] || exit 1; echo "${CO_ALLOWED-merge squash rebase}" ;;
+  "api repos/me/site/rules/branches/"*)
+    [ -z "${CO_RULES_FAIL:-}" ] || { echo "gh: Upgrade to GitHub Pro (HTTP 403)" >&2; exit 1; }
+    echo "${CO_RULED-merge squash rebase}" ;;
   "api repos/"*)
     [ -z "${REF_GONE:-}" ] || { echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
     [ -z "${REF_FORBIDDEN:-}" ] || { echo "gh: Forbidden (HTTP 403)" >&2; exit 1; } ;;
@@ -1118,6 +1126,7 @@ case "$1 $2" in
     echo $(( $(cat "$FAKE_LOG.updated" 2>/dev/null || echo 0) + 1 )) > "$FAKE_LOG.updated" ;;
   "pr merge")
     case "$*" in *--match-head-commit*) [ -z "${HEAD_MOVED:-}" ] || exit 1 ;; esac
+    case "$3" in 3) [ -z "${CO_MERGE_FAIL:-}" ] || exit 1 ;; esac
     case "${BEHIND:-}" in
       start) [ -e "$FAKE_LOG.updated" ] || exit 1 ;;
       late) [ -e "$FAKE_LOG.tried" ] || { touch "$FAKE_LOG.tried"; exit 1; } ;;
@@ -1302,6 +1311,11 @@ LAND_ENV="CHECKS=none"
 landing 7
 assert_eq "refuses a pull request that never gets checks" "$RC" 1
 assert_no "rather than merging it untested" "$LOG" "pr merge"
+# Told apart from red CI: "not green" sent agents looking for a failure on a
+# documentation pull request whose checks were never going to come.
+assert_has "saying no checks appeared" "$OUT" "no checks appeared on me/app#7 in two minutes - nothing merged"
+assert_has "and where the paths CI skips belong" "$OUT" "HARNESS_LAND_NO_CI"
+assert_no "not that CI is red" "$OUT" "CI is not green"
 
 LAND_ENV="CHECKS=pending"
 landing 7
@@ -1315,11 +1329,50 @@ assert_has "and says nothing was merged" "$OUT" "nothing merged"
 LAND_ENV=""
 landing 7 me/site#3
 assert_eq "lands the companion after the pull request" "$RC" 0
+assert_no "saying nothing about a method it shares" "$OUT" "will merge with"
 assert_has "pinned to the head it had when land started" "$LOG" \
   "pr merge 3 -R me/site --merge --match-head-commit abcdef0123456789"
 main_at=$(grep -n "pr merge 7 " "$R/gh.log" | cut -d: -f1)
 co_at=$(grep -n "pr merge 3 -R me/site" "$R/gh.log" | cut -d: -f1)
 assert_eq "in that order" "$([ -n "$main_at" ] && [ -n "$co_at" ] && [ "$main_at" -lt "$co_at" ] && echo yes)" "yes"
+
+# The companion's repository decides how it merges: a documentation site that keeps
+# a linear history refuses the merge commit this project lands with.
+LAND_ENV="CO_RULED=squash"
+landing 7 me/site#3
+assert_eq "lands a companion whose rules refuse a merge commit" "$RC" 0
+assert_has "with a method its rules take" "$LOG" "pr merge 3 -R me/site --squash --match-head-commit abcdef0123456789"
+assert_has "while the pull request keeps the project's own" "$LOG" "pr merge 7 -R me/app --merge"
+assert_has "and says which method the companion gets" "$OUT" "me/site does not take merge - me/site#3 will merge with squash"
+LAND_ENV="CO_ALLOWED=squash"
+landing 7 me/site#3
+assert_has "and a method its repository allows" "$LOG" "pr merge 3 -R me/site --squash"
+echo 'HARNESS_LAND_METHOD=rebase' >> scripts/harness/config.sh
+LAND_ENV="CO_ALLOWED=merge"
+landing 7 me/site#3
+assert_has "falling back to merge when that is all it takes" "$LOG" "pr merge 3 -R me/site --merge"
+LAND_ENV=""
+landing 7 me/site#3
+assert_has "and taking the project's method when it can" "$LOG" "pr merge 3 -R me/site --rebase"
+sed -i.bak '/HARNESS_LAND_METHOD/d' scripts/harness/config.sh
+LAND_ENV="CO_RULES_FAIL=1"
+landing 7 me/site#3
+assert_eq "reads rules it cannot get as no rules" "$RC" 0
+assert_has "and merges with the project's method" "$LOG" "pr merge 3 -R me/site --merge"
+LAND_ENV="CO_ALLOWED=merge CO_RULED=squash"
+landing 7 me/site#3
+assert_eq "refuses a companion no method can merge" "$RC" 1
+assert_has "saying so" "$OUT" "me/site takes none of merge, squash or rebase"
+assert_no "before merging either of them" "$LOG" "pr merge"
+LAND_ENV="CO_REPO_FAIL=1"
+landing 7 me/site#3
+assert_eq "refuses when it cannot read how the companion merges" "$RC" 1
+assert_no "before merging either of them, too" "$LOG" "pr merge"
+LAND_ENV="CO_MERGE_FAIL=1"
+landing 7 me/site#3
+assert_eq "stops when GitHub refuses the companion" "$RC" 1
+assert_has "saying which half merged" "$OUT" "me/app#7 merged, but GitHub refused to merge me/site#3"
+assert_no "without guessing why" "$OUT" "a push to it"
 
 LAND_ENV="CO_MERGEABLE=CONFLICTING"
 landing 7 me/site#3

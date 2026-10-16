@@ -356,14 +356,15 @@ working outside a repository sees.
 | `HARNESS_LAND_METHOD` other than `merge`, `squash` or `rebase` | 2 | Decided before GitHub is asked anything. |
 | A `!` negation in `HARNESS_LAND_NO_CI` | 2 | Half-honouring it could skip the wait for a path CI does run on. |
 | The pull request or the companion not open | 1 | Checked for both before anything merges, so a closed companion never leaves half a delivery. |
+| The companion's repository takes no merge method its rules leave, or how it merges cannot be read | 1 | Checked before anything merges; the companion is merged the way its own repository takes, which may not be `HARNESS_LAND_METHOD`. |
 | The pull request does not merge cleanly, or GitHub never settles whether it does | 1 | A conflicting pull request gets no CI run, so there is nothing to wait for. Bring the base branch in and run it again. |
 | A head commit that cannot be read | 1 | Every merge is pinned to it; without it the merge would be unpinned. |
 | The pull request's files cannot be listed, or `HARNESS_LAND_NO_CI` holds a pattern that cannot be read | 1 | An error would otherwise read as "touches nothing CI runs on" and skip the wait. |
-| CI red, or no check at all on a pull request that touches a path CI runs on | 1 | No check is not a pass. A pull request touching only `HARNESS_LAND_NO_CI` paths is the one exception, because its checks never come. |
+| CI red, or no check at all on a pull request that touches a path CI runs on | 1 | No check is not a pass. A pull request touching only `HARNESS_LAND_NO_CI` paths is the one exception, because its checks never come. The two are said differently: no checks names `HARNESS_LAND_NO_CI`, so a documentation pull request is not mistaken for a red one. |
 | New checks still appearing after five rounds of green | 1 | Something keeps registering workflows; green is not settled. |
 | GitHub refuses the merge - the head moved after the checks passed, among other reasons | 1 | The merge is pinned to the commit that went green; a later push is code no check ran on. |
 | The pull request cannot be brought up to date with its base, or is still behind after three updates | 1 | Only a repository that merges up-to-date branches asks for it; a base moving faster than CI is a race `land` would never win. |
-| The companion does not merge cleanly, or its merge fails - a push to it since `land` started among the reasons | 1 | The first pull request is already merged and the message says so, so whoever reads it knows exactly which half is missing. |
+| The companion does not merge cleanly, or GitHub refuses its merge - with its own message, not a guess at why | 1 | The first pull request is already merged and the message says so, so whoever reads it knows exactly which half is missing. |
 
 Every refusal before the first merge leaves both pull requests as they were. After
 a merge, a branch that something still depends on is kept rather than deleted -
