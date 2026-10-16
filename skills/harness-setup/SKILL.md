@@ -1,7 +1,8 @@
 ---
 name: harness-setup
 description: Use to install or finish setting up the task harness in a repository - it detects the stack, interviews the human for every decision the installer cannot infer, and writes the gate config, the mandatory loop, the architecture adoption map and the index. Use it on a repository with no harness, and on one where docs/harness still contains TODO(harness) markers.
-version: 1.0.0
+metadata:
+  version: "1.0.0"
 ---
 
 # harness-setup

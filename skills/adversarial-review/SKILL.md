@@ -1,7 +1,8 @@
 ---
 name: adversarial-review
 description: Use after an implementation passes its own tests and verification, before committing or archiving a change - an independent red-team pass that assumes the work is wrong and tries to break it. Also use when the user asks for a devil's advocate, red-team or independent review.
-version: 1.3.0
+metadata:
+  version: "1.3.0"
 ---
 
 # adversarial-review

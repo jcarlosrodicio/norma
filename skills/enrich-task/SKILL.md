@@ -1,7 +1,8 @@
 ---
 name: enrich-task
 description: Use before planning any feature, fix or refactor when the request is a short roadmap line, a phase item, a screenshot or a one-paragraph idea - turns it into an implementation-ready spec with acceptance criteria, edge cases and open questions. Run this before openspec new/ff.
-version: 1.0.0
+metadata:
+  version: "1.0.0"
 ---
 
 # enrich-task

@@ -118,6 +118,15 @@ the conditions, the phrasings a user would actually type, and the boundary again
 neighbouring skills. `writing-skills/SKILL.md` covers this properly - read it
 before adding or renaming anything.
 
+The frontmatter itself follows the
+[Agent Skills specification](https://agentskills.io/specification), which allows
+six top-level fields: `name`, `description`, `license`, `compatibility`,
+`metadata` and `allowed-tools`. Anything else - a skill's own `version`, an
+`author` - goes under `metadata` as a string, so `version: "1.0.0"` is quoted.
+Nothing in `bin/` or `core/` reads those values. The reference validator
+(`uvx --from skills-ref agentskills validate skills/<name>`) rejects any other
+top-level field, and `test/run.sh` checks the same list for every skill.
+
 ## Adding or changing a skill
 
 1. Write or edit it under `skills/<name>/SKILL.md`.

@@ -1,7 +1,8 @@
 ---
 name: code-auditing
 description: Use when auditing code quality or security - a systematic pass over a module, package or whole codebase following OWASP Top 10 and NIST, including dead-code detection. Use for security reviews, pre-release audits and 'is this code safe/healthy' questions, not for reviewing a single change (use adversarial-review for that).
-version: 1.0.0
+metadata:
+  version: "1.0.0"
 ---
 # Code Auditing Skill
 

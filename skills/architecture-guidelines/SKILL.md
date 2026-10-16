@@ -1,7 +1,8 @@
 ---
 name: architecture-guidelines
 description: Use before writing or reviewing any production code - the shared architectural criteria (layering, domain purity, naming, testing, migrations) that apply across projects. Read it during planning and implementation, and use it as a review dimension. Consult the backend reference for services, APIs and CLIs, and the frontend reference for client applications.
-version: 1.0.0
+metadata:
+  version: "1.0.0"
 ---
 
 # architecture-guidelines

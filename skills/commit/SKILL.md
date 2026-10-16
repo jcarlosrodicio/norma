@@ -1,7 +1,8 @@
 ---
 name: commit
 description: Use when the user asks to commit, to create a pull request, or when a change is verified and ready to land - produces atomic commits that stage only the files belonging to the change, with a message and PR body written from the actual diff.
-version: 1.0.0
+metadata:
+  version: "1.0.0"
 ---
 
 # commit

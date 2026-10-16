@@ -1,7 +1,8 @@
 ---
 name: start-project
 description: Use to start a project that does not exist yet - it talks with the human until it understands what they want to build, well enough to write the founding documents and a roadmap of phases of at most a day each, and then creates the repository and installs the harness so the first phase runs through the normal loop. Use it when the request is "I want to build X" and there is no repository, or an empty one. Not for a repository that already has code - that is harness-setup.
-version: 2.0.0
+metadata:
+  version: "2.0.0"
 ---
 
 # start-project
