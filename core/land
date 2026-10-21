@@ -445,10 +445,12 @@ merge_pinned() {
   fi
   # A repository that deletes merged branches itself also retargets what was
   # stacked on them, racing this edit: one that fails is moved if it already
-  # points at the base, and kept only if it does not.
+  # points at the base, and kept only if it does not. Through the REST API: gh pr
+  # edit fails on a deprecated GraphQL field in the gh Ubuntu ships, even when the
+  # edit went through.
   kept=""
   for c in $children; do
-    gh pr edit "$c" -R "$2" --base "$base_ref" >/dev/null 2>&1 \
+    gh api -X PATCH "repos/$2/pulls/$c" -f base="$base_ref" >/dev/null 2>&1 \
       || [ "$(field "$c" "$2" baseRefName 2>/dev/null || true)" = "$base_ref" ] \
       || kept="$kept #$c"
   done
@@ -484,7 +486,10 @@ while :; do
     [ $updates -lt 3 ] || fail "$REPO#$PR is still behind its base after three updates - nothing merged"
     updates=$((updates + 1))
     say "$REPO#$PR is behind its base, and this repository merges only branches that are up to date - updating it"
-    gh pr update-branch "$PR" -R "$REPO" >/dev/null \
+    # Through the REST API - gh pr update-branch is missing from older gh, the one
+    # Ubuntu ships among them - and only from the head that was pinned, so a push
+    # in between makes GitHub refuse rather than update code nobody pinned.
+    gh api -X PUT "repos/$REPO/pulls/$PR/update-branch" -f expected_head_sha="$HEAD" >/dev/null \
       || fail "could not bring $REPO#$PR up to date with its base - nothing merged"
     # The update commit takes a moment to become the head GitHub reports; until it
     # does, the old sha would be pinned while CI runs on the new one.

@@ -1119,11 +1119,21 @@ case "$1 $2" in
     [ "${CHECKS:-pass}" = pending ] && exit 8
     exit 1 ;;
   "pr list") [ -z "${LIST_FAIL:-}" ] || exit 1; [ -z "${CHILDREN:-}" ] || echo "$CHILDREN" | tr , '\n' ;;
-  "pr edit") [ -z "${EDIT_FAIL:-}" ] || exit 1 ;;
-  # POST is a commit status - a review verdict - and anything else a branch delete
+  # gh 2.46, the one Ubuntu ships: pr update-branch does not exist, and pr edit
+  # fails on a deprecated GraphQL field even when it applied the change. land goes
+  # through the REST API for both, which no gh version changes.
+  "pr edit") echo "GraphQL: Projects (classic) is being deprecated (repository.pullRequest.projectCards)" >&2; exit 1 ;;
+  "pr update-branch") echo 'unknown command "update-branch" for "gh pr"' >&2; exit 1 ;;
+  # POST is a commit status - a review verdict -, PUT a pull request brought up to
+  # date, PATCH one moved onto another base, and DELETE a branch deleted
   "api -X")
     case "$3" in
       POST) [ -z "${STATUS_FAIL:-}" ] || exit 1 ;;
+      PUT)
+        [ -z "${UPDATE_FAIL:-}" ] || exit 1
+        # every update is a new commit, so a new head
+        echo $(( $(cat "$FAKE_LOG.updated" 2>/dev/null || echo 0) + 1 )) > "$FAKE_LOG.updated" ;;
+      PATCH) [ -z "${EDIT_FAIL:-}" ] || exit 1 ;;
       *) [ -z "${DELETE_FAIL:-}" ] || exit 1 ;;
     esac ;;
   # the merge methods the companion's repository allows, and those the rules on
@@ -1151,10 +1161,6 @@ case "$1 $2" in
   "api repos/"*)
     [ -z "${REF_GONE:-}" ] || { echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
     [ -z "${REF_FORBIDDEN:-}" ] || { echo "gh: Forbidden (HTTP 403)" >&2; exit 1; } ;;
-  "pr update-branch")
-    [ -z "${UPDATE_FAIL:-}" ] || exit 1
-    # every update is a new commit, so a new head
-    echo $(( $(cat "$FAKE_LOG.updated" 2>/dev/null || echo 0) + 1 )) > "$FAKE_LOG.updated" ;;
   "pr merge")
     case "$*" in *--match-head-commit*) [ -z "${HEAD_MOVED:-}" ] || exit 1 ;; esac
     case "$3" in 3) [ -z "${CO_MERGE_FAIL:-}" ] || exit 1 ;; esac
@@ -1230,9 +1236,9 @@ assert_has "deletes the merged branch" "$LOG" "api -X DELETE repos/me/app/git/re
 LAND_ENV="CHILDREN=8,9"
 landing 7
 assert_eq "lands the bottom of a stack" "$RC" 0
-assert_has "moving the pull requests stacked on it onto its base" "$LOG" "pr edit 8 -R me/app --base master"
-assert_has "every one of them" "$LOG" "pr edit 9 -R me/app --base master"
-edit_at=$(grep -n "pr edit 9" "$R/gh.log" | cut -d: -f1)
+assert_has "moving the pull requests stacked on it onto its base" "$LOG" "api -X PATCH repos/me/app/pulls/8 -f base=master"
+assert_has "every one of them" "$LOG" "api -X PATCH repos/me/app/pulls/9 -f base=master"
+edit_at=$(grep -n "pulls/9 -f base=master" "$R/gh.log" | cut -d: -f1)
 del_at=$(grep -n "api -X DELETE" "$R/gh.log" | cut -d: -f1)
 assert_eq "before deleting the branch they were based on" \
   "$([ -n "$edit_at" ] && [ -n "$del_at" ] && [ "$edit_at" -lt "$del_at" ] && echo yes)" "yes"
@@ -1261,10 +1267,10 @@ assert_no "nor that the delete failed" "$OUT" "could not delete"
 LAND_ENV="BEHIND=start"
 landing 7
 assert_eq "lands a pull request that is behind its base" "$RC" 0
-assert_has "after bringing it up to date" "$LOG" "pr update-branch 7 -R me/app"
+assert_has "after bringing it up to date" "$LOG" "api -X PUT repos/me/app/pulls/7/update-branch -f expected_head_sha=abcdef0123456789"
 assert_has "and saying why" "$OUT" "merges only branches that are up to date"
 assert_has "pinned to the head the update produced" "$LOG" "pr merge 7 -R me/app --merge --match-head-commit 1234567890abcde1"
-up_at=$(grep -n "pr update-branch" "$R/gh.log" | head -1 | cut -d: -f1)
+up_at=$(grep -n "pulls/7/update-branch" "$R/gh.log" | head -1 | cut -d: -f1)
 # The fake's checks do not know which sha they are for, so "CI for the new head"
 # is proven by order: the first watch comes after the update.
 watch_at=$(grep -n "pr checks 7 -R me/app --watch" "$R/gh.log" | head -1 | cut -d: -f1)
@@ -1277,13 +1283,13 @@ assert_has "and pins the new one, not the one read too early" "$LOG" "--match-he
 LAND_ENV="BEHIND=late"
 landing 7
 assert_eq "lands one that fell behind while its CI ran" "$RC" 0
-assert_has "updating it after the refused merge" "$LOG" "pr update-branch 7 -R me/app"
+assert_has "updating it after the refused merge" "$LOG" "api -X PUT repos/me/app/pulls/7/update-branch -f expected_head_sha=abcdef0123456789"
 assert_has "and merging the updated head" "$LOG" "--match-head-commit 1234567890abcde1"
 LAND_ENV="BEHIND=always"
 landing 7
 assert_eq "gives up on a base that never stops moving" "$RC" 1
 assert_has "saying so" "$OUT" "still behind its base"
-assert_eq "after three updates" "$(grep -c "pr update-branch" "$R/gh.log")" "3"
+assert_eq "after three updates" "$(grep -c "pulls/7/update-branch" "$R/gh.log")" "3"
 LAND_ENV="BEHIND=start UPDATE_FAIL=1"
 landing 7
 assert_eq "refuses when it cannot bring the pull request up to date" "$RC" 1
