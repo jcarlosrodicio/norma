@@ -244,6 +244,12 @@ it - is `owner`. Changing it is the owner's decision, merged like any other chan
   guard finds the bar lowered. `land --landing <pr>` says so, `land` refuses it,
   and the owner lands it with `scripts/harness/land --owner <pr>`.
 
+Either way, with `HARNESS_LAND_REVIEW=required` in `scripts/harness/config.sh`,
+`land` merges only a head carrying a passing review verdict - the commit status
+`norma/review`, posted with `scripts/harness/land --review <pr> blocking=<n>
+unresolved=<n>` from a checkout at that head - a verdict the review reports, tied
+to that commit. A push after it needs a new review.
+
 Either way, `land` needs the paths CI ignores in `HARNESS_LAND_NO_CI`
 (`scripts/harness/config.sh`) when the workflow has a `paths-ignore`: without them a
 pull request that touches only those paths waits for checks that never come.

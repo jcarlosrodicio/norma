@@ -229,6 +229,14 @@ nothing and exits 0, so it is safe to run anywhere. Run it again after the fixes
 adding `unresolved=<n>`, because the review the human reads is the one that ran
 last.
 
+Once the change has a pull request, its verdict also goes **on the commit**:
+`scripts/harness/land --review <pr> blocking=<n> unresolved=<n>`, the same counts,
+from a checkout at the pull request's head. It posts the commit status
+`norma/review` - success only with nothing blocking and nothing unresolved - and a
+project that sets `HARNESS_LAND_REVIEW=required` lands no head without a passing
+one. The event and the report say what the review found; the status says which
+commit it found it in, which is the only thing a merge can check.
+
 ---
 
 The coverage contract of stage 1 and the two grounds of stage 4 are adapted from

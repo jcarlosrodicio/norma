@@ -315,11 +315,16 @@ deploy. When the user approves, and only then, follow
 `.agents/skills/commit/SKILL.md`.
 
 The merge is the one of those that can follow without asking again, and only
-this way: if the approval included opening a pull request, run
+this way: if the approval included opening a pull request, first post the last
+review's verdict on its head - `scripts/harness/land --review <pr> blocking=<n>
+unresolved=<n>`, from this branch's checkout at the pushed commit - because a
+project with `HARNESS_LAND_REVIEW=required` lands nothing without it, and a commit
+pushed after it needs its diff reviewed and the verdict posted again. Then run
 `scripts/harness/land --landing <pr>` from this branch's checkout at the pushed
 head. It reads the project's `Landing:` line in `docs/harness/mandatory-steps.md`
 step 9, and under `agent` it also asks the change: a pull request touching the
-harness or a path in `HARNESS_LAND_OWNER_PATHS`, or whose floor guard finds the bar
+harness, what an agent is told or may reach (`.agents/`, `.claude/`, `AGENTS.md`,
+`CLAUDE.md`, MCP servers) or a path in `HARNESS_LAND_OWNER_PATHS`, or whose floor guard finds the bar
 lowered, is the owner's. `owner` - which includes no line, or one it cannot read -
 leaves the pull request open, with `scripts/harness/land <pr> [<owner>/<repo>#<n>]`
 ready to paste, or `land --owner <pr> ...` when the line said `agent` and the change

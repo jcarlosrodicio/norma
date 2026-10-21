@@ -5,6 +5,8 @@
 #
 #   scripts/harness/land [--owner] <pr> [<owner>/<repo>#<pr>]
 #   scripts/harness/land --landing [<pr>]   prints who lands: owner or agent
+#   scripts/harness/land --review <pr> blocking=<n> unresolved=<n>
+#                                           posts a review's verdict on the head
 #
 # Who may run it is the project's decision, recorded in docs/harness/mandatory-steps.md
 # step 9 as one line under `### Landing`: `Landing: owner` or `Landing: agent`.
@@ -18,10 +20,17 @@
 # change sets the bar, not whoever wrote it: one that touches the harness itself -
 # scripts/harness/, .githooks/, docs/harness/, .github/workflows/ - or what an agent
 # is told or may reach - .agents/, .claude/, AGENTS.md, CLAUDE.md, MCP servers and
-# other agents' settings - or a path in HARNESS_LAND_OWNER_PATHS, or whose floor guard finds the bar lowered
-# or cannot check it. `--landing <pr>` prints owner for it, and land refuses to
+# other agents' settings - or a path in HARNESS_LAND_OWNER_PATHS, or whose floor
+# guard finds the bar lowered or cannot check it. `--landing <pr>` prints owner for it, and land refuses to
 # merge it without --owner, which the owner passes - and an agent only when the
 # owner said so for that pull request.
+#
+# A review's verdict lives on one commit: `--review` posts it as the
+# commit status norma/review on the pull request's head - success when nothing
+# blocks and nothing is unresolved, failure otherwise - and only from a checkout at
+# that head with nothing uncommitted, the code that was reviewed. A push makes it
+# a head with no verdict. With HARNESS_LAND_REVIEW=required, land merges only a
+# head whose norma/review is success, whoever runs it and whatever the Landing line.
 #
 # It merges exactly the commit that went green - a push after the checks passed makes
 # the merge refuse rather than land code nobody tested - and stops with nothing merged
@@ -36,12 +45,15 @@
 #   HARNESS_LAND_OWNER_PATHS  patterns, in the same syntax, of the paths only the
 #                         owner lands under Landing: agent - added to the harness's
 #                         own, never replacing them. Unset: the harness's alone.
+#   HARNESS_LAND_REVIEW   required, or unset: whether a passing norma/review on the
+#                         head is a condition of the merge. A failing one stops it
+#                         either way, as any red check does.
 #   HARNESS_LAND_METHOD   merge (the default), squash or rebase. The companion takes
 #                         it too when its repository allows it, and otherwise the
 #                         first of squash, rebase and merge that it does.
 set -eu
 
-usage() { echo "usage: scripts/harness/land [--owner] <pr> [<owner>/<repo>#<pr>] | --landing [<pr>]" >&2; exit 2; }
+usage() { echo "usage: scripts/harness/land [--owner] <pr> [<owner>/<repo>#<pr>] | --landing [<pr>] | --review <pr> blocking=<n> unresolved=<n>" >&2; exit 2; }
 
 # The default branch as origin has it - never the working tree, which the branch
 # being merged could have changed. Empty when origin names none.
@@ -86,6 +98,7 @@ landing_line() {
 
 ASKING=""
 AS_OWNER=""
+REVIEWING=""
 case "${1:-}" in
   --landing)
     [ $# -le 2 ] || usage
@@ -105,6 +118,20 @@ case "${1:-}" in
     [ "$who" = agent ] || { echo owner; exit 0; }
     ASKING=1; shift ;;
   --owner) AS_OWNER=1; shift ;;
+  --review)
+    [ $# -eq 4 ] || usage
+    BLOCKING=""
+    UNRESOLVED=""
+    for kv in "$3" "$4"; do
+      case "$kv" in
+        blocking=*) BLOCKING=${kv#*=} ;;
+        unresolved=*) UNRESOLVED=${kv#*=} ;;
+        *) usage ;;
+      esac
+    done
+    case "$BLOCKING" in ''|*[!0-9]*) usage ;; esac
+    case "$UNRESOLVED" in ''|*[!0-9]*) usage ;; esac
+    REVIEWING=1; set -- "$2" ;;
 esac
 [ $# -ge 1 ] && [ $# -le 2 ] || usage
 [ -z "$ASKING" ] || [ $# -eq 1 ] || usage
@@ -122,6 +149,7 @@ fi
 cd "$(git rev-parse --show-toplevel)"
 HARNESS_LAND_NO_CI=""
 HARNESS_LAND_OWNER_PATHS=""
+HARNESS_LAND_REVIEW=""
 HARNESS_LAND_METHOD=merge
 # From the default branch, for the reason --landing reads from there: read from the
 # working tree, a branch could set HARNESS_LAND_NO_CI="**" and skip its own CI.
@@ -142,6 +170,10 @@ case "$HARNESS_LAND_METHOD" in
 esac
 case " $HARNESS_LAND_NO_CI" in
   *" !"*) echo "land: HARNESS_LAND_NO_CI cannot hold a ! negation - list only the paths CI ignores" >&2; exit 2 ;;
+esac
+case "$HARNESS_LAND_REVIEW" in
+  ''|required) ;;
+  *) echo "land: HARNESS_LAND_REVIEW must be required or unset, not '$HARNESS_LAND_REVIEW'" >&2; exit 2 ;;
 esac
 case " $HARNESS_LAND_OWNER_PATHS" in
   *" !"*) echo "land: HARNESS_LAND_OWNER_PATHS cannot hold a ! negation - list only the paths the owner lands" >&2; exit 2 ;;
@@ -191,10 +223,13 @@ path_regex() {
 # agents follow, and the CI that judges them - a change to any of these changes the
 # bar the change is held to - and what tells an agent what to do or what it may
 # reach: its instructions, its settings and its MCP servers, for Claude Code, Codex,
-# opencode, pi and the editors that run agents.
+# opencode, pi, Gemini, Cursor, Copilot and the editors that run agents.
+# The agents' own files count in any directory: a monorepo package can carry its own.
 HARNESS_OWN_PATHS="scripts/harness/** .githooks/** docs/harness/** .github/workflows/**
-  .agents/** .claude/** **/AGENTS.md **/CLAUDE.md .mcp.json .codex/** .opencode/**
-  opencode.json opencode.jsonc .pi/** .cursor/mcp.json .vscode/mcp.json"
+  **/.agents/** **/.claude/** **/AGENTS.md **/AGENTS.override.md **/CLAUDE.md
+  **/CLAUDE.local.md **/.mcp.json **/.codex/** **/.opencode/** **/opencode.json
+  **/opencode.jsonc **/.pi/** **/.cursor/mcp.json **/.vscode/mcp.json
+  **/GEMINI.md **/.cursor/rules/** .github/copilot-instructions.md"
 
 # Why pull request $2#$1 is the owner's to land by the paths it touches, matched
 # against the patterns in $3 - nothing when it is not. What cannot be read is a
@@ -232,6 +267,24 @@ owner_reason() {
     *) echo "the floor guard could not check it" ;;
   esac
 }
+
+if [ -n "$REVIEWING" ]; then
+  h=$(field "$PR" "$REPO" headRefOid 2>/dev/null || true)
+  case "$h" in ''|*[!0-9a-f]*) fail "could not read the head commit of $REPO#$PR - no verdict posted" ;; esac
+  h7=${h%"${h#???????}"}
+  [ "$(git rev-parse -q --verify HEAD 2>/dev/null || true)" = "$h" ] \
+    || fail "this checkout is not at the head of $REPO#$PR, $h7 - a verdict vouches for the code that was reviewed; review it at that commit"
+  # Staged or not, against the commit. Untracked files are not read: a worktree
+  # always has some - logs, screenshots, reports - and they are not the change.
+  git diff --quiet HEAD -- \
+    || fail "this checkout has uncommitted changes - the verdict would vouch for code that is not $h7"
+  if [ "$BLOCKING" -eq 0 ] && [ "$UNRESOLVED" -eq 0 ]; then state=success; else state=failure; fi
+  gh api -X POST "repos/$REPO/statuses/$h" -f state=$state -f context=norma/review \
+    -f description="blocking=$BLOCKING unresolved=$UNRESOLVED" >/dev/null \
+    || fail "could not post norma/review on $REPO#$PR"
+  say "norma/review $state on $h7 ($REPO#$PR)"
+  exit 0
+fi
 
 if [ -n "$ASKING" ]; then
   reason=$(owner_reason "$(field "$PR" "$REPO" headRefOid 2>/dev/null || true)")
@@ -276,6 +329,22 @@ if [ -z "$AS_OWNER" ] && [ "$(landing_line)" = agent ]; then
     reason=$(paths_reason "$CO_PR" "$CO_REPO" "$HARNESS_OWN_PATHS")
     [ -z "$reason" ] || fail "$CO_REPO#$CO_PR is the owner's to land: $reason - nothing merged. The owner lands both with scripts/harness/land --owner $PR $CO_REPO#$CO_PR"
   fi
+fi
+
+# A project that requires a review lands only a head with a passing verdict on it,
+# asked before the wait: CI on a head nobody reviewed is time spent on nothing.
+if [ "$HARNESS_LAND_REVIEW" = required ]; then
+  CHECKED=1
+  h7=${HEAD%"${HEAD#???????}"}
+  # The combined status holds the latest of each context, thirty to a page by default.
+  verdict=$(gh api "repos/$REPO/commits/$HEAD/status?per_page=100" \
+      --jq '.statuses[] | select(.context == "norma/review") | "\(.state) \(.description)"' 2>/dev/null) \
+    || fail "could not read the review status of $REPO#$PR - nothing merged"
+  case "$verdict" in
+    'success '*) ;;
+    '') fail "$REPO#$PR has no norma/review on $h7 - nothing merged. Review it at that commit, then: scripts/harness/land --review $PR blocking=<n> unresolved=<n>" ;;
+    *) fail "norma/review on $REPO#$PR is ${verdict%% *} (${verdict#* }) at $h7 - nothing merged" ;;
+  esac
 fi
 
 # The companion lives in another repository, and that repository's settings - not
@@ -426,12 +495,23 @@ while :; do
       sleep 5
     done
     [ "$HEAD" != "$was" ] || fail "updated $REPO#$PR, but its new head never appeared - nothing merged"
-    # A checked head may only move by this update: a commit whose first parent is
-    # the head that was checked. Anything else is a push nobody checked.
+    # A checked or reviewed head may only move by this update: a merge commit whose
+    # first parent is the head that was judged and whose second is already on the
+    # base. Anything else - a child commit, a merge of another branch - is a push
+    # nobody judged.
     if [ -n "$CHECKED" ]; then
-      parent=$(gh api "repos/$REPO/commits/$HEAD" --jq '.parents[0].sha' 2>/dev/null || true)
-      [ "$parent" = "$was" ] \
-        || fail "$REPO#$PR moved beyond its update - $HEAD is not the update of the head that was checked; nothing merged"
+      parents=$(gh api "repos/$REPO/commits/$HEAD" --jq '[.parents[].sha] | join(" ")' 2>/dev/null || true)
+      p1=${parents%% *}
+      p2=${parents#* }
+      on_base=""
+      if [ "$p1" = "$was" ] && [ -n "$p2" ] && [ "$p2" != "$parents" ] && [ "$p2" = "${p2%% *}" ]; then
+        base_ref=$(field "$PR" "$REPO" baseRefName 2>/dev/null || true)
+        on_base=$(gh api "repos/$REPO/compare/$p2...$base_ref" --jq .status 2>/dev/null || true)
+      fi
+      case "$on_base" in
+        identical|ahead) ;;
+        *) fail "$REPO#$PR moved beyond its update - $HEAD is not the update of the head that was judged; nothing merged" ;;
+      esac
     fi
   fi
   wait_for_ci

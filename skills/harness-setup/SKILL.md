@@ -118,13 +118,18 @@ depend only on domain and ports?" gets a decision.
    always, and whichever paths the owner names here. Ask which parts of this
    project an agent should never land on its own - migrations, payments,
    authentication, infrastructure, CI configured outside `.github/workflows/`,
-   the settings of an agent the harness does not name - and write them, in GitHub's path syntax, into
-   `HARNESS_LAND_OWNER_PATHS` in `config.sh`. None is a valid answer; the harness's
+   the settings of an agent the harness does not name - and write them, in
+   GitHub's path syntax, into `HARNESS_LAND_OWNER_PATHS` in `config.sh`. None is a valid answer; the harness's
    paths and the floor guard still apply.
 8. For `land`, whichever the answer: if the CI workflow has a `paths-ignore`, the
    same paths go into `HARNESS_LAND_NO_CI` in `config.sh` - in GitHub's syntax, as
    the workflow writes them - or a pull request touching only those waits for
-   checks that never come. `land` reads both settings from `config.sh` on the
+   checks that never come. Ask whether `land` should require a passing review
+   verdict on the head it merges - `HARNESS_LAND_REVIEW=required`: every pull
+   request then needs `land --review` posted on its last commit, by the agent's
+   review or by the owner who read it. Propose it with `Landing: agent`, where it
+   is the one record a review happened before an unattended merge. `land` reads
+   these settings from `config.sh` on the
    default branch, so they apply from the first pull request after this setup is
    merged, not to the one that writes them. The merge method, if the repository does not merge
    commits (`HARNESS_LAND_METHOD`). And if CI runs on one shared or slow runner,

@@ -309,12 +309,25 @@ Then:
    report**, because then the local gate is the only thing that ran and the
    reviewer should know it.
 4. **Land it or stop at it - the project's `Landing:` line decides**, the one in
-   `docs/harness/mandatory-steps.md` step 9. Run `scripts/harness/land --landing <pr>`
+   `docs/harness/mandatory-steps.md` step 9.
+
+   **First, whatever the line says and whether or not there is CI, post the
+   review's verdict on the head**, from this branch's checkout at the commit you
+   pushed, with nothing uncommitted:
+   `scripts/harness/land --review <pr> blocking=<n> unresolved=<n>`, the counts of
+   the review that ran last. It becomes the commit status `norma/review` on that
+   commit, and a project with `HARNESS_LAND_REVIEW=required` lands nothing without
+   a passing one. A fix pushed after it - a red check, a conflict - is a head
+   nobody reviewed: review that diff, record the review, and post again. Never
+   post counts you did not get from a review.
+
+   Then run `scripts/harness/land --landing <pr>`
    from this branch's checkout, at the head you pushed, and act on what it prints;
    never read the line by eye, and never infer it from anything else. It prints
    `agent` only for exactly `Landing: agent` **and** a pull request the change
-   leaves to an agent: one that touches the harness itself or a path in
-   `HARNESS_LAND_OWNER_PATHS`, or whose floor guard finds the bar lowered - or
+   leaves to an agent: one that touches the harness itself, what an agent is told
+   or may reach - `.agents/`, `.claude/`, `AGENTS.md`, `CLAUDE.md`, MCP servers -
+   or a path in `HARNESS_LAND_OWNER_PATHS`, or whose floor guard finds the bar lowered - or
    cannot check it, which is why the checkout matters - is `owner`, with the reason
    on stderr. Every other case is `owner` too.
 
