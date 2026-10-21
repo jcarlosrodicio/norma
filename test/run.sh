@@ -2130,6 +2130,17 @@ assert_has "and never on the subjects where being wrong costs most" "$adv" "Neve
 assert_has "it attacks a bar lowered to get to green" "$adv" "**A weakened bar.**"
 assert_has "reading the removed lines, not only the added ones" "$adv" "**removed** lines"
 assert_has "and blocks a loosening nobody justified" "$adv" "loosening it always does"
+# A reviewer that re-reads the whole change every round re-raises what it already
+# raised, and a change can spend fifty passes fixing what the last fix broke. Later
+# rounds read the diff, findings are named by class, and three rounds is the cap.
+assert_has "later review rounds read only what changed since the last" "$adv" "**Every later round reviews only what changed since the last one**"
+assert_has "recording what each round reviewed so the next can diff it" "$adv" "git stash create"
+assert_has "naming the class of a finding, not only the instance" "$adv" "**Name the class, not only the instance.**"
+assert_has "and stopping after three rounds" "$adv" "**Three rounds is the cap.**"
+assert_has "a defect the change did not write is reported apart and never blocks" "$adv" "**Pre-existing**, apart from the rest"
+assert_has "and is counted on its own" "$adv" "pre_existing=<n>"
+assert_has "run-task ends the loop on a third blocking round" "$(cat "$HOME_DIR/skills/run-task/SKILL.md")" "**The third round that still blocks ends the loop"
+assert_has "auto-run-task escalates it" "$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")" "A review whose third round still blocks is this reason too"
 # Unsupervised, the archive has to travel inside the pull request: there is no
 # second branch because there is nobody to remember it.
 auto=$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")
