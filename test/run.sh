@@ -1523,8 +1523,13 @@ landing 7
 assert_eq "but not a head that moved beyond the update" "$RC" 1
 assert_has "saying so" "$OUT" "moved beyond its update"
 assert_no "and merging nothing" "$LOG" "pr merge"
+# and what tells an agent what to do or what it may reach: its instructions, its
+# settings, its MCP servers - for every agent the harness runs with
 for f in scripts/harness/verify .githooks/pre-commit docs/harness/mandatory-steps.md \
-  .agents/skills/run-task/SKILL.md .github/workflows/ci.yml; do
+  .agents/skills/run-task/SKILL.md .agents/rules.md .github/workflows/ci.yml \
+  .claude/settings.json AGENTS.md CLAUDE.md packages/app/CLAUDE.md .mcp.json \
+  .codex/config.toml .opencode/agent/review.md opencode.json opencode.jsonc \
+  .pi/settings.json .cursor/mcp.json .vscode/mcp.json; do
   LAND_ENV="HEAD_SHA=local FILES=src/a.ts,$f"
   landing 7
   assert_eq "refuses an agent a pull request touching $f" "$RC" 1
@@ -1532,6 +1537,11 @@ for f in scripts/harness/verify .githooks/pre-commit docs/harness/mandatory-step
   assert_no "and merging nothing: $f" "$LOG" "pr merge"
 done
 assert_has "naming the command the owner lands it with" "$OUT" "scripts/harness/land --owner 7"
+for f in src/agents.ts docs/CLAUDE.md.txt .vscode/settings.json; do
+  LAND_ENV="HEAD_SHA=local FILES=$f"
+  landing 7
+  assert_eq "a name that only resembles one is the agent's: $f" "$RC" 0
+done
 LAND_ENV="HEAD_SHA=local FILES=.github/workflows/ci.yml"
 landing --owner 7
 assert_eq "which lands it" "$RC" 0

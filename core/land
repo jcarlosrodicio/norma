@@ -16,8 +16,9 @@
 #
 # Under `Landing: agent` some pull requests are still the owner's, because the
 # change sets the bar, not whoever wrote it: one that touches the harness itself -
-# scripts/harness/, .githooks/, docs/harness/, .agents/skills/, .github/workflows/ -
-# or a path in HARNESS_LAND_OWNER_PATHS, or whose floor guard finds the bar lowered
+# scripts/harness/, .githooks/, docs/harness/, .github/workflows/ - or what an agent
+# is told or may reach - .agents/, .claude/, AGENTS.md, CLAUDE.md, MCP servers and
+# other agents' settings - or a path in HARNESS_LAND_OWNER_PATHS, or whose floor guard finds the bar lowered
 # or cannot check it. `--landing <pr>` prints owner for it, and land refuses to
 # merge it without --owner, which the owner passes - and an agent only when the
 # owner said so for that pull request.
@@ -187,9 +188,13 @@ path_regex() {
 }
 
 # The paths that are always the owner's to land: the harness itself, the loop the
-# agents follow, and the CI that judges them. A change to any of these changes the
-# bar the change is held to.
-HARNESS_OWN_PATHS="scripts/harness/** .githooks/** docs/harness/** .agents/skills/** .github/workflows/**"
+# agents follow, and the CI that judges them - a change to any of these changes the
+# bar the change is held to - and what tells an agent what to do or what it may
+# reach: its instructions, its settings and its MCP servers, for Claude Code, Codex,
+# opencode, pi and the editors that run agents.
+HARNESS_OWN_PATHS="scripts/harness/** .githooks/** docs/harness/** .github/workflows/**
+  .agents/** .claude/** **/AGENTS.md **/CLAUDE.md .mcp.json .codex/** .opencode/**
+  opencode.json opencode.jsonc .pi/** .cursor/mcp.json .vscode/mcp.json"
 
 # Why pull request $2#$1 is the owner's to land by the paths it touches, matched
 # against the patterns in $3 - nothing when it is not. What cannot be read is a
