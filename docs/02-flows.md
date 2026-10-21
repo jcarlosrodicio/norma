@@ -355,6 +355,9 @@ working outside a repository sees.
 | No pull request, more than one companion, a companion not written `<owner>/<repo>#<n>`, or the pull request named as its own companion | 2 | A typo would land the wrong pull request. |
 | `HARNESS_LAND_METHOD` other than `merge`, `squash` or `rebase` | 2 | Decided before GitHub is asked anything. |
 | A `!` negation in `HARNESS_LAND_NO_CI` | 2 | Half-honouring it could skip the wait for a path CI does run on. |
+| A `!` negation in `HARNESS_LAND_OWNER_PATHS` | 2 | Half-honouring it could hand an agent a path the owner kept. |
+| Under `Landing: agent`, without `--owner`: a pull request touching the harness's own paths or `HARNESS_LAND_OWNER_PATHS` - in any case, by its name or its old one - whose floor guard finds the bar lowered, whose files, file count, head or floor cannot be read here, or with more files than GitHub lists; or a companion touching the harness's own paths | 1 | The change sets the bar, not its author: an agent cannot lower the gate, edit the loop or touch what the owner kept, and land it itself. The message names the reason and `land --owner <pr>`, the command the owner lands it with. |
+| The head moved while the files were read, or moved by more than `land`'s own update to its base | 1 | The files checked must be those of the head the merge is pinned to. Run it again. |
 | The pull request or the companion not open | 1 | Checked for both before anything merges, so a closed companion never leaves half a delivery. |
 | The companion's repository takes no merge method its rules leave, or how it merges cannot be read | 1 | Checked before anything merges; the companion is merged the way its own repository takes, which may not be `HARNESS_LAND_METHOD`. |
 | The pull request does not merge cleanly, or GitHub never settles whether it does | 1 | A conflicting pull request gets no CI run, so there is nothing to wait for. Bring the base branch in and run it again. |
@@ -376,7 +379,12 @@ agent about to merge should be handed. It reads the default branch, not the
 working tree, so a branch that rewrites the line changes nothing until the owner
 merges that change.
 
-`land` reads `HARNESS_LAND_NO_CI` and `HARNESS_LAND_METHOD` the same way, from
+`land --landing <pr>` answers the same question for one pull request: `owner`
+when the line says so, and under `agent` `owner` again for a pull request the
+change makes the owner's, with the reason on stderr - from the same rules `land`
+refuses with, so asking first and landing never disagree.
+
+`land` reads `HARNESS_LAND_NO_CI`, `HARNESS_LAND_OWNER_PATHS` and `HARNESS_LAND_METHOD` the same way, from
 `config.sh` on the default branch: a branch that empties its own CI wait with
 `HARNESS_LAND_NO_CI="**"` still waits. With no default branch known to git, or no
 `config.sh` on it, it says so, names `git remote set-head origin -a`, and lands

@@ -235,7 +235,12 @@ it - is `owner`. Changing it is the owner's decision, merged like any other chan
   attempts at the same failure, as for any fix; after that the pull request stays
   open and the hand-over says why. Never `--admin`, never a force-push, never a
   merge around `land`. The owner keeps one pull request open by saying so for that
-  task, and then it is `owner` for that one.
+  task, and then it is `owner` for that one. Even under `agent`, the change can
+  make a pull request the owner's: one that touches the harness itself
+  (`scripts/harness/`, `.githooks/`, `docs/harness/`, `.agents/skills/`,
+  `.github/workflows/`) or a path in `HARNESS_LAND_OWNER_PATHS`, or whose floor
+  guard finds the bar lowered. `land --landing <pr>` says so, `land` refuses it,
+  and the owner lands it with `scripts/harness/land --owner <pr>`.
 
 Either way, `land` needs the paths CI ignores in `HARNESS_LAND_NO_CI`
 (`scripts/harness/config.sh`) when the workflow has a `paths-ignore`: without them a

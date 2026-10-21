@@ -316,10 +316,15 @@ deploy. When the user approves, and only then, follow
 
 The merge is the one of those that can follow without asking again, and only
 this way: if the approval included opening a pull request, run
-`scripts/harness/land --landing`, which reads the project's `Landing:` line in
-`docs/harness/mandatory-steps.md` step 9. `owner` - which includes no line, or one it
-cannot read - leaves the pull request open, with
-`scripts/harness/land <pr> [<owner>/<repo>#<n>]` ready to paste. `agent` lands it
+`scripts/harness/land --landing <pr>` from this branch's checkout at the pushed
+head. It reads the project's `Landing:` line in `docs/harness/mandatory-steps.md`
+step 9, and under `agent` it also asks the change: a pull request touching the
+harness or a path in `HARNESS_LAND_OWNER_PATHS`, or whose floor guard finds the bar
+lowered, is the owner's. `owner` - which includes no line, or one it cannot read -
+leaves the pull request open, with `scripts/harness/land <pr> [<owner>/<repo>#<n>]`
+ready to paste, or `land --owner <pr> ...` when the line said `agent` and the change
+made it the owner's. `--owner` is never yours to pass unless the user told you, in
+this conversation, to land that pull request. `agent` lands it
 with that command, following `auto-run-task` stage 9 step 4 for everything else:
 the companion only if this task opened it, a red check or a conflict handled, two
 attempts at the same failure, and a give-up reported with its output. If the user
