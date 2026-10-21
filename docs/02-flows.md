@@ -357,6 +357,11 @@ working outside a repository sees.
 | A `!` negation in `HARNESS_LAND_NO_CI` | 2 | Half-honouring it could skip the wait for a path CI does run on. |
 | A `!` negation in `HARNESS_LAND_OWNER_PATHS` | 2 | Half-honouring it could hand an agent a path the owner kept. |
 | Under `Landing: agent`, without `--owner`: a pull request touching the harness's own paths or `HARNESS_LAND_OWNER_PATHS` - in any case, by its name or its old one - whose floor guard finds the bar lowered, whose files, file count, head or floor cannot be read here, or with more files than GitHub lists; or a companion touching the harness's own paths | 1 | The change sets the bar, not its author: an agent cannot lower the gate, edit the loop or touch what the owner kept, and land it itself. The message names the reason and `land --owner <pr>`, the command the owner lands it with. |
+| `HARNESS_LAND_REVIEW` other than `required` or unset | 2 | A typo would silently turn the requirement off. |
+| With `HARNESS_LAND_REVIEW=required`: no `norma/review` on the head, one that is not `success`, or one that cannot be read | 1 | A review vouches for one commit; a head without a passing verdict is one nobody vouched for. Asked before the CI wait, and `--owner` does not replace it. The message names `land --review`. |
+| `--review` without exactly a pull request, `blocking=<n>` and `unresolved=<n>` | 2 | A verdict a machine reads has one shape. |
+| `--review` from a checkout that is not the pull request's head, or with changes to tracked files, staged or not, or whose head cannot be read | 1 | The verdict is posted for the commit checked out, so that is the commit it has to be. Untracked files are not read: a worktree always has some. |
+| `--review` that GitHub refuses to post | 1 | Said, so nobody assumes a verdict that is not there. |
 | The head moved while the files were read, or moved by more than `land`'s own update to its base | 1 | The files checked must be those of the head the merge is pinned to. Run it again. |
 | The pull request or the companion not open | 1 | Checked for both before anything merges, so a closed companion never leaves half a delivery. |
 | The companion's repository takes no merge method its rules leave, or how it merges cannot be read | 1 | Checked before anything merges; the companion is merged the way its own repository takes, which may not be `HARNESS_LAND_METHOD`. |
@@ -384,7 +389,7 @@ when the line says so, and under `agent` `owner` again for a pull request the
 change makes the owner's, with the reason on stderr - from the same rules `land`
 refuses with, so asking first and landing never disagree.
 
-`land` reads `HARNESS_LAND_NO_CI`, `HARNESS_LAND_OWNER_PATHS` and `HARNESS_LAND_METHOD` the same way, from
+`land` reads `HARNESS_LAND_NO_CI`, `HARNESS_LAND_OWNER_PATHS`, `HARNESS_LAND_REVIEW` and `HARNESS_LAND_METHOD` the same way, from
 `config.sh` on the default branch: a branch that empties its own CI wait with
 `HARNESS_LAND_NO_CI="**"` still waits. With no default branch known to git, or no
 `config.sh` on it, it says so, names `git remote set-head origin -a`, and lands

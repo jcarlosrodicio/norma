@@ -308,6 +308,7 @@ Two limits, both found by review and neither closed:
 ```sh
 scripts/harness/land [--owner] <pr> [<owner>/<repo>#<pr>]
 scripts/harness/land --landing [<pr>]
+scripts/harness/land --review <pr> blocking=<n> unresolved=<n>
 ```
 
 Waits for the pull request's CI, merges exactly the commit that went green, then
@@ -352,7 +353,7 @@ request. Some are the owner's whatever the line says, because of what they chang
 | what makes it the owner's | why |
 |---|---|
 | a file under `scripts/harness/`, `.githooks/`, `docs/harness/` or `.github/workflows/` - by its name or, for a rename, by its old one, in any case: on a case-insensitive checkout `.Githooks/pre-commit` is the hook | the gate, the hook, the loop and the CI that judges them. A change to any of them changes the bar the change itself is held to |
-| a file under `.agents/`, `.claude/`, `.codex/`, `.opencode/` or `.pi/`; an `AGENTS.md` or `CLAUDE.md` in any directory; `.mcp.json`, `opencode.json`, `opencode.jsonc`, `.cursor/mcp.json` or `.vscode/mcp.json` - matched the same way | what tells an agent what to do and what it may reach: its skills, its instructions, its settings, its hooks and its MCP servers. An agent that rewrites them rewrites the agent that lands next |
+| in any directory - a monorepo package can carry its own: a file under `.agents/`, `.claude/`, `.codex/`, `.opencode/` or `.pi/`; `AGENTS.md`, `AGENTS.override.md`, `CLAUDE.md`, `CLAUDE.local.md` or `GEMINI.md`; a file under `.cursor/rules/`; `.mcp.json`, `opencode.json`, `opencode.jsonc`, `.cursor/mcp.json` or `.vscode/mcp.json`; and `.github/copilot-instructions.md` - matched the same way | what tells an agent what to do and what it may reach: its skills, its instructions, its settings, its hooks and its MCP servers. An agent that rewrites them rewrites the agent that lands next |
 | a file matching `HARNESS_LAND_OWNER_PATHS` in `config.sh` - read from the default branch, in GitHub's path syntax, no `!` | what this project considers too sensitive to land unattended - migrations, payments, authentication. It adds to the list above and cannot remove from it |
 | `verify --floor` reporting findings, or unable to check | a skip, a suppression, a deleted test, assertions removed, `config.sh` touched: the cheapest roads to green. Measured on 2026-10-07, three of 28 merged pull requests in three consumers would have gone to the owner, every one with something real to look at |
 | a file list, a file count, a head or a floor that cannot be read; more than the 3000 files GitHub lists; a head that moved while its files were read | a doubt, and every doubt falls on the side nobody granted |
@@ -392,10 +393,56 @@ Decisions inside it:
   to date during the wait is not checked again - the update merges the base, whose
   files are not the change's - but its new head must have the checked head as its
   first parent, or it is a push nobody checked and `land` refuses.
-- **The CI in the list is GitHub Actions'.** CI configured elsewhere -
-  `.gitlab-ci.yml`, `Jenkinsfile`, `.circleci/` - and the settings of an agent not
-  named here are the project's to add to `HARNESS_LAND_OWNER_PATHS`;
-  `harness-setup` asks.
+#### A review's verdict, on one commit
+
+The adversarial review ends in a report and a run event, and neither is something
+a merge can check: the report is prose in a pull request, and the event lives in
+the gitignored `.harness/` of whichever machine ran it, until `run close` removes
+it. `land --review <pr> blocking=<n> unresolved=<n>` turns the verdict into the
+commit status `norma/review` on the pull request's head - `success` only with
+nothing blocking and nothing unresolved, `failure` otherwise, the counts in its
+description - and `HARNESS_LAND_REVIEW=required` in `config.sh`, read from the
+default branch, makes a passing one a condition of the merge.
+
+- **A status, not a marker in the pull request.** GitHub attaches it to one
+  commit, so a push leaves the new head with no verdict at all, which is exactly
+  "an approval covers one commit". It shows with the checks, and the CI reviewer
+  that may one day post it uses the same mechanism.
+- **Only from a checkout at that head, with no change to a tracked file.** The
+  verdict is posted for the commit checked out. The review itself runs before the
+  commit exists, so this proves the commit is clean, not that the review read it:
+  the loop asks for a new review of any diff pushed after it. Untracked files are
+  not read - a worktree always has logs and screenshots that are not the change.
+- **Required in both modes, and `--owner` does not stand in for it.** A project
+  that turns it on gets a review before every merge, whoever runs `land`. An owner
+  who read the pull request posts the verdict the same way.
+- **Asked before the wait.** CI on a head nobody reviewed is time spent on a merge
+  that will not happen.
+- **`land`'s own update keeps it.** A head brought up to date with its base is a
+  new commit with no status. It is accepted when it is a merge whose first parent
+  is the reviewed head and whose second is already on the base - the same rule
+  that keeps a checked head - and refused otherwise: a commit on top, or a merge
+  of anything else, is a push nobody judged. What it cannot see is an edit made
+  inside such a merge in the seconds between the update and the read.
+- **A failing verdict is a red status.** Without the setting, `land` refuses it
+  as it refuses any red check while it waits for CI - and so a pull request with
+  no CI to wait for, one inside `HARNESS_LAND_NO_CI`, is not stopped by it. With
+  the setting it is read before the wait, CI or not.
+- **The main pull request only.** A companion in another repository is held to
+  its own process; `land` asks it nothing but the harness's paths under
+  `Landing: agent`.
+- **A self-reported verdict, not a proof.** Whoever can push can post it, and in
+  a one-person project the author, the reviewer and the account are the same, so
+  no check on who posted it would hold. `land` cannot tell that a review ran; the
+  skills forbid posting counts no review produced. What makes it a record is that
+  it is tied to one commit and visible on it; what would make it independent is a
+  CI job the author does not run posting it instead.
+
+- **The CI in the list is GitHub Actions', and the agents are named ones** -
+  Claude Code, Codex, opencode, pi, Gemini, Cursor, Copilot and the editors' MCP
+  files. CI configured elsewhere - `.gitlab-ci.yml`, `Jenkinsfile`, `.circleci/` -
+  and any other agent's files are the project's to add to
+  `HARNESS_LAND_OWNER_PATHS`; `harness-setup` asks.
 
 The decisions inside it:
 

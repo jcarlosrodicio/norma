@@ -1120,20 +1120,34 @@ case "$1 $2" in
     exit 1 ;;
   "pr list") [ -z "${LIST_FAIL:-}" ] || exit 1; [ -z "${CHILDREN:-}" ] || echo "$CHILDREN" | tr , '\n' ;;
   "pr edit") [ -z "${EDIT_FAIL:-}" ] || exit 1 ;;
-  "api -X") [ -z "${DELETE_FAIL:-}" ] || exit 1 ;;
+  # POST is a commit status - a review verdict - and anything else a branch delete
+  "api -X")
+    case "$3" in
+      POST) [ -z "${STATUS_FAIL:-}" ] || exit 1 ;;
+      *) [ -z "${DELETE_FAIL:-}" ] || exit 1 ;;
+    esac ;;
   # the merge methods the companion's repository allows, and those the rules on
   # its base leave (CO_RULES_FAIL: the 403 of a private repository on the free plan)
   "api repos/me/site") [ -z "${CO_REPO_FAIL:-}" ] || exit 1; echo "${CO_ALLOWED-merge squash rebase}" ;;
   "api repos/me/site/rules/branches/"*)
     [ -z "${CO_RULES_FAIL:-}" ] || { echo "gh: Upgrade to GitHub Pro (HTTP 403)" >&2; exit 1; }
     echo "${CO_RULED-merge squash rebase}" ;;
-  # the first parent of an updated head: the head before the update, or UPDATE_PARENT
+  # norma/review on a head: REVIEW is its state, REVIEW_DESC its description with
+  # commas for spaces; no REVIEW is no status at all
+  "api repos/me/app/commits/"*/status\?*)
+    [ -z "${REVIEW_FAIL:-}" ] || exit 1
+    [ -z "${REVIEW:-}" ] || echo "$REVIEW $(echo "${REVIEW_DESC:-blocking=0,unresolved=0}" | tr , ' ')" ;;
+  # the parents of an updated head: the head before the update and the base's tip,
+  # or UPDATE_PARENTS (commas for spaces); COMPARE is where that tip stands to the
+  # base: identical or ahead when it is on it
   "api repos/me/app/commits/"*)
-    if [ -n "${UPDATE_PARENT:-}" ]; then echo "$UPDATE_PARENT"; exit 0; fi
+    if [ -n "${UPDATE_PARENTS:-}" ]; then echo "$UPDATE_PARENTS" | tr , ' '; exit 0; fi
     k=$(cat "$FAKE_LOG.updated")
-    if [ "$k" -gt 1 ]; then echo "1234567890abcde$((k - 1))"
-    elif [ "${HEAD_SHA:-}" = local ]; then git rev-parse HEAD
-    else echo "${HEAD_SHA-abcdef0123456789}"; fi ;;
+    if [ "$k" -gt 1 ]; then p="1234567890abcde$((k - 1))"
+    elif [ "${HEAD_SHA:-}" = local ]; then p=$(git rev-parse HEAD)
+    else p="${HEAD_SHA-abcdef0123456789}"; fi
+    echo "$p 0123456789fedcba" ;;
+  "api repos/me/app/compare/0123456789fedcba...master") echo "${COMPARE-identical}" ;;
   "api repos/"*)
     [ -z "${REF_GONE:-}" ] || { echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
     [ -z "${REF_FORBIDDEN:-}" ] || { echo "gh: Forbidden (HTTP 403)" >&2; exit 1; } ;;
@@ -1518,7 +1532,7 @@ LAND_ENV="HEAD_SHA=local BEHIND=start"
 landing 7
 assert_eq "an agent lands a checked pull request brought up to date" "$RC" 0
 assert_has "pinned to the update" "$LOG" "--match-head-commit 1234567890abcde1"
-LAND_ENV="HEAD_SHA=local BEHIND=start UPDATE_PARENT=0000000000000000"
+LAND_ENV="HEAD_SHA=local BEHIND=start UPDATE_PARENTS=0000000000000000,0123456789fedcba"
 landing 7
 assert_eq "but not a head that moved beyond the update" "$RC" 1
 assert_has "saying so" "$OUT" "moved beyond its update"
@@ -1529,7 +1543,10 @@ for f in scripts/harness/verify .githooks/pre-commit docs/harness/mandatory-step
   .agents/skills/run-task/SKILL.md .agents/rules.md .github/workflows/ci.yml \
   .claude/settings.json AGENTS.md CLAUDE.md packages/app/CLAUDE.md .mcp.json \
   .codex/config.toml .opencode/agent/review.md opencode.json opencode.jsonc \
-  .pi/settings.json .cursor/mcp.json .vscode/mcp.json; do
+  .pi/settings.json .cursor/mcp.json .vscode/mcp.json AGENTS.override.md \
+  CLAUDE.local.md packages/app/.mcp.json packages/app/.claude/settings.json \
+  packages/app/.agents/skills/x/SKILL.md packages/app/.codex/config.toml \
+  GEMINI.md packages/app/GEMINI.md .cursor/rules/style.mdc .github/copilot-instructions.md; do
   LAND_ENV="HEAD_SHA=local FILES=src/a.ts,$f"
   landing 7
   assert_eq "refuses an agent a pull request touching $f" "$RC" 1
@@ -1636,6 +1653,101 @@ assert_eq "under Landing: owner land merges what it is given, as before" "$RC" 0
 asking 7
 assert_eq "and --landing <pr> is owner" "$OUT" "owner"
 assert_no "without asking GitHub" "$LOG" "pr view"
+
+# A review's verdict lives on the commit it vouches for: land --review <pr>
+# blocking=<n> unresolved=<n> posts norma/review on the pull request's head, and
+# only from a checkout at that head with nothing uncommitted - the code reviewed.
+LAND_ENV="HEAD_SHA=local"
+landing --review 7 blocking=0 unresolved=0
+assert_eq "posts a review verdict" "$RC" 0
+assert_has "as norma/review success on the head" "$LOG" \
+  "api -X POST repos/me/app/statuses/$(git rev-parse HEAD) -f state=success -f context=norma/review -f description=blocking=0 unresolved=0"
+assert_has "and says so" "$OUT" "norma/review success on"
+landing --review 7 unresolved=0 blocking=1
+assert_has "failure when anything blocks, in either order" "$LOG" "-f state=failure -f context=norma/review -f description=blocking=1 unresolved=0"
+landing --review 7 blocking=0 unresolved=2
+assert_has "or anything is unresolved" "$LOG" "-f state=failure"
+LAND_ENV=""
+landing --review 7 blocking=0 unresolved=0
+assert_eq "refuses from a checkout that is not the pull request" "$RC" 1
+assert_has "saying so" "$OUT" "this checkout is not at the head of me/app#7"
+assert_no "and posts nothing" "$LOG" "statuses"
+LAND_ENV="HEAD_SHA=local"
+echo dirty >> README.md
+landing --review 7 blocking=0 unresolved=0
+assert_eq "refuses with uncommitted changes" "$RC" 1
+assert_has "saying so" "$OUT" "uncommitted changes"
+assert_no "posting nothing" "$LOG" "statuses"
+git checkout -q README.md
+# BRANCH_ONLY: landing would otherwise commit what is staged along with the config
+echo staged >> README.md; git add README.md
+BRANCH_ONLY=1
+landing --review 7 blocking=0 unresolved=0
+assert_eq "and with staged ones" "$RC" 1
+BRANCH_ONLY=
+git reset -q README.md; git checkout -q README.md
+landing --review 7 blocking=00 unresolved=0
+assert_has "reads counts as numbers, not strings" "$LOG" "-f state=success"
+for bad in "7 blocking=0" "7 blocking=0 unresolved=x" "7 blocking=0 verdict=ok" \
+  "x blocking=0 unresolved=0" "7 blocking= unresolved=0" "7 blocking=0 unresolved=0 x"; do
+  landing --review $bad
+  assert_eq "refuses a malformed verdict: $bad" "$RC" 2
+done
+LAND_ENV="HEAD_SHA=local STATUS_FAIL=1"
+landing --review 7 blocking=0 unresolved=0
+assert_eq "says when the verdict could not be posted" "$RC" 1
+assert_has "in so many words" "$OUT" "could not post norma/review"
+
+# HARNESS_LAND_REVIEW=required: land merges only a head with a passing verdict on it,
+# whoever runs it.
+echo 'HARNESS_LAND_REVIEW=required' >> scripts/harness/config.sh
+LAND_ENV=""
+landing 7
+assert_eq "a project that requires a review refuses a head without one" "$RC" 1
+assert_has "saying which head" "$OUT" "me/app#7 has no norma/review on abcdef0"
+assert_has "and how to give it one" "$OUT" "scripts/harness/land --review 7 blocking=<n> unresolved=<n>"
+assert_no "merging nothing" "$LOG" "pr merge"
+assert_no "and not waiting for CI first" "$LOG" "pr checks"
+LAND_ENV="REVIEW=failure REVIEW_DESC=blocking=1,unresolved=0"
+landing 7
+assert_eq "and a head whose review failed" "$RC" 1
+assert_has "saying what it said" "$OUT" "norma/review on me/app#7 is failure (blocking=1 unresolved=0) at abcdef0"
+LAND_ENV="REVIEW=success"
+landing 7
+assert_eq "it lands a head with a passing review" "$RC" 0
+LAND_ENV="REVIEW=success BEHIND=start"
+landing 7
+assert_eq "and one it brought up to date after the review" "$RC" 0
+LAND_ENV="REVIEW=success BEHIND=start UPDATE_PARENTS=0000000000000000,0123456789fedcba"
+landing 7
+assert_eq "but not one that moved beyond the update" "$RC" 1
+assert_has "saying so" "$OUT" "moved beyond its update"
+LAND_ENV="REVIEW=success BEHIND=start UPDATE_PARENTS=abcdef0123456789"
+landing 7
+assert_eq "nor a plain commit on top of the reviewed head" "$RC" 1
+LAND_ENV="REVIEW=success BEHIND=start COMPARE=diverged"
+landing 7
+assert_eq "nor a merge of something that is not on the base" "$RC" 1
+assert_no "merging nothing" "$LOG" "pr merge"
+assert_has "asking only for the review status's first hundred contexts" "$LOG" "status?per_page=100"
+assert_has "selecting norma/review from them" "$LOG" 'select(.context == "norma/review")'
+
+LAND_ENV=""
+landing --owner 7
+assert_eq "--owner does not stand in for a review" "$RC" 1
+LAND_ENV="REVIEW_FAIL=1"
+landing 7
+assert_eq "a review status that cannot be read refuses" "$RC" 1
+assert_has "saying so" "$OUT" "could not read the review status of me/app#7"
+sed -i.bak '/HARNESS_LAND_REVIEW/d' scripts/harness/config.sh
+LAND_ENV=""
+landing 7
+assert_eq "without the setting, no review is asked for" "$RC" 0
+echo 'HARNESS_LAND_REVIEW=yes' >> scripts/harness/config.sh
+landing 7
+assert_eq "refuses a value it does not know" "$RC" 2
+assert_no "before asking GitHub anything" "$LOG" "pr "
+sed -i.bak '/HARNESS_LAND_REVIEW/d' scripts/harness/config.sh
 
 echo 'HARNESS_LAND_METHOD=squash' >> scripts/harness/config.sh
 LAND_ENV=""
@@ -2130,7 +2242,7 @@ assert_has "auto-run-task delegates the stages to run-task instead of copying th
 # Who merges is the project's line, not the skill's. The skill reads it, lands only
 # through land and only on `agent`, and stops at the pull request on anything else.
 assert_has "auto-run-task reads the project's Landing line" "$auto" "Landing:"
-assert_has "through the reader that fails closed, not by eye" "$auto" "Run \`scripts/harness/land --landing <pr>\`"
+assert_has "through the reader that fails closed, not by eye" "$auto" "run \`scripts/harness/land --landing <pr>\`"
 assert_has "spending CI attempts once, not again through land" "$auto" "gets no third through"
 assert_has "governing the companion with this repository's line" "$auto" "pass one only if this run opened it"
 assert_has "and reporting a give-up as the escalation it is" "$auto" "escalation
