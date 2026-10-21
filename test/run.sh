@@ -1148,8 +1148,18 @@ with_land() {
 }
 
 # run land with $LAND_ENV (space-separated VAR=value) on top of the fake gh,
-# capturing stdout+stderr in $OUT, the exit code in $RC and gh's calls in $LOG
+# capturing stdout+stderr in $OUT, the exit code in $RC and gh's calls in $LOG.
+# land reads config.sh from the default branch as origin has it, so the config a
+# test wrote is first committed to master and origin/HEAD pointed at it, as a
+# clone would have it - unless BRANCH_ONLY is set, which leaves it in the working
+# tree the way a branch that edited it would. --no-verify: no hook is installed
+# here, and one inherited from the machine's git config is not what is under test.
 landing() {
+  if [ -z "${BRANCH_ONLY:-}" ]; then
+    git add scripts/harness/config.sh && git commit -qm config --no-verify --allow-empty
+    git update-ref refs/remotes/origin/master HEAD
+    git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/master
+  fi
   : > "$R/gh.log"; rm -f "$R/gh.log.n" "$R/gh.log.updated" "$R/gh.log.tried" "$R/gh.log.reads"
   set +e
   OUT=$(env GH_TOKEN= $LAND_ENV FAKE_LOG="$R/gh.log" PATH="$FAKE_BIN:$PATH" \
@@ -1426,6 +1436,32 @@ landing 7
 assert_eq "refuses a negation it cannot honour" "$RC" 2
 assert_no "before asking GitHub anything" "$LOG" "pr "
 sed -i.bak '/HARNESS_LAND_NO_CI/d' scripts/harness/config.sh
+
+# The branch being merged cannot loosen how it is merged. config.sh is read from
+# the default branch as origin has it, as --landing reads who may merge: read from
+# the working tree, a branch could add ** here and skip its own CI.
+landing 7
+echo 'HARNESS_LAND_NO_CI="**"' >> scripts/harness/config.sh
+LAND_ENV="CHECKS=none FILES=src/a.ts" BRANCH_ONLY=1
+landing 7
+assert_eq "a branch that marks every path as CI-free still waits for CI" "$RC" 1
+assert_no "and merges nothing without it" "$LOG" "pr merge"
+echo 'HARNESS_LAND_METHOD=fast-forward' >> scripts/harness/config.sh
+LAND_ENV=""
+landing 7
+assert_eq "a method set only on the branch does not reach land either" "$RC" 0
+assert_has "which merges the way the default branch says" "$LOG" "pr merge 7 -R me/app --merge "
+git symbolic-ref -d refs/remotes/origin/HEAD
+git update-ref -d refs/remotes/origin/master
+sed -i.bak '/HARNESS_LAND_METHOD/d' scripts/harness/config.sh
+echo 'HARNESS_LAND_METHOD=squash' >> scripts/harness/config.sh
+landing 7
+assert_eq "with no default branch on origin it still lands" "$RC" 0
+assert_has "with the defaults, not the working tree's config" "$LOG" "pr merge 7 -R me/app --merge "
+assert_has "and says so" "$OUT" "landing with the defaults"
+assert_has "naming how to give origin a default branch" "$OUT" "git remote set-head origin -a"
+BRANCH_ONLY=
+git checkout -q scripts/harness/config.sh
 
 echo 'HARNESS_LAND_METHOD=squash' >> scripts/harness/config.sh
 LAND_ENV=""
