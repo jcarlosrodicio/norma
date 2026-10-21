@@ -113,6 +113,14 @@ depend only on domain and ports?" gets a decision.
    carried out; but the rule lets any agent in the repository run `land` on any
    pull request, which is a wider grant than the `Landing:` answer, and the owner
    says yes to it on its own or not at all.
+
+   Under `agent`, some pull requests stay the owner's: the harness's own paths
+   always, and whichever paths the owner names here. Ask which parts of this
+   project an agent should never land on its own - migrations, payments,
+   authentication, infrastructure, CI configured outside `.github/workflows/`,
+   the project's own agent instructions - and write them, in GitHub's path syntax, into
+   `HARNESS_LAND_OWNER_PATHS` in `config.sh`. None is a valid answer; the harness's
+   paths and the floor guard still apply.
 8. For `land`, whichever the answer: if the CI workflow has a `paths-ignore`, the
    same paths go into `HARNESS_LAND_NO_CI` in `config.sh` - in GitHub's syntax, as
    the workflow writes them - or a pull request touching only those waits for

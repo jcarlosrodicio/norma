@@ -306,7 +306,8 @@ Two limits, both found by review and neither closed:
 ### `core/land` - landing a green pull request
 
 ```sh
-scripts/harness/land <pr> [<owner>/<repo>#<pr>]
+scripts/harness/land [--owner] <pr> [<owner>/<repo>#<pr>]
+scripts/harness/land --landing [<pr>]
 ```
 
 Waits for the pull request's CI, merges exactly the commit that went green, then
@@ -342,6 +343,57 @@ its own `docs/harness/mandatory-steps.md` as one line under `### Landing`,
 An agent asks this instead of interpreting the document, because the moment it
 reads the line is the moment it wants to merge, and every doubt has to fall on
 the side nobody granted.
+
+#### The change sets the bar, not its author
+
+`Landing: agent` grants the merge to an agent; it does not grant every pull
+request. Some are the owner's whatever the line says, because of what they change:
+
+| what makes it the owner's | why |
+|---|---|
+| a file under `scripts/harness/`, `.githooks/`, `docs/harness/`, `.agents/skills/` or `.github/workflows/` - by its name or, for a rename, by its old one, in any case: on a case-insensitive checkout `.Githooks/pre-commit` is the hook | the gate, the hook, the loop, the skills the agents follow and the CI that judges them. A change to any of them changes the bar the change itself is held to |
+| a file matching `HARNESS_LAND_OWNER_PATHS` in `config.sh` - read from the default branch, in GitHub's path syntax, no `!` | what this project considers too sensitive to land unattended - migrations, payments, authentication. It adds to the list above and cannot remove from it |
+| `verify --floor` reporting findings, or unable to check | a skip, a suppression, a deleted test, assertions removed, `config.sh` touched: the cheapest roads to green. Measured on 2026-10-07, three of 28 merged pull requests in three consumers would have gone to the owner, every one with something real to look at |
+| a file list, a file count, a head or a floor that cannot be read; more than the 3000 files GitHub lists; a head that moved while its files were read | a doubt, and every doubt falls on the side nobody granted |
+| a companion touching the harness's own paths | its repository's list and floor cannot be read from here, but a workflow lands in a documentation site too. `land` refuses both before either merges |
+
+`land --landing <pr>` prints `owner` for such a pull request, with the reason on
+stderr, and `land <pr>` refuses it with nothing merged and the command the owner
+lands it with: `land --owner <pr> [companion]`. Under `Landing: owner` none of this
+runs - every landing is already the owner's - and `--landing <pr>` answers without
+asking GitHub.
+
+Decisions inside it:
+
+- **In `land` too, not only in `--landing`.** The template that tells an agent to
+  ask is the project's after the first write, so a consumer installed before this
+  keeps telling its agents to run `--landing` with no pull request. The refusal in
+  `land` is the part that arrives with `norma upgrade` whatever the project's
+  documents say.
+- **`--owner` is a flag, not a proof.** `land` cannot tell who runs it. The flag
+  makes landing such a pull request a deliberate, visible act - in the command, in
+  the shell history, in the agent's transcript - and the skills forbid an agent to
+  pass it unless the owner said so for that pull request. It is the same trust
+  `Landing: agent` already rests on, made explicit at the one point that matters.
+- **The floor is read from the checkout, so the checkout must be the pull
+  request.** `verify --floor` reads the working tree against its merge base; `land`
+  runs it only when `HEAD` is the pull request's head, which is the case for an
+  agent landing the branch it just pushed, and answers `owner` otherwise rather
+  than judge other code. A checkout with untracked files can report findings the
+  pull request does not have; that errs towards the owner too.
+- **The floor guard of the branch is trusted only because the harness's own paths
+  are checked first.** A branch that rewrote `scripts/harness/verify` to say clean,
+  or `config.sh` to narrow `HARNESS_CODE_PATHS`, is already the owner's for
+  touching them.
+- **Read at the pinned head, and the head may only move by `land`'s own update.**
+  The check runs after both heads are pinned and before anything merges; the head
+  is read again after it, and a head that moved refuses. A pull request brought up
+  to date during the wait is not checked again - the update merges the base, whose
+  files are not the change's - but its new head must have the checked head as its
+  first parent, or it is a push nobody checked and `land` refuses.
+- **The list is GitHub Actions'.** CI configured elsewhere - `.gitlab-ci.yml`,
+  `Jenkinsfile`, `.circleci/` - and the project's own agent instructions are the
+  project's to add to `HARNESS_LAND_OWNER_PATHS`; `harness-setup` asks.
 
 The decisions inside it:
 

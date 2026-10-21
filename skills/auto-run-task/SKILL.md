@@ -139,7 +139,8 @@ Do everything that does not depend on the answer **first**. Then:
   `Landing:` line says `agent` - never enable auto-merge, never pass `--admin`, never
   force-push a branch that is already on the remote. Never edit the `Landing:`
   line: it is the owner's grant, and `land --landing` reads it from the default
-  branch precisely so that a run cannot grant itself the merge.
+  branch precisely so that a run cannot grant itself the merge. Never pass
+  `land --owner`: it is the owner's flag, for a pull request the change made theirs.
 - Never deploy, publish a package, run a migration against a production store, or
   create, modify or rotate a credential, a secret or a CI variable.
 - Never write the real `.env`, or any local-only file the repository ships an
@@ -308,10 +309,14 @@ Then:
    report**, because then the local gate is the only thing that ran and the
    reviewer should know it.
 4. **Land it or stop at it - the project's `Landing:` line decides**, the one in
-   `docs/harness/mandatory-steps.md` step 9. Run `scripts/harness/land --landing`
-   and act on what it prints; never read the line by eye, and never infer it from
-   anything else. It prints `agent` only for exactly `Landing: agent`; every other
-   case is `owner`.
+   `docs/harness/mandatory-steps.md` step 9. Run `scripts/harness/land --landing <pr>`
+   from this branch's checkout, at the head you pushed, and act on what it prints;
+   never read the line by eye, and never infer it from anything else. It prints
+   `agent` only for exactly `Landing: agent` **and** a pull request the change
+   leaves to an agent: one that touches the harness itself or a path in
+   `HARNESS_LAND_OWNER_PATHS`, or whose floor guard finds the bar lowered - or
+   cannot check it, which is why the checkout matters - is `owner`, with the reason
+   on stderr. Every other case is `owner` too.
 
    - **`owner` - which is anything `--landing` does not print as `agent`: stop
      at the open pull request.** Do not merge
@@ -319,7 +324,9 @@ Then:
      request, and taking it away is the same mistake as skipping the stops without
      recording anything. End the report with
      `scripts/harness/land <pr> [<owner>/<repo>#<n>]` ready to paste, the companion
-     pull request included if this phase opened one.
+     pull request included if this phase opened one - as
+     `scripts/harness/land --owner <pr> ...` when the line said `agent` and the
+     pull request made it `owner`, with the reason `--landing` gave.
    - **`agent`: land it.** The owner has moved their review point after the
      merge, standing, and this is that decision being carried out - not one this
      run takes. Run `scripts/harness/land <pr> [<owner>/<repo>#<n>]` in the

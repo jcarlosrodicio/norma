@@ -1068,17 +1068,26 @@ case "$1 $2" in
   "auth token") [ "$4" = "${FAKE_ACCOUNT:-me}" ] && [ -n "${FAKE_TOKEN:-}" ] && echo "$FAKE_TOKEN" && exit 0; exit 1 ;;
   "api --paginate")
     [ -z "${FILES_FAIL:-}" ] || exit 1
-    [ -z "${FILES-src/a.ts}" ] || echo "${FILES-src/a.ts}" | tr , '\n' ;;
+    # the companion's files are CO_FILES; PREV are the old names of renamed files,
+    # printed only when land asks for them
+    case "$3" in */site/*) echo "${CO_FILES-index.md}" | tr , '\n'; exit 0 ;; esac
+    [ -z "${FILES-src/a.ts}" ] || echo "${FILES-src/a.ts}" | tr , '\n'
+    case "$*" in *previous_filename*) [ -z "${PREV:-}" ] || echo "$PREV" | tr , '\n' ;; esac ;;
   "pr view")
     p=MAIN; case "$5" in */site) p=CO ;; esac
     case "$7" in
       state) eval "echo \${${p}_STATE:-OPEN}" ;;
       mergeable) eval "echo \${${p}_MERGEABLE:-MERGEABLE}" ;;
-      # after an update the new head appears at once, or (HEAD_LAG) two reads later
+      # after an update the new head appears at once, or (HEAD_LAG) two reads later.
+      # HEAD_SHA=local is the commit checked out, as when an agent lands its own
+      # branch; moving is that commit at the first read and another one after.
       headRefOid)
         if [ -e "$FAKE_LOG.updated" ]; then
           k=$(( $(cat "$FAKE_LOG.reads" 2>/dev/null || echo 0) + 1 )); echo $k > "$FAKE_LOG.reads"
           if [ -n "${HEAD_LAG:-}" ] && [ $k -le 2 ]; then echo abcdef0123456789; else echo "1234567890abcde$(cat "$FAKE_LOG.updated")"; fi
+        elif [ "${HEAD_SHA:-}" = local ]; then git rev-parse HEAD
+        elif [ "${HEAD_SHA:-}" = moving ]; then
+          [ -e "$FAKE_LOG.moved" ] && echo fedcba9876543210 || { touch "$FAKE_LOG.moved"; git rev-parse HEAD; }
         else echo "${HEAD_SHA-abcdef0123456789}"; fi ;;
       # BEHIND: start - behind until updated; late - goes behind at the first
       # merge attempt, until updated; always - never catches up
@@ -1090,6 +1099,7 @@ case "$1 $2" in
           *) echo CLEAN ;;
         esac ;;
       headRefName) echo feature ;;
+      changedFiles) echo "${CHANGED_FILES:-1}" ;;
       # a stacked pull request (8 or 9) is based on feature until something moves
       # it; CHILD_BASE says where it already points
       baseRefName) case "$3" in 8|9) echo "${CHILD_BASE:-feature}" ;; *) echo master ;; esac ;;
@@ -1117,6 +1127,13 @@ case "$1 $2" in
   "api repos/me/site/rules/branches/"*)
     [ -z "${CO_RULES_FAIL:-}" ] || { echo "gh: Upgrade to GitHub Pro (HTTP 403)" >&2; exit 1; }
     echo "${CO_RULED-merge squash rebase}" ;;
+  # the first parent of an updated head: the head before the update, or UPDATE_PARENT
+  "api repos/me/app/commits/"*)
+    if [ -n "${UPDATE_PARENT:-}" ]; then echo "$UPDATE_PARENT"; exit 0; fi
+    k=$(cat "$FAKE_LOG.updated")
+    if [ "$k" -gt 1 ]; then echo "1234567890abcde$((k - 1))"
+    elif [ "${HEAD_SHA:-}" = local ]; then git rev-parse HEAD
+    else echo "${HEAD_SHA-abcdef0123456789}"; fi ;;
   "api repos/"*)
     [ -z "${REF_GONE:-}" ] || { echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
     [ -z "${REF_FORBIDDEN:-}" ] || { echo "gh: Forbidden (HTTP 403)" >&2; exit 1; } ;;
@@ -1160,7 +1177,7 @@ landing() {
     git update-ref refs/remotes/origin/master HEAD
     git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/master
   fi
-  : > "$R/gh.log"; rm -f "$R/gh.log.n" "$R/gh.log.updated" "$R/gh.log.tried" "$R/gh.log.reads"
+  : > "$R/gh.log"; rm -f "$R/gh.log.n" "$R/gh.log.updated" "$R/gh.log.tried" "$R/gh.log.reads" "$R/gh.log.moved"
   set +e
   OUT=$(env GH_TOKEN= $LAND_ENV FAKE_LOG="$R/gh.log" PATH="$FAKE_BIN:$PATH" \
     sh scripts/harness/land "$@" 2>&1)
@@ -1173,7 +1190,7 @@ new_repo; with_land
 LAND_ENV=""
 landing
 assert_eq "refuses to run without a pull request" "$RC" 2
-assert_has "and says how it is called" "$OUT" "usage: scripts/harness/land <pr>"
+assert_has "and says how it is called" "$OUT" "usage: scripts/harness/land [--owner] <pr>"
 landing 7 site#3
 assert_eq "refuses a companion that names no repository" "$RC" 2
 landing 7 me/site#x
@@ -1462,6 +1479,153 @@ assert_has "and says so" "$OUT" "landing with the defaults"
 assert_has "naming how to give origin a default branch" "$OUT" "git remote set-head origin -a"
 BRANCH_ONLY=
 git checkout -q scripts/harness/config.sh
+
+# Under Landing: agent the change, not its author, says whether an agent may land
+# it. The harness's own paths, the project's HARNESS_LAND_OWNER_PATHS, and a floor
+# guard that finds the bar lowered - or cannot look - make it the owner's.
+mkdir -p docs/harness
+printf '# Loop\n\n### Landing\n\nLanding: agent\n' > docs/harness/mandatory-steps.md
+printf '#!/bin/sh\necho "floor stub $*"\nexit ${FLOOR_RC:-0}\n' > scripts/harness/verify
+chmod +x scripts/harness/verify
+git add docs/harness/mandatory-steps.md scripts/harness/verify
+LAND_ENV="HEAD_SHA=local"
+landing 7
+assert_eq "an agent lands a pull request with nothing of the owner's in it" "$RC" 0
+assert_has "once the floor guard looked at it" "$OUT" "floor stub --floor"
+LAND_ENV="HEAD_SHA=local FILES=src/ci.yml PREV=.github/workflows/ci.yml"
+landing 7
+assert_eq "a file renamed out of an owner path is the owner's" "$RC" 1
+assert_has "by its old name" "$OUT" "it touches .github/workflows/ci.yml"
+LAND_ENV="HEAD_SHA=local FILES=.GitHub/workflows/ci.yml"
+landing 7
+assert_eq "an owner path in another case is the owner's: a macOS checkout is case-insensitive" "$RC" 1
+LAND_ENV="HEAD_SHA=local CHANGED_FILES=3000"
+landing 7
+assert_eq "so is a pull request with more files than GitHub lists" "$RC" 1
+assert_has "saying so" "$OUT" "it changes 3000 files, more than GitHub lists"
+LAND_ENV="HEAD_SHA=local CHANGED_FILES=x"
+landing 7
+assert_eq "and one whose file count cannot be read" "$RC" 1
+LAND_ENV="HEAD_SHA=local CO_FILES=.github/workflows/deploy.yml"
+landing 7 me/site#3
+assert_eq "a companion touching the harness's paths is the owner's" "$RC" 1
+assert_has "named as the one that is" "$OUT" "me/site#3 is the owner's to land: it touches .github/workflows/deploy.yml"
+assert_no "and nothing merged, the first one included" "$LOG" "pr merge"
+LAND_ENV="HEAD_SHA=local"
+landing 7 me/site#3
+assert_eq "a clean one lands with it" "$RC" 0
+LAND_ENV="HEAD_SHA=local BEHIND=start"
+landing 7
+assert_eq "an agent lands a checked pull request brought up to date" "$RC" 0
+assert_has "pinned to the update" "$LOG" "--match-head-commit 1234567890abcde1"
+LAND_ENV="HEAD_SHA=local BEHIND=start UPDATE_PARENT=0000000000000000"
+landing 7
+assert_eq "but not a head that moved beyond the update" "$RC" 1
+assert_has "saying so" "$OUT" "moved beyond its update"
+assert_no "and merging nothing" "$LOG" "pr merge"
+for f in scripts/harness/verify .githooks/pre-commit docs/harness/mandatory-steps.md \
+  .agents/skills/run-task/SKILL.md .github/workflows/ci.yml; do
+  LAND_ENV="HEAD_SHA=local FILES=src/a.ts,$f"
+  landing 7
+  assert_eq "refuses an agent a pull request touching $f" "$RC" 1
+  assert_has "saying it is the owner's: $f" "$OUT" "me/app#7 is the owner's to land: it touches $f, an owner path"
+  assert_no "and merging nothing: $f" "$LOG" "pr merge"
+done
+assert_has "naming the command the owner lands it with" "$OUT" "scripts/harness/land --owner 7"
+LAND_ENV="HEAD_SHA=local FILES=.github/workflows/ci.yml"
+landing --owner 7
+assert_eq "which lands it" "$RC" 0
+assert_has "merged" "$LOG" "pr merge 7 -R me/app --merge"
+landing --owner 7 me/site#3
+assert_eq "with its companion" "$RC" 0
+LAND_ENV="HEAD_SHA=local FILES=.github/workflows/ci.yml"
+landing 7 me/site#3
+assert_has "and the command it names keeps the companion" "$OUT" "scripts/harness/land --owner 7 me/site#3"
+echo 'HARNESS_LAND_OWNER_PATHS="db/migrations/** *.sql"' >> scripts/harness/config.sh
+LAND_ENV="HEAD_SHA=local FILES=src/a.ts,db/migrations/0042/users.rb"
+landing 7
+assert_eq "a path in HARNESS_LAND_OWNER_PATHS is the owner's too" "$RC" 1
+assert_has "and named" "$OUT" "it touches db/migrations/0042/users.rb"
+LAND_ENV="HEAD_SHA=local FILES=schema.sql"
+landing 7
+assert_eq "read in GitHub's syntax" "$RC" 1
+LAND_ENV="HEAD_SHA=local FILES=src/schema.sql"
+landing 7
+assert_eq "where a single * does not cross a directory" "$RC" 0
+LAND_ENV="HEAD_SHA=local FILES=.github/workflows/ci.yml"
+landing 7
+assert_eq "and the project's list adds to the harness's, never replaces it" "$RC" 1
+sed -i.bak '/HARNESS_LAND_OWNER_PATHS/d' scripts/harness/config.sh
+echo "HARNESS_LAND_OWNER_PATHS='['" >> scripts/harness/config.sh
+LAND_ENV="HEAD_SHA=local"
+landing 7
+assert_eq "a pattern that cannot be read is the owner's" "$RC" 1
+assert_has "saying which setting" "$OUT" "HARNESS_LAND_OWNER_PATHS holds a pattern that cannot be read"
+sed -i.bak '/HARNESS_LAND_OWNER_PATHS/d' scripts/harness/config.sh
+echo 'HARNESS_LAND_OWNER_PATHS="db/** !db/seeds/**"' >> scripts/harness/config.sh
+landing 7
+assert_eq "refuses a negation in HARNESS_LAND_OWNER_PATHS" "$RC" 2
+assert_no "before asking GitHub anything" "$LOG" "pr "
+sed -i.bak '/HARNESS_LAND_OWNER_PATHS/d' scripts/harness/config.sh
+LAND_ENV="HEAD_SHA=local FLOOR_RC=1"
+landing 7
+assert_eq "a floor guard that finds the bar lowered makes it the owner's" "$RC" 1
+assert_has "saying so" "$OUT" "the floor guard found the bar lowered"
+assert_no "and merging nothing" "$LOG" "pr merge"
+LAND_ENV="HEAD_SHA=local FLOOR_RC=2"
+landing 7
+assert_eq "so does one that could not check" "$RC" 1
+assert_has "said apart" "$OUT" "the floor guard could not check it"
+LAND_ENV=""
+landing 7
+assert_eq "a checkout that is not the pull request cannot have its floor checked" "$RC" 1
+assert_has "and says which commit it is not at" "$OUT" "this checkout is not at abcdef0"
+assert_no "without running the guard on the wrong code" "$OUT" "floor stub"
+LAND_ENV="HEAD_SHA=local FILES_FAIL=1"
+landing 7
+assert_eq "files that cannot be listed are the owner's" "$RC" 1
+assert_has "saying so" "$OUT" "its files could not be listed"
+LAND_ENV="HEAD_SHA=local FILES="
+landing 7
+assert_eq "so is a file list that came back empty" "$RC" 1
+LAND_ENV="HEAD_SHA=moving"
+landing 7
+assert_eq "a head that moved while its files were read refuses" "$RC" 1
+assert_has "saying so" "$OUT" "moved while its files were read"
+assert_no "and merges nothing" "$LOG" "pr merge"
+rm scripts/harness/verify
+LAND_ENV="HEAD_SHA=local"
+landing 7
+assert_eq "no gate to check the floor with is the owner's" "$RC" 1
+
+# --landing <pr> answers the same question before land is run, from the same rules.
+asking() {
+  : > "$R/gh.log"; rm -f "$R/gh.log.moved"
+  set +e
+  OUT=$(env GH_TOKEN= $LAND_ENV FAKE_LOG="$R/gh.log" PATH="$FAKE_BIN:$PATH" \
+    sh scripts/harness/land --landing "$@" 2>"$R/ask.err"); RC=$?
+  ERR=$(cat "$R/ask.err"); LOG=$(cat "$R/gh.log")
+  set -e
+}
+git checkout -q scripts/harness/verify
+LAND_ENV="HEAD_SHA=local"
+asking 7
+assert_eq "--landing <pr> prints agent for a pull request an agent may land" "$OUT" "agent"
+assert_eq "and exits 0" "$RC" 0
+LAND_ENV="HEAD_SHA=local FILES=.githooks/pre-commit"
+asking 7
+assert_eq "and owner for one that is the owner's" "$OUT" "owner"
+assert_has "saying why" "$ERR" "it touches .githooks/pre-commit, an owner path"
+assert_eq "still exiting 0" "$RC" 0
+asking 7 8
+assert_eq "it takes one pull request at most" "$RC" 2
+git rm -q docs/harness/mandatory-steps.md
+LAND_ENV="HEAD_SHA=local FILES=.github/workflows/ci.yml"
+landing 7
+assert_eq "under Landing: owner land merges what it is given, as before" "$RC" 0
+asking 7
+assert_eq "and --landing <pr> is owner" "$OUT" "owner"
+assert_no "without asking GitHub" "$LOG" "pr view"
 
 echo 'HARNESS_LAND_METHOD=squash' >> scripts/harness/config.sh
 LAND_ENV=""
@@ -1956,7 +2120,7 @@ assert_has "auto-run-task delegates the stages to run-task instead of copying th
 # Who merges is the project's line, not the skill's. The skill reads it, lands only
 # through land and only on `agent`, and stops at the pull request on anything else.
 assert_has "auto-run-task reads the project's Landing line" "$auto" "Landing:"
-assert_has "through the reader that fails closed, not by eye" "$auto" "Run \`scripts/harness/land --landing\`"
+assert_has "through the reader that fails closed, not by eye" "$auto" "Run \`scripts/harness/land --landing <pr>\`"
 assert_has "spending CI attempts once, not again through land" "$auto" "gets no third through"
 assert_has "governing the companion with this repository's line" "$auto" "pass one only if this run opened it"
 assert_has "and reporting a give-up as the escalation it is" "$auto" "escalation
