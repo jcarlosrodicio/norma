@@ -1,7 +1,8 @@
 ---
 name: runtime-verification
 description: Use after the verification gate passes and before the adversarial review, whenever a change could show up at runtime - a screen, an endpoint, a command, a job, a migration. It is the step that proves the thing works rather than that the tests pass, so use it whenever the human asks for QA, to try it for real, to check a flow by hand, or to confirm a change actually behaves in the running system. It does not replace scripts/harness/verify, which proves something else.
-version: 1.0.0
+metadata:
+  version: "1.0.0"
 ---
 
 # runtime-verification

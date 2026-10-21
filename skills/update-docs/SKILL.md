@@ -1,7 +1,8 @@
 ---
 name: update-docs
 description: Use as the last step of any change that altered behaviour, contracts, schema or architecture, before committing - updates the technical documentation the project treats as its source of truth so the next session starts from accurate context.
-version: 1.0.0
+metadata:
+  version: "1.0.0"
 ---
 
 # update-docs
