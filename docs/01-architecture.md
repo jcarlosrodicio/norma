@@ -517,11 +517,20 @@ The decisions inside it:
   requests too, racing `land`'s own move: a move that fails counts as done when
   the pull request already points at the base, and only then. A failed delete is
   reported only when the branch is really still there.
+- **The REST API where `gh`'s own commands vary by version.** `gh pr
+  update-branch` does not exist in the `gh` Ubuntu ships (2.46), and `gh pr edit`
+  there fails on a deprecated GraphQL field even when the edit went through - found
+  landing norma's own pull requests on 2026-10-21, when the first stopped a stacked
+  pull request from landing and the second reported a branch kept that GitHub had
+  already deleted. `land` updates a branch with `PUT .../update-branch`, passing
+  the pinned head as `expected_head_sha`, and moves a stacked pull request with
+  `PATCH .../pulls/<n>`.
 - **A pull request behind its base is brought up to date, not refused.** A
   repository that merges only up-to-date branches refuses one whose base moved -
   before the wait, or during it, when another pull request lands first, which with
-  several agents is the normal case. `land` runs `gh pr update-branch`, and the
-  update is a new head: pinned and waited for like the first. Three updates and it
+  several agents is the normal case. `land` asks GitHub's REST API to update it
+  from the pinned head, and the update is a new head: pinned and waited for like
+  the first. Three updates and it
   stops - the base is moving faster than CI. It waits for the update commit to
   become the reported head before pinning it, so the pin never names the old one.
   Any other refused merge says only that GitHub refused it, with GitHub's own
