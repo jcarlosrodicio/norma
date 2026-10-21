@@ -223,6 +223,13 @@ The review leaves its report **in the change**, next to the verification report.
 That is what makes it survive the session that wrote it - and the corrections are
 often another session, which can only read files.
 
+A review that ends not safe to commit sends the change back to stage 4: fix, run
+stage 5 again, and review again - the next round reads only what the fixes
+changed, as the skill says. **The third round that still blocks ends the loop
+here**: stop and hand the human the three reports. The approach is what needs a
+decision now, and only the human can take it. Pre-existing findings never block a
+round; they go in the report for somebody to pick up.
+
 Fix what it finds, then re-run stage 5. A finding you argue with instead of checking
 is a finding you did not understand yet.
 

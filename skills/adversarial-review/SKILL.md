@@ -2,7 +2,7 @@
 name: adversarial-review
 description: Use after an implementation passes its own tests and verification, before committing or archiving a change - an independent red-team pass that assumes the work is wrong and tries to break it. Also use when the user asks for a devil's advocate, red-team or independent review.
 metadata:
-  version: "1.3.0"
+  version: "1.4.0"
 ---
 
 # adversarial-review
@@ -175,12 +175,49 @@ it looks - it still removes what the diff flatly refutes. When the pass runs in 
 fresh session with a different model, as the context boundary asks, so does this
 step, and then it is worth considerably more.
 
+## 5. Rounds
+
+A review that ends not safe to commit sends the change back to be fixed, and then
+it is reviewed again. Each pass is a **round**, and the rounds are not alike.
+
+**Round 1 reviews the whole change.** Record in the report what it reviewed:
+`git rev-parse HEAD`, and when the tree had uncommitted changes, the hash
+`git stash create` prints - it records them as a commit without touching the tree
+or the stash list.
+
+**Every later round reviews only what changed since the last one**: `git diff`
+against the commit the previous report recorded, plus any file that did not exist
+then. The rest was reviewed already. Read the previous report first - it is a
+review, not the author's reasoning, so the context boundary does not apply to it -
+and close every one of its findings as **resolved**, **still open** or **dismissed
+with a reason**. Do not raise again what it already raised: a finding the fix did
+not resolve is *still open*, not new, and one dismissed with a reason stays
+dismissed unless the diff contradicts the reason.
+
+**Name the class, not only the instance.** When a finding is one case of a
+pattern - a missing bound, an unchecked error, the same assumption in three
+callers - say the pattern and list every instance in the change, so one round fixes
+all of them instead of one round each.
+
+**Three rounds is the cap.** If the third still ends with something blocking, stop
+reviewing: the verdict is not safe to commit, and the report says the approach is
+what needs reconsidering - a fourth round on the same approach is where a change
+goes to spend fifty passes fixing what the last fix broke. That goes to the human.
+
 ## Output
 
-Open with the coverage line: files in the change, files reviewed, files skipped,
-and the reason for each skip.
+Open with the coverage line: the round, files in the change, files reviewed,
+files skipped, and the reason for each skip. From round 2, the coverage is the
+files the round's diff touched.
 
-Then group findings by severity: **Blocking**, **Should fix**, **Nit**.
+Then group findings by severity: **Blocking**, **Should fix**, **Nit** - and
+**Pre-existing**, apart from the rest.
+
+A finding is **pre-existing** when the defect was there before this change and the
+change neither wrote it, nor modified it, nor made it reachable in a new way. It
+is reported - somebody should know - but it never blocks, it is never counted as
+blocking or unresolved, and it is not the change's to fix. If the change makes it
+worse, newly reachable or newly exposed, it is the change's, at its real severity.
 
 Each finding:
 
@@ -217,9 +254,10 @@ Then record the same thing where a machine can read it, **in addition to** the
 report above and never instead of it:
 
 ```
-scripts/harness/run event review review=adversarial \
+scripts/harness/run event review review=adversarial round=<n> \
   files_in_change=<n> files_reviewed=<n> files_skipped=<n> \
-  blocking=<n> should_fix=<n> nit=<n> verdict=<safe_to_commit|not_safe_to_commit>
+  blocking=<n> should_fix=<n> nit=<n> pre_existing=<n> \
+  verdict=<safe_to_commit|not_safe_to_commit>
 ```
 
 Counts and a verdict, not a score: the findings themselves stay in the report file,

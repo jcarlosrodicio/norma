@@ -69,6 +69,8 @@ assumption is indistinguishable from a bug that has not been found yet.
 5. **The harness itself is what is blocking** - `config.sh` names a command this
    machine does not have, the gate refuses for a reason that is not your change.
 6. **Two attempts at the same failure both failed.** Not three. Attach the output.
+   A review whose third round still blocks is this reason too: the fixes are not
+   converging, and the approach is what failed. Attach the three reports.
 7. **The phase looks wrong or already done** - the roadmap and the repository
    disagree.
 
