@@ -351,7 +351,8 @@ request. Some are the owner's whatever the line says, because of what they chang
 
 | what makes it the owner's | why |
 |---|---|
-| a file under `scripts/harness/`, `.githooks/`, `docs/harness/`, `.agents/skills/` or `.github/workflows/` - by its name or, for a rename, by its old one, in any case: on a case-insensitive checkout `.Githooks/pre-commit` is the hook | the gate, the hook, the loop, the skills the agents follow and the CI that judges them. A change to any of them changes the bar the change itself is held to |
+| a file under `scripts/harness/`, `.githooks/`, `docs/harness/` or `.github/workflows/` - by its name or, for a rename, by its old one, in any case: on a case-insensitive checkout `.Githooks/pre-commit` is the hook | the gate, the hook, the loop and the CI that judges them. A change to any of them changes the bar the change itself is held to |
+| a file under `.agents/`, `.claude/`, `.codex/`, `.opencode/` or `.pi/`; an `AGENTS.md` or `CLAUDE.md` in any directory; `.mcp.json`, `opencode.json`, `opencode.jsonc`, `.cursor/mcp.json` or `.vscode/mcp.json` - matched the same way | what tells an agent what to do and what it may reach: its skills, its instructions, its settings, its hooks and its MCP servers. An agent that rewrites them rewrites the agent that lands next |
 | a file matching `HARNESS_LAND_OWNER_PATHS` in `config.sh` - read from the default branch, in GitHub's path syntax, no `!` | what this project considers too sensitive to land unattended - migrations, payments, authentication. It adds to the list above and cannot remove from it |
 | `verify --floor` reporting findings, or unable to check | a skip, a suppression, a deleted test, assertions removed, `config.sh` touched: the cheapest roads to green. Measured on 2026-10-07, three of 28 merged pull requests in three consumers would have gone to the owner, every one with something real to look at |
 | a file list, a file count, a head or a floor that cannot be read; more than the 3000 files GitHub lists; a head that moved while its files were read | a doubt, and every doubt falls on the side nobody granted |
@@ -391,9 +392,10 @@ Decisions inside it:
   to date during the wait is not checked again - the update merges the base, whose
   files are not the change's - but its new head must have the checked head as its
   first parent, or it is a push nobody checked and `land` refuses.
-- **The list is GitHub Actions'.** CI configured elsewhere - `.gitlab-ci.yml`,
-  `Jenkinsfile`, `.circleci/` - and the project's own agent instructions are the
-  project's to add to `HARNESS_LAND_OWNER_PATHS`; `harness-setup` asks.
+- **The CI in the list is GitHub Actions'.** CI configured elsewhere -
+  `.gitlab-ci.yml`, `Jenkinsfile`, `.circleci/` - and the settings of an agent not
+  named here are the project's to add to `HARNESS_LAND_OWNER_PATHS`;
+  `harness-setup` asks.
 
 The decisions inside it:
 

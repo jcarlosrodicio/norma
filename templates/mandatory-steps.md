@@ -237,8 +237,10 @@ it - is `owner`. Changing it is the owner's decision, merged like any other chan
   merge around `land`. The owner keeps one pull request open by saying so for that
   task, and then it is `owner` for that one. Even under `agent`, the change can
   make a pull request the owner's: one that touches the harness itself
-  (`scripts/harness/`, `.githooks/`, `docs/harness/`, `.agents/skills/`,
-  `.github/workflows/`) or a path in `HARNESS_LAND_OWNER_PATHS`, or whose floor
+  (`scripts/harness/`, `.githooks/`, `docs/harness/`, `.github/workflows/`), what
+  an agent is told or may reach (`.agents/`, `.claude/`, any `AGENTS.md` or
+  `CLAUDE.md`, `.mcp.json` and the other agents' settings) or a path in
+  `HARNESS_LAND_OWNER_PATHS`, or whose floor
   guard finds the bar lowered. `land --landing <pr>` says so, `land` refuses it,
   and the owner lands it with `scripts/harness/land --owner <pr>`.
 

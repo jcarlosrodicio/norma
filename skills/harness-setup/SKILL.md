@@ -118,7 +118,7 @@ depend only on domain and ports?" gets a decision.
    always, and whichever paths the owner names here. Ask which parts of this
    project an agent should never land on its own - migrations, payments,
    authentication, infrastructure, CI configured outside `.github/workflows/`,
-   the project's own agent instructions - and write them, in GitHub's path syntax, into
+   the settings of an agent the harness does not name - and write them, in GitHub's path syntax, into
    `HARNESS_LAND_OWNER_PATHS` in `config.sh`. None is a valid answer; the harness's
    paths and the floor guard still apply.
 8. For `land`, whichever the answer: if the CI workflow has a `paths-ignore`, the
