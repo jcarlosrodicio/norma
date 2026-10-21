@@ -345,6 +345,14 @@ the side nobody granted.
 
 The decisions inside it:
 
+- **Its settings come from the default branch too.** `HARNESS_LAND_NO_CI` and
+  `HARNESS_LAND_METHOD` are read from `scripts/harness/config.sh` as origin's
+  default branch has it, for the reason the Landing line is: read from the working
+  tree, a branch could set `HARNESS_LAND_NO_CI="**"` and merge itself without
+  waiting for its CI. A change to either takes effect once it is on the default
+  branch, and as fresh as the last fetch. With no default branch known to git, or
+  no `config.sh` on it, `land` says so and uses the defaults - wait for CI, merge -
+  which is the reading that can only wait longer, never merge sooner.
 - **`--match-head-commit` with the sha read before the wait**, for the pull
   request and for its companion. A push after that point would otherwise land a
   commit no check ran on. GitHub refuses the merge instead, and `land` says so; a

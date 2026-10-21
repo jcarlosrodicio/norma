@@ -16,7 +16,8 @@
 #
 # It merges exactly the commit that went green - a push after the checks passed makes
 # the merge refuse rather than land code nobody tested - and stops with nothing merged
-# on red CI or a conflict. Two settings come from scripts/harness/config.sh:
+# on red CI or a conflict. Two settings come from scripts/harness/config.sh, read
+# from the default branch as origin has it, like the Landing line:
 #
 #   HARNESS_LAND_NO_CI    space-separated patterns of the paths CI does not run on -
 #                         its paths-ignore, in GitHub's syntax: ** crosses directories,
@@ -29,6 +30,18 @@
 set -eu
 
 usage() { echo "usage: scripts/harness/land <pr> [<owner>/<repo>#<pr>] | --landing" >&2; exit 2; }
+
+# The default branch as origin has it - never the working tree, which the branch
+# being merged could have changed. Empty when origin names none.
+default_branch() {
+  b=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
+  if [ -z "$b" ]; then
+    for c in origin/main origin/master; do
+      if git rev-parse -q --verify "$c" >/dev/null; then b=$c; break; fi
+    done
+  fi
+  echo "$b"
+}
 
 if [ "${1:-}" = --landing ]; then
   [ $# -eq 1 ] || usage
@@ -51,12 +64,7 @@ if [ "${1:-}" = --landing ]; then
   }
   # Read from the default branch as origin has it, never from the working tree: a
   # branch can say anything, and the branch about to be merged is the one asking.
-  base=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
-  if [ -z "$base" ]; then
-    for b in origin/main origin/master; do
-      if git rev-parse -q --verify "$b" >/dev/null; then base=$b; break; fi
-    done
-  fi
+  base=$(default_branch)
   if [ -z "$base" ]; then
     echo owner
     echo "land: no default branch of origin to read the Landing line from - reading it as owner (git remote set-head origin -a)" >&2
@@ -86,8 +94,19 @@ fi
 cd "$(git rev-parse --show-toplevel)"
 HARNESS_LAND_NO_CI=""
 HARNESS_LAND_METHOD=merge
+# From the default branch, for the reason --landing reads from there: read from the
+# working tree, a branch could set HARNESS_LAND_NO_CI="**" and skip its own CI.
 # config.sh only defines settings and functions; nothing in it runs when sourced.
-if [ -f scripts/harness/config.sh ]; then . scripts/harness/config.sh; fi
+base=$(default_branch)
+if [ -n "$base" ] && conf=$(git show "$base:scripts/harness/config.sh" 2>/dev/null); then
+  eval "$conf"
+else
+  if [ -n "$base" ]; then
+    echo "land: no scripts/harness/config.sh on $base - landing with the defaults: wait for CI, $HARNESS_LAND_METHOD" >&2
+  else
+    echo "land: no default branch of origin to read scripts/harness/config.sh from (git remote set-head origin -a) - landing with the defaults: wait for CI, $HARNESS_LAND_METHOD" >&2
+  fi
+fi
 case "$HARNESS_LAND_METHOD" in
   merge|squash|rebase) ;;
   *) echo "land: HARNESS_LAND_METHOD must be merge, squash or rebase, not '$HARNESS_LAND_METHOD'" >&2; exit 2 ;;

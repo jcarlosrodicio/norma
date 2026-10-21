@@ -376,5 +376,13 @@ agent about to merge should be handed. It reads the default branch, not the
 working tree, so a branch that rewrites the line changes nothing until the owner
 merges that change.
 
+`land` reads `HARNESS_LAND_NO_CI` and `HARNESS_LAND_METHOD` the same way, from
+`config.sh` on the default branch: a branch that empties its own CI wait with
+`HARNESS_LAND_NO_CI="**"` still waits. With no default branch known to git, or no
+`config.sh` on it, it says so, names `git remote set-head origin -a`, and lands
+with the defaults - every pull request waits for CI, merged with `merge`. That
+fails closed: a pull request touching only ignored paths waits for checks that
+never come and refuses, rather than one touching code skipping its own.
+
 Soften none of these without reading the reason and replacing it with something
 stronger.
