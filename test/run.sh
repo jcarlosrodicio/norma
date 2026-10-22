@@ -330,6 +330,8 @@ assert_eq "a kind outside the two is refused" "$RC" 2
 assert_has "naming both of them" "$OUT" "benchmark"
 ctx event verify Mode=full
 assert_eq "an event key that is not lowercase is refused" "$RC" 2
+ctx event Verify mode=full
+assert_eq "an event type that is not lowercase is refused" "$RC" 2
 ctx event verify lonely
 assert_eq "an event field that is not key=value is refused" "$RC" 2
 done_repo
