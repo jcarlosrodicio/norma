@@ -127,6 +127,12 @@ If the change carries no identifiable risk, write that instead of padding the li
     one is **blocking** unless the change's own report names it and quotes the
     requirement that backs it - the same bar `run-task` sets for a check it calls
     wrong. Tightening the bar needs no justification; loosening it always does.
+11. **Tests that prove nothing new.** A new test that re-proves what an existing
+    one already asserts, the same rule tested again at a slower layer, a table of
+    near-identical cases, or anything "Which tests to write" in
+    `.agents/skills/architecture-guidelines/SKILL.md` says not to test. Name the
+    existing test it duplicates, or the rule it breaks. It is **should fix**: it
+    does not make the change wrong, it makes every later task slower.
 
 Cross-file findings are part of the job: an inconsistency between two files in the
 change, an update applied to one caller and not the other, a contract broken on one

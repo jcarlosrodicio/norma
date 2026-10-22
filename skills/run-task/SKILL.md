@@ -115,6 +115,12 @@ Follow `.agents/skills/openspec-apply-change/SKILL.md`, respecting every step in
 `docs/harness/mandatory-steps.md`: tests before implementation, the project's layer
 boundaries, and the mandatory verification steps in their stated order.
 
+Write the fewest tests that pin the change, following "Which tests to write" in
+`.agents/skills/architecture-guidelines/SKILL.md`: search for the test that already
+covers the behaviour first, then one test per rule at the cheapest layer, in the
+owning module's file. Every test you add is run by every later task and every CI
+run.
+
 **`.env.example` is yours to write; `.env` is the human's.** When you add a variable,
 update the example in the same change - an example that lags the code is how the next
 person gets a broken setup on their first try. Never write the real `.env`: it holds
