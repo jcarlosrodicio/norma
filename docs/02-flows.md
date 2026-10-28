@@ -356,7 +356,8 @@ working outside a repository sees.
 | `HARNESS_LAND_METHOD` other than `merge`, `squash` or `rebase` | 2 | Decided before GitHub is asked anything. |
 | A `!` negation in `HARNESS_LAND_NO_CI` | 2 | Half-honouring it could skip the wait for a path CI does run on. |
 | A `!` negation in `HARNESS_LAND_OWNER_PATHS` | 2 | Half-honouring it could hand an agent a path the owner kept. |
-| Under `Landing: agent`, without `--owner`: a pull request touching the harness's own paths or `HARNESS_LAND_OWNER_PATHS` - in any case, by its name or its old one - whose floor guard finds the bar lowered, whose files, file count, head or floor cannot be read here, or with more files than GitHub lists; or a companion touching the harness's own paths | 1 | The change sets the bar, not its author: an agent cannot lower the gate, edit the loop or touch what the owner kept, and land it itself. The message names the reason and `land --owner <pr>`, the command the owner lands it with. |
+| `HARNESS_LAND_FIXED_PATHS` other than `agent` or unset | 2 | A typo must not hand the harness's paths to an agent, nor silently fail to. |
+| Under `Landing: agent`, without `--owner`: a pull request touching the harness's own paths (with `HARNESS_LAND_FIXED_PATHS=agent`, only `scripts/harness/` and `.github/workflows/`) or `HARNESS_LAND_OWNER_PATHS` - in any case, by its name or its old one - whose floor guard finds the bar lowered, whose files, file count, head or floor cannot be read here, or with more files than GitHub lists; or a companion touching the harness's own paths | 1 | The change sets the bar, not its author: an agent cannot lower the gate, edit the loop or touch what the owner kept, and land it itself - the loop and the agents' files aside when the owner handed them over with `HARNESS_LAND_FIXED_PATHS=agent`. The message names the reason and `land --owner <pr>`, the command the owner lands it with. |
 | `HARNESS_LAND_REVIEW` other than `required` or unset | 2 | A typo would silently turn the requirement off. |
 | With `HARNESS_LAND_REVIEW=required`: no `norma/review` on the head, one that is not `success`, or one that cannot be read | 1 | A review vouches for one commit; a head without a passing verdict is one nobody vouched for. Asked before the CI wait, and `--owner` does not replace it. The message names `land --review`. |
 | `--review` without exactly a pull request, `blocking=<n>` and `unresolved=<n>` | 2 | A verdict a machine reads has one shape. |
@@ -389,7 +390,7 @@ when the line says so, and under `agent` `owner` again for a pull request the
 change makes the owner's, with the reason on stderr - from the same rules `land`
 refuses with, so asking first and landing never disagree.
 
-`land` reads `HARNESS_LAND_NO_CI`, `HARNESS_LAND_OWNER_PATHS`, `HARNESS_LAND_REVIEW` and `HARNESS_LAND_METHOD` the same way, from
+`land` reads `HARNESS_LAND_NO_CI`, `HARNESS_LAND_OWNER_PATHS`, `HARNESS_LAND_FIXED_PATHS`, `HARNESS_LAND_REVIEW` and `HARNESS_LAND_METHOD` the same way, from
 `config.sh` on the default branch: a branch that empties its own CI wait with
 `HARNESS_LAND_NO_CI="**"` still waits. With no default branch known to git, or no
 `config.sh` on it, it says so, names `git remote set-head origin -a`, and lands

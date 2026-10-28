@@ -337,8 +337,8 @@ pushed after it needs its diff reviewed and the verdict posted again. Then run
 head. It reads the project's `Landing:` line in `docs/harness/mandatory-steps.md`
 step 9, and under `agent` it also asks the change: a pull request touching the
 harness, what an agent is told or may reach (`.agents/`, `.claude/`, `AGENTS.md`,
-`CLAUDE.md`, MCP servers) or a path in `HARNESS_LAND_OWNER_PATHS`, or whose floor guard finds the bar
-lowered, is the owner's. `owner` - which includes no line, or one it cannot read -
+`CLAUDE.md`, MCP servers) - unless `HARNESS_LAND_FIXED_PATHS=agent` hands them over, `scripts/harness/` and `.github/workflows/` aside - or a path in
+`HARNESS_LAND_OWNER_PATHS`, or whose floor guard finds the bar lowered, is the owner's. `owner` - which includes no line, or one it cannot read -
 leaves the pull request open, with `scripts/harness/land <pr> [<owner>/<repo>#<n>]`
 ready to paste, or `land --owner <pr> ...` when the line said `agent` and the change
 made it the owner's. `--owner` is never yours to pass unless the user told you, in

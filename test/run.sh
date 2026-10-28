@@ -1602,6 +1602,46 @@ landing 7
 assert_eq "refuses a negation in HARNESS_LAND_OWNER_PATHS" "$RC" 2
 assert_no "before asking GitHub anything" "$LOG" "pr "
 sed -i.bak '/HARNESS_LAND_OWNER_PATHS/d' scripts/harness/config.sh
+# HARNESS_LAND_FIXED_PATHS=agent is the owner's standing word that the agent lands
+# the harness's own paths too; the project's list and the floor still hold.
+echo 'HARNESS_LAND_FIXED_PATHS=agent' >> scripts/harness/config.sh
+for f in AGENTS.md packages/app/CLAUDE.md .githooks/pre-commit \
+  docs/harness/mandatory-steps.md .agents/skills/run-task/SKILL.md .claude/settings.json .mcp.json; do
+  LAND_ENV="HEAD_SHA=local FILES=src/a.ts,$f"
+  landing 7
+  assert_eq "with HARNESS_LAND_FIXED_PATHS=agent an agent lands $f" "$RC" 0
+done
+LAND_ENV="HEAD_SHA=local FILES=AGENTS.md,scripts/harness/verify"
+landing 7
+assert_eq "but not scripts/harness/: the floor guard land runs is the branch's own" "$RC" 1
+assert_has "naming it" "$OUT" "it touches scripts/harness/verify, an owner path"
+LAND_ENV="HEAD_SHA=local FILES=AGENTS.md,.github/workflows/ci.yml"
+landing 7
+assert_eq "nor .github/workflows/: the CI land waits for is the branch's own" "$RC" 1
+assert_has "naming it" "$OUT" "it touches .github/workflows/ci.yml, an owner path"
+assert_no "and merging nothing" "$LOG" "pr merge"
+echo 'HARNESS_LAND_OWNER_PATHS="db/**"' >> scripts/harness/config.sh
+LAND_ENV="HEAD_SHA=local FILES=AGENTS.md,db/schema.rb"
+landing 7
+assert_eq "but not a path in HARNESS_LAND_OWNER_PATHS" "$RC" 1
+assert_has "naming it" "$OUT" "it touches db/schema.rb, an owner path"
+sed -i.bak '/HARNESS_LAND_OWNER_PATHS/d' scripts/harness/config.sh
+LAND_ENV="HEAD_SHA=local FILES=AGENTS.md FLOOR_RC=1"
+landing 7
+assert_eq "nor a pull request whose floor guard finds the bar lowered" "$RC" 1
+assert_has "saying so" "$OUT" "the floor guard found the bar lowered"
+LAND_ENV="HEAD_SHA=local FILES=AGENTS.md CO_FILES=.github/workflows/deploy.yml"
+landing 7 me/site#3
+assert_eq "nor a companion touching the harness's paths" "$RC" 1
+assert_has "named as the one that is" "$OUT" "me/site#3 is the owner's to land: it touches .github/workflows/deploy.yml"
+assert_no "and nothing merged" "$LOG" "pr merge"
+sed -i.bak '/HARNESS_LAND_FIXED_PATHS/d' scripts/harness/config.sh
+echo 'HARNESS_LAND_FIXED_PATHS=yes' >> scripts/harness/config.sh
+landing 7
+assert_eq "refuses a HARNESS_LAND_FIXED_PATHS that is not agent" "$RC" 2
+assert_has "saying what it takes" "$OUT" "HARNESS_LAND_FIXED_PATHS must be agent or unset"
+assert_no "before asking GitHub anything" "$LOG" "pr "
+sed -i.bak '/HARNESS_LAND_FIXED_PATHS/d' scripts/harness/config.sh
 LAND_ENV="HEAD_SHA=local FLOOR_RC=1"
 landing 7
 assert_eq "a floor guard that finds the bar lowered makes it the owner's" "$RC" 1
@@ -1654,6 +1694,16 @@ assert_has "saying why" "$ERR" "it touches .githooks/pre-commit, an owner path"
 assert_eq "still exiting 0" "$RC" 0
 asking 7 8
 assert_eq "it takes one pull request at most" "$RC" 2
+echo 'HARNESS_LAND_FIXED_PATHS=agent' >> scripts/harness/config.sh
+git add scripts/harness/config.sh && git commit -qm config --no-verify
+git update-ref refs/remotes/origin/master HEAD
+LAND_ENV="HEAD_SHA=local FILES=AGENTS.md"
+asking 7
+assert_eq "--landing <pr> agrees: agent for what the setting hands over" "$OUT" "agent"
+LAND_ENV="HEAD_SHA=local FILES=scripts/harness/verify"
+asking 7
+assert_eq "and owner for what it keeps" "$OUT" "owner"
+sed -i.bak '/HARNESS_LAND_FIXED_PATHS/d' scripts/harness/config.sh
 git rm -q docs/harness/mandatory-steps.md
 LAND_ENV="HEAD_SHA=local FILES=.github/workflows/ci.yml"
 landing 7
