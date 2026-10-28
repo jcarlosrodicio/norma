@@ -242,7 +242,10 @@ it - is `owner`. Changing it is the owner's decision, merged like any other chan
   `CLAUDE.md`, `.mcp.json` and the other agents' settings) or a path in
   `HARNESS_LAND_OWNER_PATHS`, or whose floor
   guard finds the bar lowered. `land --landing <pr>` says so, `land` refuses it,
-  and the owner lands it with `scripts/harness/land --owner <pr>`.
+  and the owner lands it with `scripts/harness/land --owner <pr>`. With
+  `HARNESS_LAND_FIXED_PATHS=agent` in `scripts/harness/config.sh` the owner hands
+  the harness's paths and the agents' files to the agent too, but for
+  `scripts/harness/` and `.github/workflows/`; the rest still holds.
 
 Either way, with `HARNESS_LAND_REVIEW=required` in `scripts/harness/config.sh`,
 `land` merges only a head carrying a passing review verdict - the commit status

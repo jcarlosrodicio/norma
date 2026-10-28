@@ -23,7 +23,9 @@
 # other agents' settings - or a path in HARNESS_LAND_OWNER_PATHS, or whose floor
 # guard finds the bar lowered or cannot check it. `--landing <pr>` prints owner for it, and land refuses to
 # merge it without --owner, which the owner passes - and an agent only when the
-# owner said so for that pull request.
+# owner said so for that pull request. HARNESS_LAND_FIXED_PATHS=agent hands the
+# harness's own paths to the agent too, but for scripts/harness/ and
+# .github/workflows/; the rest still holds.
 #
 # A review's verdict lives on one commit: `--review` posts it as the
 # commit status norma/review on the pull request's head - success when nothing
@@ -45,6 +47,12 @@
 #   HARNESS_LAND_OWNER_PATHS  patterns, in the same syntax, of the paths only the
 #                         owner lands under Landing: agent - added to the harness's
 #                         own, never replacing them. Unset: the harness's alone.
+#   HARNESS_LAND_FIXED_PATHS  agent, or unset: who lands, under Landing: agent, a
+#                         pull request touching the harness's own paths. agent
+#                         is the owner's standing word that the agent does, but
+#                         for scripts/harness/ and .github/workflows/: the floor
+#                         guard and the CI land trusts are the branch's own.
+#                         HARNESS_LAND_OWNER_PATHS still holds.
 #   HARNESS_LAND_REVIEW   required, or unset: whether a passing norma/review on the
 #                         head is a condition of the merge. A failing one stops it
 #                         either way, as any red check does.
@@ -149,6 +157,7 @@ fi
 cd "$(git rev-parse --show-toplevel)"
 HARNESS_LAND_NO_CI=""
 HARNESS_LAND_OWNER_PATHS=""
+HARNESS_LAND_FIXED_PATHS=""
 HARNESS_LAND_REVIEW=""
 HARNESS_LAND_METHOD=merge
 # From the default branch, for the reason --landing reads from there: read from the
@@ -177,6 +186,10 @@ case "$HARNESS_LAND_REVIEW" in
 esac
 case " $HARNESS_LAND_OWNER_PATHS" in
   *" !"*) echo "land: HARNESS_LAND_OWNER_PATHS cannot hold a ! negation - list only the paths the owner lands" >&2; exit 2 ;;
+esac
+case "$HARNESS_LAND_FIXED_PATHS" in
+  ''|agent) ;;
+  *) echo "land: HARNESS_LAND_FIXED_PATHS must be agent or unset, not '$HARNESS_LAND_FIXED_PATHS'" >&2; exit 2 ;;
 esac
 
 REPO=$(git remote get-url origin | sed -E 's#/+$##; s#\.git$##; s#^.*[:/]([^/]+/[^/]+)$#\1#')
@@ -254,7 +267,11 @@ paths_reason() {
 # nothing when it is not: its paths, then its floor.
 owner_reason() {
   case "$1" in ''|*[!0-9a-f]*) echo "its head commit could not be read"; return ;; esac
-  r=$(paths_reason "$PR" "$REPO" "$HARNESS_OWN_PATHS $HARNESS_LAND_OWNER_PATHS")
+  # These stay the owner's: the floor guard below and the CI land waits for are
+  # that branch's own, so a branch free to change them could make itself green.
+  fixed=$HARNESS_OWN_PATHS
+  [ "$HARNESS_LAND_FIXED_PATHS" != agent ] || fixed="scripts/harness/** .github/workflows/**"
+  r=$(paths_reason "$PR" "$REPO" "$fixed $HARNESS_LAND_OWNER_PATHS")
   [ -z "$r" ] || { echo "$r"; return; }
   # The floor guard reads the checkout, so the checkout has to be the pull request.
   [ "$(git rev-parse -q --verify HEAD 2>/dev/null || true)" = "$1" ] \

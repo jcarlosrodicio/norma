@@ -365,6 +365,13 @@ lands it with: `land --owner <pr> [companion]`. Under `Landing: owner` none of t
 runs - every landing is already the owner's - and `--landing <pr>` answers without
 asking GitHub.
 
+`HARNESS_LAND_FIXED_PATHS=agent` in `config.sh`, read from the default branch,
+hands the first two rows to the agent, but for `scripts/harness/` and
+`.github/workflows/`: the owner's standing word, for one project, that an agent
+lands a pull request touching the loop, the hook or the agents' files too. Those
+two directories, `HARNESS_LAND_OWNER_PATHS`, the floor guard, every doubt and the
+companion's rule still hold. Unset, nothing changes; any other value refuses.
+
 Decisions inside it:
 
 - **In `land` too, not only in `--landing`.** The template that tells an agent to
@@ -387,6 +394,20 @@ Decisions inside it:
   are checked first.** A branch that rewrote `scripts/harness/verify` to say clean,
   or `config.sh` to narrow `HARNESS_CODE_PATHS`, is already the owner's for
   touching them.
+- **The fixed list can be handed over, whole, by the owner.** Measured on
+  2026-10-28, 18 of intriga's last 20 merged pull requests were the owner's, 12 of
+  them for one status line in `AGENTS.md`: the owner was saying "merge" to every
+  one, a review point in name only. A path cannot tell a status line from an
+  instruction, so the setting does not try: it hands over the fixed list, not a
+  part of it chosen file by file. It keeps back the two directories whose change
+  could make the pull request itself pass: `scripts/harness/`, because the floor
+  guard `land` runs is the branch's own `scripts/harness/verify`, and
+  `.github/workflows/`, because the CI `land` waits for runs the branch's own
+  workflow - `run: true` in place of the tests goes green, and the floor guard
+  does not read workflows. That also keeps `config.sh` - so turning the setting
+  on, or off, is the owner's to land - a `norma upgrade`, and a Dependabot bump
+  of an action. What it hands over still changes the next agent's instructions;
+  the owner who sets it accepts that.
 - **Read at the pinned head, and the head may only move by `land`'s own update.**
   The check runs after both heads are pinned and before anything merges; the head
   is read again after it, and a head that moved refuses. A pull request brought up
