@@ -66,8 +66,10 @@ json_string() {
 json_pair() {
   k=${1%%=*}
   v=${1#*=}
+  # The letters are spelled out: a range follows the locale's collation, and
+  # under a UTF-8 locale macOS's sh lets [a-z] match capitals too.
   case $k in
-    [a-z]*) : ;;
+    [abcdefghijklmnopqrstuvwxyz]*) : ;;
     *) die "event key '$k' must start with a lowercase letter" ;;
   esac
   case $v in
@@ -198,7 +200,7 @@ cmd_event() {
   [ -n "$type" ] || usage
   shift
   case $type in
-    *[!a-z_]*) die "event type '$type' may only contain lowercase letters and '_'" ;;
+    *[!abcdefghijklmnopqrstuvwxyz_]*) die "event type '$type' may only contain lowercase letters and '_'" ;;
   esac
 
   line="{\"schema\": \"norma.event/1\", \"run_id\": \"$(json_string "$(read_field run_id)")\""
