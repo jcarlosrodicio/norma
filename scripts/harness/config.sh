@@ -13,7 +13,7 @@ HARNESS_CODE_PATHS="bin core profiles skills templates test scripts install.sh"
 # the loop, the agents' files and the workflows too. The owner's call, 2026-10-30.
 HARNESS_LAND_FIXED_PATHS=all
 
-SHELL_FILES="install.sh bin/norma core/verify core/run core/pre-commit test/run.sh test/fixtures/config.sh scripts/harness/config.sh"
+SHELL_FILES="install.sh bin/norma core/verify core/run core/land core/pre-commit test/run.sh test/fixtures/config.sh scripts/harness/config.sh"
 
 harness_gates() {
   echo "harness: static gates"
