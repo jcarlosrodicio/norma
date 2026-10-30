@@ -30,6 +30,13 @@ allows them.
   grounds of stage 4 are adapted from
   [`alibaba/open-code-review`](https://github.com/alibaba/open-code-review),
   Apache License 2.0. No code is copied; the skill says so where it uses them.
+- **Decision audit and test falsification** - dimensions 12 and 13 of
+  `skills/adversarial-review/`, "See it fail once" and the false-confidence list in
+  `skills/architecture-guidelines/`, and the decisions list in `run-task` and
+  `auto-run-task` are adapted from `audit-decisions`, `audit-tests` and
+  `write-tests` in [`dzhng/skills`](https://github.com/dzhng/skills), MIT License,
+  Copyright (c) 2026 David Zhang. Rewritten for norma, keeping a few of their
+  phrases; the review skill says so where it uses them.
 
 ## Referenced, not vendored
 
