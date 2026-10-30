@@ -283,7 +283,11 @@ vendored_upgrade() {
   home=$(norma home 2>/dev/null) && [ -d "$home" ] || return 1
   now=$(git show HEAD:scripts/harness/VERSION 2>/dev/null) || return 1
   [ "$now" = "$(cat "$home/VERSION" 2>/dev/null)" ] || return 1
+  # No default branch would read the index, which is the branch's; a stamp that is
+  # not a version cannot be ordered. Either is a doubt.
+  [ -n "$base" ] || return 1
   was=$(git show "$base:scripts/harness/VERSION" 2>/dev/null || true)
+  case "$was" in ''|*[!0-9.]*) return 1 ;; esac
   [ "$(printf '%s\n%s\n' "$was" "$now" | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)" = "$now" ] || return 1
   files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)' 2>/dev/null) \
     || return 1

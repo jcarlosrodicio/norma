@@ -1731,6 +1731,13 @@ LAND_ENV="HEAD_SHA=local NORMA_HOME_FAKE=$NH FILES=scripts/harness/verify,script
 landing 7
 assert_eq "nor a downgrade to the older norma installed here" "$RC" 1
 assert_has "naming it" "$OUT" "it touches scripts/harness/verify, an owner path"
+printf 'x\n' > scripts/harness/VERSION
+git add scripts/harness/VERSION && git commit -qm unordered --no-verify
+git update-ref refs/remotes/origin/master HEAD
+printf '9.9.9\n' > scripts/harness/VERSION
+git add scripts/harness/VERSION && git commit -qm stamped --no-verify
+landing 7
+assert_eq "nor over a default branch whose stamp is not a version" "$RC" 1
 BRANCH_ONLY=
 sed -i.bak '/HARNESS_LAND_FIXED_PATHS/d' scripts/harness/config.sh
 rm -rf "$NH"
