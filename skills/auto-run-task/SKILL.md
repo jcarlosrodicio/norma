@@ -2,7 +2,7 @@
 name: auto-run-task
 description: Use to run a whole roadmap phase end to end with nobody watching - from the phase line to a pushed branch, an open pull request and a green CI, deciding the ambiguities itself and recording every decision it took. Use it when the human hands over a phase and leaves, or says "run phase N", "do it autonomously", "without asking me". Use run-task instead whenever the human wants to see the spec and the task list before code exists.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # auto-run-task
@@ -381,6 +381,13 @@ It carries:
 
 - **Decisions taken instead of asked.** Every question from stage 1, its answer,
   the reason, and the alternative rejected.
+- **Decisions nobody asked about.** The ones no question surfaced: before
+  delivering, read the diff back and list every call it makes that the phase and
+  the artifacts did not - a data shape, a default, a dependency, a timeout - each
+  with its verdict (sound, unsound, the human's) and how sure you are the human
+  would have made it, least confident first. An unsound one is redone before
+  delivery, not logged. The two or three least confident open the pull request
+  body. An empty list on nontrivial work means you have not looked.
 - **The plan self-review** from stage 3.
 - **Deviations.** Any architecture rule bent, with its justification. A silent
   deviation is a defect; an unsupervised silent deviation is worse.

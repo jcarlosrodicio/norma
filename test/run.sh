@@ -2290,6 +2290,19 @@ assert_has "naming the class of a finding, not only the instance" "$adv" "**Name
 assert_has "and stopping after three rounds" "$adv" "**Three rounds is the cap.**"
 assert_has "a defect the change did not write is reported apart and never blocks" "$adv" "**Pre-existing**, apart from the rest"
 assert_has "and is counted on its own" "$adv" "pre_existing=<n>"
+# Working code still rests on calls nobody asked for - a data shape, a timeout
+# bumped until the case passed - and the diff never flags them. The review lists
+# them, judges each, and reads an empty list on real work as not having looked.
+assert_has "the review audits the decisions the change took on its own" "$adv" "**Decisions nobody made.**"
+assert_has "where green is not a verdict on a decision" "$adv" "\"It works\" is not a verdict"
+assert_has "and an empty list on real work is a finding" "$adv" "An empty list on nontrivial work"
+assert_has "it attacks a test that cannot fail for the reason it names" "$adv" "**Tests that cannot fail for their reason.**"
+guide=$(cat "$HOME_DIR/skills/architecture-guidelines/SKILL.md")
+assert_has "a regression test is seen failing once" "$guide" "**See it fail once.**"
+assert_has "checking the revert actually took" "$guide" "the red counts equal the green"
+assert_has "and the shapes of false confidence are named" "$guide" "**The mock does the work.**"
+assert_has "run-task hands over the decisions it took, least sure first" "$(cat "$HOME_DIR/skills/run-task/SKILL.md")" "least confident first"
+assert_has "auto-run-task logs the decisions nobody asked about" "$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")" "**Decisions nobody asked about.**"
 assert_has "run-task ends the loop on a third blocking round" "$(cat "$HOME_DIR/skills/run-task/SKILL.md")" "**The third round that still blocks ends the loop"
 assert_has "auto-run-task escalates it" "$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")" "A review whose third round still blocks is this reason too"
 # Unsupervised, the archive has to travel inside the pull request: there is no

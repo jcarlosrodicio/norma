@@ -2,7 +2,7 @@
 name: run-task
 description: Use to run a complete implementation task end to end - a roadmap phase item, a feature, a fix or a refactor - from a vague request to code that is verified and waiting for human review. Invoke it whenever the user asks for work to be built rather than just discussed, and follow it in order without skipping stages. It stops three times for the human; use auto-run-task instead when they hand over a whole phase and want it delivered to a pull request without being asked anything.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # run-task
@@ -119,7 +119,7 @@ Write the fewest tests that pin the change, following "Which tests to write" in
 `.agents/skills/architecture-guidelines/SKILL.md`: search for the test that already
 covers the behaviour first, then one test per rule at the cheapest layer, in the
 owning module's file. Every test you add is run by every later task and every CI
-run.
+run. A regression test is seen failing once before it counts, as that list says.
 
 **`.env.example` is yours to write; `.env` is the human's.** When you add a variable,
 update the example in the same change - an example that lags the code is how the next
@@ -317,6 +317,10 @@ deferral.
   evidence it captured - the committed report carries the file names, so this
   message is the only place the human learns where the files actually are;
 - what the adversarial review found and what you did about it;
+- the **decisions you took that the request and the artifacts did not** - read
+  back from the diff, not from memory - each with its verdict and how sure you
+  are the human would have made the same call, least confident first. An empty
+  list on nontrivial work means you have not looked;
 - which documents you updated, and where the phase was closed;
 - that the change is archived and the specs synced, or what blocks it;
 - the **run id** and where its evidence summary landed, so the human can find this

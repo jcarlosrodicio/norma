@@ -2,7 +2,7 @@
 name: architecture-guidelines
 description: Use before writing or reviewing any production code - the shared architectural criteria (layering, domain purity, naming, testing, migrations) that apply across projects. Read it during planning and implementation, and use it as a review dimension. Consult the backend reference for services, APIs and CLIs, and the frontend reference for client applications.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # architecture-guidelines
@@ -98,6 +98,25 @@ it.
   data-transforming migrations and data loss each need a test at their enforcement
   point. A test there is removed only when the change names the test that still
   proves the same thing; a removal that cannot name one is a gap.
+- **See it fail once.** A regression test, and any test written after the code,
+  is decoration until it has gone red: break the production code the way the bug
+  would, confirm it fails **for the reason it names**, restore, confirm green.
+  Check the break actually took - a stash or a checkout with a wrong pathspec
+  reverts nothing, silently, and the tell is that the red counts equal the green
+  ones. The report says how the test was seen failing.
+- **A test can fail for the wrong reason, or for none.** These pass while the
+  behaviour is broken:
+  - **Circular evidence.** The expected value comes from the helper under test,
+    or is copied from production. Derive it independently.
+  - **The mock does the work.** A mock or a fixture supplies what production
+    should produce - the acknowledgement, the ordering, the stored row - or the
+    assertion reads a store the real path never writes. Mock at the edges only.
+  - **The wrong guard goes red.** A negative case rejected by another check, or
+    never reaching the branch it names. Assert the reason, not only the refusal.
+  - **A declaration posing as behaviour.** An import, a flag, a call shape or an
+    export asserted where the behaviour it promises goes unchecked.
+  - **A count without the value.** On a dedup, normalise or idempotency path,
+    `length == 1` passes with normalisation broken; assert what was stored.
 
 The project's own test policy in `AGENTS.md`, where it has one, wins over this
 list: it is the one that knows which paths are critical there.

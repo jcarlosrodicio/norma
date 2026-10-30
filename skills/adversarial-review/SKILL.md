@@ -2,7 +2,7 @@
 name: adversarial-review
 description: Use after an implementation passes its own tests and verification, before committing or archiving a change - an independent red-team pass that assumes the work is wrong and tries to break it. Also use when the user asks for a devil's advocate, red-team or independent review.
 metadata:
-  version: "1.4.0"
+  version: "1.5.0"
 ---
 
 # adversarial-review
@@ -133,6 +133,33 @@ If the change carries no identifiable risk, write that instead of padding the li
     `.agents/skills/architecture-guidelines/SKILL.md` says not to test. Name the
     existing test it duplicates, or the rule it breaks. It is **should fix**: it
     does not make the change wrong, it makes every later task slower.
+12. **Tests that cannot fail for their reason.** A test that passes whether or not
+    the behaviour it names works proves nothing, and it reads exactly like one
+    that does. Look for: an expected value computed by the helper under test, or
+    copied from production; a mock or a fixture that does what production should -
+    the acknowledgement, the ordering, the stored row; a negative case rejected by
+    a different guard than the one it names, or never reaching that branch; an
+    assertion on a declaration - an import, a flag, a call shape - where the
+    behaviour it promises goes unchecked; a count asserted without the value. When
+    a test is the only proof of a fix or a refusal in the change, break the code
+    the way the bug would and run it: green is **blocking**. Otherwise it is
+    **should fix**.
+13. **Decisions nobody made.** Wherever the request and the change artifacts left
+    a gap, the code filled it - a data shape, a storage location, a dependency, an
+    error contract, a default, a timeout, a scope read one way rather than the
+    other - and the diff does not flag any of them. Reconstruct them **from the
+    diff and the artifacts**, not from the author's notes, which name the
+    decisions the author noticed and not the others. Give each one a verdict -
+    **sound**, **unsound**, or **the human's** (taste, product direction, an
+    external cost) - and a confidence that the human would have made the same
+    call. "It works" is not a verdict on a decision: a buffer resized, a timeout
+    bumped or a special case whose size happens to cover the failing input leaves
+    the cause where it was. Ask what property makes it hold in general; if the
+    answer is "this case passes", it is unsound. An unsound decision is a finding
+    at the severity of what it breaks, naming the decision to redo it from rather
+    than a patch on top. Sound and the human's are not findings; they go in the
+    report's decisions list. An empty list on nontrivial work is not a pass - ask
+    what the request left unspecified, because something filled it.
 
 Cross-file findings are part of the job: an inconsistency between two files in the
 change, an update applied to one caller and not the other, a contract broken on one
@@ -232,6 +259,13 @@ Each finding:
 - the exact input, state or sequence that triggers it;
 - why the existing tests miss it.
 
+Then the **decisions** from dimension 13, grouped by verdict - the human's,
+unsound, sound - and least confident first within each group. Each one says what
+gap forced it, what it does today and the alternative it ruled out, and what later
+work it constrains: the reader did not live the session and must be able to judge
+it without the diff. Trivial ones - internal naming, cosmetics - compress to a
+count.
+
 Close with a single explicit verdict: **safe to commit** or **not safe to commit**.
 If you found nothing blocking, say so plainly - do not invent findings to look
 thorough.
@@ -286,3 +320,5 @@ commit it found it in, which is the only thing a merge can check.
 The coverage contract of stage 1 and the two grounds of stage 4 are adapted from
 [`alibaba/open-code-review`](https://github.com/alibaba/open-code-review)
 (Apache-2.0), which runs them as separate passes around its review agent.
+Dimensions 12 and 13 adapt `audit-tests` and `audit-decisions` from
+[`dzhng/skills`](https://github.com/dzhng/skills) (MIT).
