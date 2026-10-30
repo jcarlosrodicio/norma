@@ -245,7 +245,10 @@ it - is `owner`. Changing it is the owner's decision, merged like any other chan
   and the owner lands it with `scripts/harness/land --owner <pr>`. With
   `HARNESS_LAND_FIXED_PATHS=agent` in `scripts/harness/config.sh` the owner hands
   the harness's paths and the agents' files to the agent too, but for
-  `scripts/harness/` and `.github/workflows/`; the rest still holds.
+  `scripts/harness/` and `.github/workflows/`, and with `HARNESS_LAND_FIXED_PATHS=all`
+  the workflows too; the rest still holds. A `norma upgrade` whose files under
+  `scripts/harness/` are byte for byte the norma installed on that machine is
+  never the owner's for touching them.
 
 Either way, with `HARNESS_LAND_REVIEW=required` in `scripts/harness/config.sh`,
 `land` merges only a head carrying a passing review verdict - the commit status

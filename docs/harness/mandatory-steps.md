@@ -144,9 +144,22 @@ follow [`../../skills/commit/SKILL.md`](../../skills/commit/SKILL.md).
 over to run unsupervised follows
 [`../../skills/auto-run-task/SKILL.md`](../../skills/auto-run-task/SKILL.md): the
 loop ends at an open pull request instead, with every decision taken without asking
-written down and linked from it. Steps 0 to 8 do not relax at all. Merging and
-propagating stay with the human in both modes - step 10 below is never the agent's
-to trigger.
+written down and linked from it. Steps 0 to 8 do not relax at all. Propagating
+stays with the human in both modes - step 10 below is never the agent's to
+trigger; merging follows *Landing* below.
+
+### Landing
+
+Landing: agent
+
+The owner's standing decision, taken on 2026-10-30, that the agent which opened a
+pull request lands it with `scripts/harness/land <pr>` once its CI is green.
+`HARNESS_LAND_FIXED_PATHS=all` in `scripts/harness/config.sh` hands it the loop,
+the agents' files and the workflows too; `scripts/harness/` stays the owner's
+unless the change is a norma upgrade identical to the norma installed here, and
+so does anything whose floor guard finds the bar lowered. The rules are the
+template's - [`../../templates/mandatory-steps.md`](../../templates/mandatory-steps.md)
+step 9 - and `land --landing <pr>` is how an agent asks.
 
 ## Step 10 - Propagate, only when asked
 

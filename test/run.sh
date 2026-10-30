@@ -1176,6 +1176,9 @@ esac
 EOF
 printf '#!/bin/sh\nexit 0\n' > "$FAKE_BIN/sleep"
 cp "$FAKE_BIN/sleep" "$FAKE_BIN/osascript"
+# norma home is NORMA_HOME_FAKE: the norma installed on this machine. Without it,
+# no norma - and never the real one, which would make a test depend on the machine.
+printf '#!/bin/sh\n[ "$1" = home ] && [ -n "${NORMA_HOME_FAKE:-}" ] && echo "$NORMA_HOME_FAKE" && exit 0\nexit 1\n' > "$FAKE_BIN/norma"
 chmod +x "$FAKE_BIN"/*
 
 with_land() {
@@ -1638,10 +1641,106 @@ assert_no "and nothing merged" "$LOG" "pr merge"
 sed -i.bak '/HARNESS_LAND_FIXED_PATHS/d' scripts/harness/config.sh
 echo 'HARNESS_LAND_FIXED_PATHS=yes' >> scripts/harness/config.sh
 landing 7
-assert_eq "refuses a HARNESS_LAND_FIXED_PATHS that is not agent" "$RC" 2
-assert_has "saying what it takes" "$OUT" "HARNESS_LAND_FIXED_PATHS must be agent or unset"
+assert_eq "refuses a HARNESS_LAND_FIXED_PATHS that is not agent or all" "$RC" 2
+assert_has "saying what it takes" "$OUT" "HARNESS_LAND_FIXED_PATHS must be agent, all or unset"
 assert_no "before asking GitHub anything" "$LOG" "pr "
 sed -i.bak '/HARNESS_LAND_FIXED_PATHS/d' scripts/harness/config.sh
+# HARNESS_LAND_FIXED_PATHS=all hands .github/workflows/ over too: the owner's word
+# that the CI a branch is judged by may be the branch's own. scripts/harness/, the
+# project's list and the floor still hold.
+echo 'HARNESS_LAND_FIXED_PATHS=all' >> scripts/harness/config.sh
+LAND_ENV="HEAD_SHA=local FILES=AGENTS.md,.github/workflows/ci.yml"
+landing 7
+assert_eq "with HARNESS_LAND_FIXED_PATHS=all an agent lands .github/workflows/ too" "$RC" 0
+LAND_ENV="HEAD_SHA=local FILES=.github/workflows/ci.yml,scripts/harness/config.sh"
+landing 7
+assert_eq "but not scripts/harness/" "$RC" 1
+assert_has "naming it" "$OUT" "it touches scripts/harness/config.sh, an owner path"
+echo 'HARNESS_LAND_OWNER_PATHS=".github/workflows/deploy.yml"' >> scripts/harness/config.sh
+LAND_ENV="HEAD_SHA=local FILES=.github/workflows/deploy.yml"
+landing 7
+assert_eq "nor a workflow the project lists in HARNESS_LAND_OWNER_PATHS" "$RC" 1
+sed -i.bak '/HARNESS_LAND_OWNER_PATHS/d' scripts/harness/config.sh
+LAND_ENV="HEAD_SHA=local FILES=.github/workflows/ci.yml FLOOR_RC=1"
+landing 7
+assert_eq "nor one whose floor guard finds the bar lowered" "$RC" 1
+sed -i.bak '/HARNESS_LAND_FIXED_PATHS/d' scripts/harness/config.sh
+# A norma upgrade sets no bar of its own: every file it touches under
+# scripts/harness/ is, byte for byte, the one the norma installed here vendors
+# there. Then scripts/harness/ is the agent's; anything else keeps it the owner's.
+NH=$(mktemp -d)
+mkdir -p "$NH/core"
+cp scripts/harness/verify "$NH/core/verify"
+cp scripts/harness/land "$NH/core/land"
+printf '#!/bin/sh\n' > "$NH/core/run"
+printf '9.9.9\n' > "$NH/VERSION"
+cp "$NH/core/run" scripts/harness/run
+cp "$NH/VERSION" scripts/harness/VERSION
+git add scripts/harness/run scripts/harness/land scripts/harness/VERSION && git commit -qm upgrade --no-verify
+echo 'HARNESS_LAND_FIXED_PATHS=agent' >> scripts/harness/config.sh
+UP=scripts/harness/verify,scripts/harness/run,scripts/harness/land,scripts/harness/VERSION,.githooks/pre-commit,AGENTS.md
+LAND_ENV="HEAD_SHA=local NORMA_HOME_FAKE=$NH FILES=$UP"
+landing 7
+assert_eq "an agent lands a norma upgrade identical to the norma installed here" "$RC" 0
+LAND_ENV="HEAD_SHA=local FILES=$UP"
+landing 7
+assert_eq "not with no norma here to compare it with" "$RC" 1
+assert_has "naming the file" "$OUT" "it touches scripts/harness/verify, an owner path"
+printf '9.9.8\n' > "$NH/VERSION"
+LAND_ENV="HEAD_SHA=local NORMA_HOME_FAKE=$NH FILES=$UP"
+landing 7
+assert_eq "nor when one file is not that norma's" "$RC" 1
+printf '9.9.9\n' > "$NH/VERSION"
+LAND_ENV="HEAD_SHA=local NORMA_HOME_FAKE=$NH FILES=$UP,scripts/harness/config.sh"
+landing 7
+assert_eq "nor when it touches a file norma does not vendor: config.sh is the project's" "$RC" 1
+LAND_ENV="HEAD_SHA=local NORMA_HOME_FAKE=$NH FILES=scripts/harness/verify PREV=scripts/harness/gate"
+landing 7
+assert_eq "nor a rename into a vendored file" "$RC" 1
+LAND_ENV="HEAD_SHA=local NORMA_HOME_FAKE=$NH FILES=scripts/harness/Verify"
+landing 7
+assert_eq "nor a vendored name in another case" "$RC" 1
+LAND_ENV="HEAD_SHA=local NORMA_HOME_FAKE=$NH FILES=scripts/harness/VERSION"
+git rm -q --cached scripts/harness/VERSION && git commit -qm drop --no-verify
+landing 7
+assert_eq "nor one that deletes a vendored file" "$RC" 1
+git add scripts/harness/VERSION && git commit -qm back --no-verify
+LAND_ENV="HEAD_SHA=local NORMA_HOME_FAKE=$NH FILES=$UP FLOOR_RC=1"
+landing 7
+assert_eq "and an identical upgrade still answers to the floor guard" "$RC" 1
+sed -i.bak '/HARNESS_LAND_FIXED_PATHS/d' scripts/harness/config.sh
+LAND_ENV="HEAD_SHA=local NORMA_HOME_FAKE=$NH FILES=scripts/harness/verify,scripts/harness/VERSION"
+landing 7
+assert_eq "it is the agent's without HARNESS_LAND_FIXED_PATHS too, when it touches nothing else" "$RC" 0
+echo 'HARNESS_LAND_FIXED_PATHS=all' >> scripts/harness/config.sh
+LAND_ENV="HEAD_SHA=local NORMA_HOME_FAKE=$NH FILES=$UP,.github/workflows/ci.yml"
+landing 7
+assert_eq "and with HARNESS_LAND_FIXED_PATHS=all, where nothing is left to hold back" "$RC" 0
+printf '9.9.8\n' > "$NH/VERSION"
+LAND_ENV="HEAD_SHA=local NORMA_HOME_FAKE=$NH FILES=scripts/harness/verify"
+landing 7
+assert_eq "not when the head stamps another version than the norma installed here" "$RC" 1
+printf '9.9.9\n' > "$NH/VERSION"
+# A downgrade is byte for byte an older norma: the default branch is ahead of it.
+printf '9.9.10\n' > scripts/harness/VERSION
+git add scripts/harness/VERSION && git commit -qm newer --no-verify
+git update-ref refs/remotes/origin/master HEAD
+printf '9.9.9\n' > scripts/harness/VERSION
+git add scripts/harness/VERSION && git commit -qm older --no-verify
+LAND_ENV="HEAD_SHA=local NORMA_HOME_FAKE=$NH FILES=scripts/harness/verify,scripts/harness/VERSION" BRANCH_ONLY=1
+landing 7
+assert_eq "nor a downgrade to the older norma installed here" "$RC" 1
+assert_has "naming it" "$OUT" "it touches scripts/harness/verify, an owner path"
+printf 'x\n' > scripts/harness/VERSION
+git add scripts/harness/VERSION && git commit -qm unordered --no-verify
+git update-ref refs/remotes/origin/master HEAD
+printf '9.9.9\n' > scripts/harness/VERSION
+git add scripts/harness/VERSION && git commit -qm stamped --no-verify
+landing 7
+assert_eq "nor over a default branch whose stamp is not a version" "$RC" 1
+BRANCH_ONLY=
+sed -i.bak '/HARNESS_LAND_FIXED_PATHS/d' scripts/harness/config.sh
+rm -rf "$NH"
 LAND_ENV="HEAD_SHA=local FLOOR_RC=1"
 landing 7
 assert_eq "a floor guard that finds the bar lowered makes it the owner's" "$RC" 1

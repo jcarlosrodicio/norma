@@ -370,7 +370,22 @@ hands the first two rows to the agent, but for `scripts/harness/` and
 `.github/workflows/`: the owner's standing word, for one project, that an agent
 lands a pull request touching the loop, the hook or the agents' files too. Those
 two directories, `HARNESS_LAND_OWNER_PATHS`, the floor guard, every doubt and the
-companion's rule still hold. Unset, nothing changes; any other value refuses.
+companion's rule still hold. `all` hands `.github/workflows/` over as well: the
+owner accepting, for one project, that the CI a branch is judged by is the
+branch's own. Unset, nothing changes; any other value refuses.
+
+A **norma upgrade** is not the owner's for touching `scripts/harness/`, under any
+of the three. When every file the pull request touches there - by its name or its
+old one, in any case - is `verify`, `run`, `land` or `VERSION`, and each is, at the
+head, byte for byte the copy in the norma installed on the machine running `land`
+(`norma home`), the change sets no bar of its own: it is the release the owner
+already installed. A deleted, renamed or edited file, `config.sh`, a head whose
+`scripts/harness/VERSION` is not that norma's, a default branch already stamped
+newer - a downgrade, byte for byte an older and weaker gate, when the machine's
+norma is behind the project's - no `norma` on the machine, or a checkout
+elsewhere keeps `scripts/harness/` the owner's. The
+floor guard and every other row still apply. This is what used to leave every
+upgrade pull request for the owner to merge by hand.
 
 Decisions inside it:
 

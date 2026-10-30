@@ -329,7 +329,7 @@ Then:
    `agent` only for exactly `Landing: agent` **and** a pull request the change
    leaves to an agent: one that touches the harness itself, what an agent is told
    or may reach - `.agents/`, `.claude/`, `AGENTS.md`, `CLAUDE.md`, MCP servers -
-   unless `HARNESS_LAND_FIXED_PATHS=agent` hands them over, `scripts/harness/` and `.github/workflows/` aside, or a path in `HARNESS_LAND_OWNER_PATHS`, or whose floor guard finds the bar lowered - or
+   unless `HARNESS_LAND_FIXED_PATHS=agent` hands them over, `scripts/harness/` and `.github/workflows/` aside (`all` hands the workflows over too, and a norma upgrade identical to the installed norma is never held for `scripts/harness/`), or a path in `HARNESS_LAND_OWNER_PATHS`, or whose floor guard finds the bar lowered - or
    cannot check it, which is why the checkout matters - is `owner`, with the reason
    on stderr. Every other case is `owner` too.
 
