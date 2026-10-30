@@ -9,6 +9,10 @@
 # `VERSION` are outside, so a documentation commit can use --docs-only.
 HARNESS_CODE_PATHS="bin core profiles skills templates test scripts install.sh"
 
+# Under `Landing: agent` (docs/harness/mandatory-steps.md step 9) the agent lands
+# the loop, the agents' files and the workflows too. The owner's call, 2026-10-30.
+HARNESS_LAND_FIXED_PATHS=all
+
 SHELL_FILES="install.sh bin/norma core/verify core/run core/pre-commit test/run.sh test/fixtures/config.sh scripts/harness/config.sh"
 
 harness_gates() {
