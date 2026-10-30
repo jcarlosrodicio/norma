@@ -25,7 +25,10 @@
 # merge it without --owner, which the owner passes - and an agent only when the
 # owner said so for that pull request. HARNESS_LAND_FIXED_PATHS=agent hands the
 # harness's own paths to the agent too, but for scripts/harness/ and
-# .github/workflows/; the rest still holds.
+# .github/workflows/; =all hands .github/workflows/ over as well; the rest still
+# holds. A norma upgrade - every file it touches under scripts/harness/ byte for
+# byte the one the norma installed here vendors there - leaves scripts/harness/
+# out of it.
 #
 # A review's verdict lives on one commit: `--review` posts it as the
 # commit status norma/review on the pull request's head - success when nothing
@@ -47,11 +50,12 @@
 #   HARNESS_LAND_OWNER_PATHS  patterns, in the same syntax, of the paths only the
 #                         owner lands under Landing: agent - added to the harness's
 #                         own, never replacing them. Unset: the harness's alone.
-#   HARNESS_LAND_FIXED_PATHS  agent, or unset: who lands, under Landing: agent, a
+#   HARNESS_LAND_FIXED_PATHS  agent, all, or unset: who lands, under Landing: agent, a
 #                         pull request touching the harness's own paths. agent
 #                         is the owner's standing word that the agent does, but
 #                         for scripts/harness/ and .github/workflows/: the floor
-#                         guard and the CI land trusts are the branch's own.
+#                         guard and the CI land trusts are the branch's own. all
+#                         hands .github/workflows/ over too, accepting that CI.
 #                         HARNESS_LAND_OWNER_PATHS still holds.
 #   HARNESS_LAND_REVIEW   required, or unset: whether a passing norma/review on the
 #                         head is a condition of the merge. A failing one stops it
@@ -188,8 +192,8 @@ case " $HARNESS_LAND_OWNER_PATHS" in
   *" !"*) echo "land: HARNESS_LAND_OWNER_PATHS cannot hold a ! negation - list only the paths the owner lands" >&2; exit 2 ;;
 esac
 case "$HARNESS_LAND_FIXED_PATHS" in
-  ''|agent) ;;
-  *) echo "land: HARNESS_LAND_FIXED_PATHS must be agent or unset, not '$HARNESS_LAND_FIXED_PATHS'" >&2; exit 2 ;;
+  ''|agent|all) ;;
+  *) echo "land: HARNESS_LAND_FIXED_PATHS must be agent, all or unset, not '$HARNESS_LAND_FIXED_PATHS'" >&2; exit 2 ;;
 esac
 
 REPO=$(git remote get-url origin | sed -E 's#/+$##; s#\.git$##; s#^.*[:/]([^/]+/[^/]+)$#\1#')
@@ -258,19 +262,55 @@ paths_reason() {
   files=$(gh api --paginate "repos/$2/pulls/$1/files" --jq '.[] | .filename, (.previous_filename // empty)' 2>/dev/null) \
     || { echo "its files could not be listed"; return; }
   [ -n "$files" ] || { echo "its file list came back empty"; return; }
+  # No pattern at all - HARNESS_LAND_FIXED_PATHS=all with no list of the project's
+  # - holds nothing back; an empty group is a regex some greps refuse.
+  case "$3" in *[![:space:]]*) ;; *) return ;; esac
   set +e; hits=$(printf '%s\n' "$files" | grep -Ei "^($(path_regex "$3"))\$"); rc=$?; set -e
   [ $rc -ne 2 ] || { echo "HARNESS_LAND_OWNER_PATHS holds a pattern that cannot be read"; return; }
   [ $rc -ne 0 ] || echo "it touches $(printf '%s\n' "$hits" | sed -n 1p), an owner path"
+}
+
+# Succeeds when every file the pull request at head $1 touches under
+# scripts/harness/ - by its name or its old one, in any case - is one norma
+# upgrade writes there, byte for byte the copy in the norma installed on this
+# machine: an upgrade, which sets no bar of its own. And an upgrade, not a
+# downgrade: the head stamps that norma's version, and the default branch stamps
+# none newer - an older norma on this machine would otherwise vouch for an older,
+# weaker gate. Read from that commit, never the working tree; no norma here, a
+# checkout elsewhere or a list that cannot be read is no.
+vendored_upgrade() {
+  [ "$(git rev-parse -q --verify HEAD 2>/dev/null || true)" = "$1" ] || return 1
+  home=$(norma home 2>/dev/null) && [ -d "$home" ] || return 1
+  now=$(git show HEAD:scripts/harness/VERSION 2>/dev/null) || return 1
+  [ "$now" = "$(cat "$home/VERSION" 2>/dev/null)" ] || return 1
+  was=$(git show "$base:scripts/harness/VERSION" 2>/dev/null || true)
+  [ "$(printf '%s\n%s\n' "$was" "$now" | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)" = "$now" ] || return 1
+  files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)' 2>/dev/null) \
+    || return 1
+  printf '%s\n' "$files" | grep -i '^scripts/harness/' | while IFS= read -r f; do
+    case "$f" in
+      scripts/harness/verify|scripts/harness/run|scripts/harness/land) src=$home/core/${f#scripts/harness/} ;;
+      scripts/harness/VERSION) src=$home/VERSION ;;
+      *) exit 1 ;;
+    esac
+    git cat-file -e "HEAD:$f" 2>/dev/null && git show "HEAD:$f" | cmp -s - "$src" || exit 1
+  done
 }
 
 # Why the pull request at head $1 is the owner's to land under Landing: agent -
 # nothing when it is not: its paths, then its floor.
 owner_reason() {
   case "$1" in ''|*[!0-9a-f]*) echo "its head commit could not be read"; return ;; esac
-  # These stay the owner's: the floor guard below and the CI land waits for are
-  # that branch's own, so a branch free to change them could make itself green.
-  fixed=$HARNESS_OWN_PATHS
-  [ "$HARNESS_LAND_FIXED_PATHS" != agent ] || fixed="scripts/harness/** .github/workflows/**"
+  # The floor guard below and the CI land waits for are that branch's own, so a
+  # branch free to change them could make itself green: .github/workflows/ stays
+  # the owner's unless all hands it over, and scripts/harness/ unless the change
+  # is a norma upgrade.
+  case "$HARNESS_LAND_FIXED_PATHS" in
+    agent) fixed=".github/workflows/**" ;;
+    all) fixed="" ;;
+    *) fixed=${HARNESS_OWN_PATHS#"scripts/harness/** "} ;;
+  esac
+  vendored_upgrade "$1" || fixed="scripts/harness/** $fixed"
   r=$(paths_reason "$PR" "$REPO" "$fixed $HARNESS_LAND_OWNER_PATHS")
   [ -z "$r" ] || { echo "$r"; return; }
   # The floor guard reads the checkout, so the checkout has to be the pull request.
