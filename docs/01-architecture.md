@@ -105,7 +105,7 @@ run. It refuses nothing.
 
 | kind | what it looks for | where |
 |---|---|---|
-| `skip` | a skip or focus marker added: `.skip(`, `.only(`, `xit(`, `@pytest.mark.skip`, `t.Skip(`, `#[ignore]`, `@Disabled`... | test files |
+| `skip` | a skip or focus marker added: `.skip(` and `.only(` on a test framework's receiver (`describe`, `it`, `test`, `context`, `suite`, `bench`, `specify`, `experiment`, `module`, `QUnit`, the `t` of node:test, tap and Ava, mocha's `this`, through chains like `test.describe` and namespaces like `Deno.test`), `xit(`, `@pytest.mark.skip`, `t.Skip(`, `#[ignore]`, `@Disabled`... | test files |
 | `suppression` | a suppression comment added: `@ts-ignore`, `eslint-disable`, `# noqa`, `// ignore:`, `#[allow(`, `istanbul ignore`... | `HARNESS_CODE_PATHS`, Markdown excluded |
 | `stub` | "not implemented", `NotImplementedError`, `todo!()`, a one-line empty `catch`, `except: pass` | the same, test files excluded |
 | `deleted_test` | a test file removed - empty and binary ones included - or renamed to a name that no longer reads as a test, which stops it running just the same | test files |
@@ -151,8 +151,26 @@ What it misses, known and accepted while it only warns:
 - **Tests the name heuristic does not see** - Rust unit tests inside `src/*.rs`,
   Python's `tests.py` and `conftest.py` - so a skip marker there goes unread, and
   assertions moved into a helper count as removed.
-- **Markers with no pattern yet** - Dart's `@Skip(`, Playwright's `test.fixme(`,
+- **Markers with no pattern yet** - Dart's `@Skip(`, Playwright's
+  `test.fixme(`, Deno's `test.ignore(`, Vitest's `skipIf(`,
   `@unittest.expectedFailure`. Adding one is a line in the gate and a test.
+- **A skip on a receiver it does not know.** `.skip(` and `.only(` count only on
+  the test frameworks' own names - the receivers, namespaces and modifiers listed
+  beside the pattern in the gate - because on any other object they are the code
+  under test: a Godot consumer's `Tutorial.skip(s)` sent a clean pull request to
+  its owner until 0.27.1. What the list does not name goes unread: a suite the
+  test names itself (uvu's `const API = suite(...)`, an alias of `test`), Japa's
+  trailing `).skip(`, Ava's `t.is.skip(`, and a modifier after the marker
+  (`test.only.each(`, `describe.skip.each(`), which the broader pattern before it
+  missed too. A marker split from its receiver goes unread as well -
+  `describe .skip(`, or a chain whose line starts at the dot - which the broader
+  pattern did catch: the receiver has to sit right before the dot, on the same
+  line.
+- **A receiver it does know can still be the domain's.** `it` in a Kotlin or
+  Groovy lambda, or a variable named `t` or `module`:
+  `tutorials.forEach { it.skip(s) }` in a Kotlin test is reported. Under
+  `Landing: agent` that hands the pull request to the owner, which is the side a
+  doubt falls on.
 - **The assertion count is lexical.** Any line in a test file mentioning
   `assert` counts, a comment included, so the net figure is a prompt to look,
   not a measurement.
