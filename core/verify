@@ -234,8 +234,16 @@ record_from() {
 # Every pattern below is written so it cannot match its own source: `[e]` where
 # `e` would do. A project can put this file inside a code path - norma does - and
 # a guard that reports itself is a guard people learn to ignore.
+#
+# A `.skip(` or `.only(` marks a test only on a test framework's own receiver -
+# describe, it, test, context, suite, bench, specify, experiment, module, QUnit,
+# mocha's `this` and the `t` node:test, tap and Ava hand a test - optionally under
+# Deno, lab, globalThis or QUnit, and through the modifiers the frameworks chain
+# in between: describe, concurrent, sequential, parallel, serial, shuffle, step,
+# fails, failing. On any other object it is a method of the code under test, and
+# calling it is what the test is for.
 FLOOR_TEST='(^|/)(test|tests|spec|specs|__tests__|integration_test|androidTest)/|(^|/)test_[^/]*\.py$|_test\.[^/]+$|\.(test|spec)\.[^/]+$|_spec\.rb$|(Test|Tests|Spec)\.(java|kt|cs|swift|scala|php|groovy)$'
-FLOOR_SKIP='\.(ski[p]|onl[y])\(|(^|[^A-Za-z0-9_.])(xi[t]|xdescrib[e]|xtes[t]|fdescrib[e]|fi[t])\(|@pytest\.mark\.(ski[p]|xfai[l])|pytest\.ski[p]\(|@unittest\.ski[p]|[^A-Za-z]ski[p]: *(tru[e]|['"'"'"])|t\.Ski[p](Now|f)?\(|#\[ignor[e]\]|@(Disable[d]|Ignor[e])([^A-Za-z]|$)|markTestSkippe[d]'
+FLOOR_SKIP='(^|[^A-Za-z0-9_.$])((Den[o]|la[b]|globalThi[s]|QUni[t])\.)?(describ[e]|i[t]|tes[t]|contex[t]|suit[e]|benc[h]|specif[y]|experimen[t]|modul[e]|QUni[t]|thi[s]|[t])(\.(describ[e]|concurren[t]|sequentia[l]|paralle[l]|seria[l]|shuffl[e]|ste[p]|fail[s]|failin[g]))*\.(ski[p]|onl[y])\(|(^|[^A-Za-z0-9_.])(xi[t]|xdescrib[e]|xtes[t]|fdescrib[e]|fi[t])\(|@pytest\.mark\.(ski[p]|xfai[l])|pytest\.ski[p]\(|@unittest\.ski[p]|[^A-Za-z]ski[p]: *(tru[e]|['"'"'"])|t\.Ski[p](Now|f)?\(|#\[ignor[e]\]|@(Disable[d]|Ignor[e])([^A-Za-z]|$)|markTestSkippe[d]'
 FLOOR_SUPPRESS='@ts-(ignor[e]|nochec[k]|expect-erro[r])|eslint-disabl[e]|biome-ignor[e]|# *noq[a]|# *type: *ignor[e]|pylint: *disabl[e]|// *ignore(_for_fil[e])?:|#!?\[allo[w]\(|@Suppres[s](Warnings)?\(|#pragma warning disabl[e]|nolin[t]|(istanbul|c8|v8) ignor[e]|pragma: *no cove[r]|rubocop:disabl[e]|@phpstan-ignor[e]|@psalm-suppres[s]|shellcheck disabl[e]|NOSONA[R]|nosemgre[p]|gitleaks:allo[w]|swiftlint:disabl[e]'
 FLOOR_STUB='[Nn]ot [Ii]mplemente[d]|NotImplemente[d](Error|Exception)|unimplemente[d]!|tod[o]!\(|UnimplementedErro[r]|catc[h] *(\([^)]*\))? *\{ *\}|excep[t][^:]*: *pass *$'
 FLOOR_ASSERT='expec[t]\(|expect \{|asser[t]|\.shoul[d]|shoul[d]\(|t\.(erro[r]|fata[l])\(|require\.|refut[e]|verif[y]\('

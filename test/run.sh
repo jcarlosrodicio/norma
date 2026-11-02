@@ -815,6 +815,42 @@ assert_has "a focus marker silences every other test, and a new file is read too
   "$OUT" "spec/c.test.ts:1"
 done_repo
 
+# Seen in a Godot consumer: a test calling the skip method of the domain's own
+# Tutorial was reported as a skipped test, and land handed the pull request to the
+# owner. Only a test framework's receivers mark a test; on any other object a skip
+# or an only is the code under test.
+floor_repo
+mkdir -p tests
+printf 'func test_skip():\n\tTutorial.%s(s)\n' "$SK" > tests/test_tutorial.gd
+printf 'playlist.%s();\niterator.%s(2);\nthis.player.%s();\nfoo.test.%s();\n$test.%s();\n' \
+  "$SK" "$SK" "$SK" "$ON" "$SK" > spec/d.test.ts
+gate --floor
+assert_eq "a domain method named skip or only is not a skip marker" "$RC" 0
+assert_no "and nothing is reported" "$OUT" "harness: floor"
+done_repo
+
+floor_repo
+printf 'describe.%s("a", f);\nit.%s("b", f);\ntest.%s("c", f);\ntest.describe.%s("d", f);\nthis.%s();\n' \
+  "$SK" "$ON" "$SK" "$SK" "$SK" > spec/e.test.ts
+printf 'test.concurrent.%s("e", f);\ncontext.%s("f", f);\nsuite.%s("g", f);\nbench.%s("h", f);\n  test.describe.parallel.%s("i", f);\n' \
+  "$ON" "$SK" "$ON" "$SK" "$ON" >> spec/e.test.ts
+printf 'test.describe.serial.%s("j", f);\ndescribe.shuffle.%s("k", f);\ntest.sequential.%s("l", f);\n' \
+  "$ON" "$SK" "$ON" >> spec/e.test.ts
+printf 'test("m", (t) => { t.%s(); });\nspecify.%s("n", f);\nDeno.test.%s("o", f);\nQUnit.module.%s("p");\n' \
+  "$SK" "$ON" "$ON" "$ON" >> spec/e.test.ts
+printf 'module.%s("q");\nexperiment.%s("r", f);\nlab.test.%s("s", f);\ntest.step.%s("t", f);\n' \
+  "$SK" "$SK" "$ON" "$SK" >> spec/e.test.ts
+printf 'it.fails.%s("u", f);\ntest.serial.failing.%s("v", f);\nglobalThis.it.%s("w", f);\nQUnit.%s("x", f);\n' \
+  "$ON" "$ON" "$SK" "$SK" >> spec/e.test.ts
+gate --floor
+assert_eq "a test framework's skip or focus is still one" "$RC" 1
+n=1
+while [ "$n" -le 25 ]; do
+  assert_has "spec/e.test.ts line $n is reported" "$OUT" "spec/e.test.ts:$n  "
+  n=$((n + 1))
+done
+done_repo
+
 floor_repo
 printf '// %s\nexport const b: number = "x";\n' "$TSI" > src/b.ts
 printf 'Never write %s in this project.\n' "$TSI" >> README.md
@@ -883,6 +919,13 @@ floor_repo
 cp "$HOME_DIR/core/verify" src/verify.sh
 gate unit
 assert_no "the gate does not trip on its own patterns" "$OUT" "src/verify.sh"
+done_repo
+
+# The skip patterns are read in test files only, so the copy above never asks them.
+floor_repo
+cp "$HOME_DIR/core/verify" spec/verify.test.sh
+gate --floor
+assert_no "nor on its skip patterns, read as a test file" "$OUT" "spec/verify.test.sh"
 done_repo
 
 floor_repo
