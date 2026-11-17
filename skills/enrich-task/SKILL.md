@@ -2,7 +2,7 @@
 name: enrich-task
 description: Use before planning any feature, fix or refactor when the request is a short roadmap line, a phase item, a screenshot or a one-paragraph idea - turns it into an implementation-ready spec with acceptance criteria, edge cases and open questions. Run this before openspec new/ff.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # enrich-task
@@ -52,11 +52,17 @@ roadmap and treat it as the source of truth for scope.
    - acceptance criteria and definition of done;
    - test cases, including the hostile ones: empty input, oversized input, wrong
      encoding, injection attempts, concurrent writes, entities in a state that
-     forbids the operation.
+     forbids the operation;
+   - assumptions: every gap you filled, each marked with where it came from - the
+     request, the code, an inference, a guess - least sure first.
 6. **Challenge the request.** End with open questions about what the input left
    ambiguous - cardinality (one vs many), ownership, permissions, what happens to
-   existing rows, behaviour on partial failure. Ask them; do not silently pick an
-   answer.
+   existing rows, behaviour on partial failure. Ask them, each with the answer you
+   would take and why - a question with a proposal gets corrected, a bare one gets
+   a shrug - and never silently pick one. Every assumption marked as a guess is
+   one of these questions, or is dropped from the spec. A reply like "looks good"
+   approves what was read, not every guess: ask about the least sure assumption
+   by name.
 
 ## Output
 

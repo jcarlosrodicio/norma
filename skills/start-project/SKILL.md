@@ -2,7 +2,7 @@
 name: start-project
 description: Use to start a project that does not exist yet - it talks with the human until it understands what they want to build, well enough to write the founding documents and a roadmap of phases of at most a day each, and then creates the repository and installs the harness so the first phase runs through the normal loop. Use it when the request is "I want to build X" and there is no repository, or an empty one. Not for a repository that already has code - that is harness-setup.
 metadata:
-  version: "2.0.0"
+  version: "2.1.0"
 ---
 
 # start-project
@@ -78,7 +78,8 @@ What that means in practice:
   attached. "Esto suena a un monolito con una sola base de datos, ¿no?" gets a
   correction; "¿qué arquitectura quieres?" gets a shrug. A blank form gets blank answers.
 - **Play back more than you ask.** Summarising what you understood and being corrected
-  is faster, and far more accurate, than another question. Do it often.
+  is faster, and far more accurate, than another question. Do it often, and mark
+  what you guessed, so their eye goes to the guesses.
 - **Never ask what you can read or work out.** If there is a directory, a README, a
   prototype, an export, notes - read them first and come back with what you already know.
   Asking someone to type what they already wrote is how an interview gets abandoned.
@@ -190,13 +191,17 @@ Everything else is a conversation. These three are checkpoints, and you do not p
 alone.
 
 1. **When you think you understand.** Play the whole thing back in half a page - the
-   point, the shape, the materials, the way out - *before* writing any document. This is
-   the cheapest moment in the project to be wrong.
+   point, the shape, the materials, the way out, and what is out - *before* writing any
+   document. This is the cheapest moment in the project to be wrong.
 2. **When the roadmap table exists**, before writing a single phase card. Show the table
    and ask three questions: is there anything here you did not ask for, is anything
    missing that you assumed, and is the order right given what you are most afraid of?
    Forty cards written before this conversation are forty cards to rewrite.
 3. **Before creating the repository.** Show what you are about to do to their disk.
+
+**A vague yes is not a yes.** "Sounds good", "vale", "ok" to half a page agrees with
+the part they read. Before you pass checkpoint 1 or 2 on one, name the guess you are least
+sure of and ask about that one; pass on their answer to it, not on the nod.
 
 ## Write the documents
 
