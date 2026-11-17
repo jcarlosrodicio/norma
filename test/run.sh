@@ -1108,10 +1108,28 @@ echo "the land script"
 FAKE_BIN=$(mktemp -d)
 cat > "$FAKE_BIN/gh" <<'EOF'
 #!/bin/sh
-echo "$* token=${GH_TOKEN:-none}" >> "$FAKE_LOG"
+printf '%s token=%s\n' "$*" "${GH_TOKEN:-none}" >> "$FAKE_LOG"
 case "$1 $2" in
   "auth token") [ "$4" = "${FAKE_ACCOUNT:-me}" ] && [ -n "${FAKE_TOKEN:-}" ] && echo "$FAKE_TOKEN" && exit 0; exit 1 ;;
   "api --paginate")
+    # a pull request's comments and its reviews: land's own --jq ($5), run over the
+    # JSON arrays in the files OWNER_COMMENTS and OWNER_REVIEWS -
+    # OWNER_LATE only from the read OWNER_LATE_FROM (2) of the comments on, one
+    # posted while land waited. COMMENTS_FAIL and REVIEWS_FAIL: lists that cannot be read.
+    case "$3" in
+      */issues/*/comments*|*/pulls/*/reviews*)
+        k=reviews; case "$3" in */comments*) k=comments ;; esac
+        if [ $k = comments ]; then
+          [ -z "${COMMENTS_FAIL:-}" ] || exit 1
+          n=$(( $(cat "$FAKE_LOG.comments" 2>/dev/null || echo 0) + 1 )); echo $n > "$FAKE_LOG.comments"
+          [ -z "${OWNER_COMMENTS:-}" ] || jq -r "$5" "$OWNER_COMMENTS"
+          [ -z "${OWNER_LATE:-}" ] || [ $n -lt "${OWNER_LATE_FROM:-2}" ] || jq -r "$5" "$OWNER_LATE"
+        else
+          [ -z "${REVIEWS_FAIL:-}" ] || exit 1
+          [ -z "${OWNER_REVIEWS:-}" ] || jq -r "$5" "$OWNER_REVIEWS"
+        fi
+        exit 0 ;;
+    esac
     [ -z "${FILES_FAIL:-}" ] || exit 1
     # the companion's files are CO_FILES; PREV are the old names of renamed files,
     # printed only when land asks for them
@@ -1247,7 +1265,7 @@ landing() {
     git update-ref refs/remotes/origin/master HEAD
     git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/master
   fi
-  : > "$R/gh.log"; rm -f "$R/gh.log.n" "$R/gh.log.updated" "$R/gh.log.tried" "$R/gh.log.reads" "$R/gh.log.moved"
+  : > "$R/gh.log"; rm -f "$R/gh.log.n" "$R/gh.log.updated" "$R/gh.log.tried" "$R/gh.log.reads" "$R/gh.log.moved" "$R/gh.log.comments"
   set +e
   OUT=$(env GH_TOKEN= GITHUB_TOKEN= $LAND_ENV FAKE_LOG="$R/gh.log" PATH="$FAKE_BIN:$PATH" \
     sh scripts/harness/land "$@" 2>&1)
@@ -1593,6 +1611,84 @@ landing 7
 assert_eq "but not a head that moved beyond the update" "$RC" 1
 assert_has "saying so" "$OUT" "moved beyond its update"
 assert_no "and merging nothing" "$LOG" "pr merge"
+# The owner steps into a pull request with a comment whose first line starts
+# "Owner review" - their own habit, kept as it was. It holds the pull request
+# whatever its verdict, ACCEPT included: a comment can take a merge away from an
+# agent, never grant one. The agents write with the same account, and their own
+# headers about the owner hold nothing.
+# The fake gh runs land's own --jq over these, as gh does: each line of a file is
+# one comment's body, from the repository's owner unless a second argument says.
+command -v jq >/dev/null || { echo "test/run.sh needs jq: the Owner review tests run land's own --jq" >&2; exit 1; }
+CMT=$(mktemp -d)
+comments() { jq -Rn --arg a "${2:-OWNER}" '[inputs | {author_association: $a, body: .}]' > "$CMT/$1"; }
+printf '%s\n' '**Owner review — ACCEPT (commit `4160fb8`).**' | comments accept
+printf '%s\n' '**Owner review — ACCEPT_WITH_CHANGES, blocking=1 (SEC1, head `1b3bc75`).**' | comments changes COLLABORATOR
+printf '%s\n' '**Owner review — ACCEPT**' | comments stranger NONE
+printf '%s\n' 'Owner review: keep this one' | comments h1
+printf '%s\n' '**Owner Review — ACCEPT**' | comments h2
+printf '%s\n' '## OWNER REVIEW' | comments h3
+printf '%s\n' '- __Owner review__ hold it' | comments h4
+printf '\302\240**Owner review**\n' | comments h5
+printf '\357\273\277Owner review\n' | comments h6
+printf '%s\n' '{"author_association": "MEMBER", "body": "\r\n\n   **Owner review — REJECT**\r\nwhy"}' \
+  | jq -s . > "$CMT/h7"
+printf '%s\n' '**STOP OWNER — review budget exhausted (not merged).**' \
+  '**OWNER BLOCKER (OD-15). Not merging.**' "## HOST3 — answer to the owner's review (B1, B2)" \
+  '**Bloqueo de la revisión del owner corregido — head `e298c770`.**' \
+  "**The owner's final decisions applied** (commit 18bea127)." \
+  '> 🤖 **Agent comment** (Claude Code) - written for me, not by me' \
+  'Re: Owner review' 'the owners review it later' | comments agents
+printf '%s\n' '{"author_association": "OWNER", "body": null}' \
+  '{"author_association": "OWNER", "body": "Thanks\n**Owner review — ACCEPT**"}' \
+  | jq -s --slurpfile a "$CMT/agents" --slurpfile s "$CMT/stranger" '. + $a[0] + $s[0]' > "$CMT/quiet"
+LAND_ENV="HEAD_SHA=local OWNER_COMMENTS=$CMT/accept"
+landing 7
+assert_eq "an Owner review comment makes the pull request the owner's" "$RC" 1
+assert_has "saying so" "$OUT" "me/app#7 is the owner's to land: an Owner review is on it"
+assert_has "naming the command the owner lands it with" "$OUT" "scripts/harness/land --owner 7"
+assert_no "merging nothing" "$LOG" "pr merge"
+assert_no "before waiting for CI" "$LOG" "pr checks"
+landing --owner 7
+assert_eq "the owner lands it with --owner" "$RC" 0
+LAND_ENV="HEAD_SHA=local OWNER_COMMENTS=$CMT/changes"
+landing 7
+assert_eq "whatever the verdict says" "$RC" 1
+for h in h1 h2 h3 h4 h5 h6 h7; do
+  LAND_ENV="HEAD_SHA=local OWNER_COMMENTS=$CMT/$h"
+  landing 7
+  assert_eq "in any case, after any markup or blank line: $h" "$RC" 1
+done
+LAND_ENV="HEAD_SHA=local OWNER_REVIEWS=$CMT/changes"
+landing 7
+assert_eq "in a review's body as in a comment" "$RC" 1
+LAND_ENV="HEAD_SHA=local OWNER_COMMENTS=$CMT/quiet OWNER_REVIEWS=$CMT/quiet"
+landing 7
+assert_eq "the agents' own lines about the owner hold nothing, nor a stranger's, nor a later line" "$RC" 0
+LAND_ENV="HEAD_SHA=local OWNER_LATE=$CMT/accept"
+landing 7
+assert_eq "an Owner review posted while land waited stops the merge" "$RC" 1
+assert_has "read again after the wait" "$LOG" "pr checks 7 -R me/app --watch"
+assert_has "saying so" "$OUT" "an Owner review is on it - nothing merged"
+assert_no "with nothing merged" "$LOG" "pr merge"
+LAND_ENV="HEAD_SHA=local OWNER_LATE=$CMT/accept OWNER_LATE_FROM=3 BEHIND=late"
+landing 7
+assert_eq "and so does one that arrives while land brings it up to date" "$RC" 1
+assert_has "read again before the merge of the updated head" "$LOG" "pulls/7/update-branch"
+assert_no "merging nothing then either" "$LOG" "pr merge 7 -R me/app --merge --match-head-commit 1234567890abcde1"
+LAND_ENV="HEAD_SHA=local COMMENTS_FAIL=1"
+landing 7
+assert_eq "comments that cannot be read are the owner's" "$RC" 1
+assert_has "saying so" "$OUT" "its comments could not be read"
+LAND_ENV="HEAD_SHA=local REVIEWS_FAIL=1"
+landing 7
+assert_eq "and so are reviews that cannot be read" "$RC" 1
+assert_has "saying so" "$OUT" "its reviews could not be read"
+LAND_ENV="HEAD_SHA=local"
+landing 7 me/site#3
+assert_eq "a pull request without one lands" "$RC" 0
+assert_has "having read every page of its comments" "$LOG" "api --paginate repos/me/app/issues/7/comments?per_page=100"
+assert_has "and of its reviews" "$LOG" "api --paginate repos/me/app/pulls/7/reviews?per_page=100"
+assert_no "and not the companion's, which it does not read" "$LOG" "repos/me/site/issues"
 # and what tells an agent what to do or what it may reach: its instructions, its
 # settings, its MCP servers - for every agent the harness runs with
 for f in scripts/harness/verify .githooks/pre-commit docs/harness/mandatory-steps.md \
@@ -1819,7 +1915,7 @@ assert_eq "no gate to check the floor with is the owner's" "$RC" 1
 
 # --landing <pr> answers the same question before land is run, from the same rules.
 asking() {
-  : > "$R/gh.log"; rm -f "$R/gh.log.moved"
+  : > "$R/gh.log"; rm -f "$R/gh.log.moved" "$R/gh.log.comments"
   set +e
   OUT=$(env GH_TOKEN= GITHUB_TOKEN= $LAND_ENV FAKE_LOG="$R/gh.log" PATH="$FAKE_BIN:$PATH" \
     sh scripts/harness/land --landing "$@" 2>"$R/ask.err"); RC=$?
@@ -1836,6 +1932,10 @@ asking 7
 assert_eq "and owner for one that is the owner's" "$OUT" "owner"
 assert_has "saying why" "$ERR" "it touches .githooks/pre-commit, an owner path"
 assert_eq "still exiting 0" "$RC" 0
+LAND_ENV="HEAD_SHA=local OWNER_COMMENTS=$CMT/accept"
+asking 7
+assert_eq "--landing <pr> says owner for a pull request with an Owner review" "$OUT" "owner"
+assert_has "and why" "$ERR" "an Owner review is on it"
 asking 7 8
 assert_eq "it takes one pull request at most" "$RC" 2
 echo 'HARNESS_LAND_FIXED_PATHS=agent' >> scripts/harness/config.sh
@@ -1852,6 +1952,11 @@ git rm -q docs/harness/mandatory-steps.md
 LAND_ENV="HEAD_SHA=local FILES=.github/workflows/ci.yml"
 landing 7
 assert_eq "under Landing: owner land merges what it is given, as before" "$RC" 0
+LAND_ENV="HEAD_SHA=local OWNER_COMMENTS=$CMT/accept"
+landing 7
+assert_eq "an Owner review included" "$RC" 0
+assert_no "reading no comments at all" "$LOG" "issues/7/comments"
+rm -rf "$CMT"
 asking 7
 assert_eq "and --landing <pr> is owner" "$OUT" "owner"
 assert_no "without asking GitHub" "$LOG" "pr view"
@@ -2380,6 +2485,21 @@ assert_has "run-task's hand-over says the same" \
 assert_has "and so does the loop template" "$(cat "$HOME_DIR/templates/mandatory-steps.md")" "stays with it until"
 assert_has "only where the agent is woken" "$(cat "$HOME_DIR/templates/mandatory-steps.md")" "agent is woken"
 assert_has "and a second failed review stops the loop" "$rt_rev" "A second failure"
+# The owner takes a pull request back with an "Owner review" comment, and the
+# agents write with the same account: an agent never writes that line, never edits
+# or deletes a comment it did not write, and says it wrote every comment it posts.
+commit_md=$(cat "$HOME_DIR/skills/commit/SKILL.md")
+assert_has "commit opens every comment with who wrote it" "$commit_md" "> 🤖 **Agent comment**"
+assert_has "naming the model only when known" "$commit_md" "rather than guess"
+assert_has "never starting one with Owner review" "$commit_md" "**Never begin a comment with \`Owner review\`**"
+assert_has "nor editing a comment it did not write" "$commit_md" "**Never edit or delete a comment you did not write.**"
+assert_has "and a pull request opens with the problem" "$commit_md" "one to three plain sentences"
+assert_has "auto-run-task holds the agent to the same" "$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")" "Never begin a comment with \`Owner review\`"
+assert_has "and names it among the owner's reasons" "$auto_land" "starts \`Owner review\`"
+assert_has "and stops at the pull request when land finds one" "$auto_land" "is not a failure to fix"
+assert_has "as run-task does" "$(sed -n '/^## 9. Hand over/,/^## Reporting honestly/p' "$HOME_DIR/skills/run-task/SKILL.md")" "left open for them"
+assert_has "as run-task does" "$(cat "$HOME_DIR/skills/run-task/SKILL.md")" "carries an \`Owner review\` comment"
+assert_has "and the loop template" "$(cat "$HOME_DIR/templates/mandatory-steps.md")" "with a first line that starts \`Owner review\`"
 assert_no "which no longer just sends it to the background" "$(cat "$HOME_DIR/templates/mandatory-steps.md")" "in the background, once it is open"
 # Unsupervised, the archive has to travel inside the pull request: there is no
 # second branch because there is nobody to remember it.
