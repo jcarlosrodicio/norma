@@ -1,5 +1,6 @@
 #!/bin/sh
 # The harness test suite. One place: the gate is the same file in every project,
+# (throwaway: verifying the 0.28.0 Owner review hold - never merged)
 # so its behaviour is tested here instead of being re-tested per repository.
 #
 #   test/run.sh
