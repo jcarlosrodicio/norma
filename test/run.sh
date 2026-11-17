@@ -2451,6 +2451,17 @@ guide=$(cat "$HOME_DIR/skills/architecture-guidelines/SKILL.md")
 assert_has "a regression test is seen failing once" "$guide" "**See it fail once.**"
 assert_has "checking the revert actually took" "$guide" "the red counts equal the green"
 assert_has "and the shapes of false confidence are named" "$guide" "**The mock does the work.**"
+# Rule 5 keeps code from reaching a schema that does not exist yet; the converse
+# - a migration removing what running code still reads - is split in two.
+backend=$(cat "$HOME_DIR/skills/architecture-guidelines/references/backend.md")
+assert_has "a migration never removes what running code still reads" "$backend" "**Never let a migration remove what running code still reads or writes.**"
+assert_has "the expand step still reads the old shape" "$backend" "writes both and still reads the old"
+assert_has "the moved data is checked before anything is dropped" "$backend" "returns zero"
+assert_has "a rollback still reads current data" "$backend" "still writes both, so a rollback"
+assert_has "each step waits for every instance and the rollback target" "$backend" "every running instance and the rollback target are at"
+assert_has "and a NOT NULL on an existing column has its own path" "$backend" "counted to"
+assert_has "and the drop travels after the code that stopped using it" "$backend" "cannot travel with step 4"
+assert_has "the key ideas say it too" "$backend" "expands, then contracts."
 assert_has "run-task hands over the decisions it took, least sure first" "$(cat "$HOME_DIR/skills/run-task/SKILL.md")" "least confident first"
 assert_has "auto-run-task logs the decisions nobody asked about" "$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")" "**Decisions nobody asked about.**"
 assert_has "run-task ends the loop on a third blocking round" "$(cat "$HOME_DIR/skills/run-task/SKILL.md")" "**The third round that still blocks ends the loop"

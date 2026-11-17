@@ -237,6 +237,29 @@ the sentence describe the behaviour.
    of the changelog.
 5. Never let code reach a schema that does not exist. If you cannot guarantee the
    order, the change is not ready.
+6. **Never let a migration remove what running code still reads or writes.** A
+   rename, a drop or a type change of a column deployed code uses, or a `NOT NULL`
+   on one that may hold nulls, is split into changes that each leave every
+   version still running working - the one before it, and the one a rollback
+   returns to:
+   1. *expand* - the new shape beside the old one, nullable or with a default,
+      and code that writes both and still reads the old;
+   2. once every running instance and the rollback target are at step 1, the
+      data moved by hand, as rule 2 says, and checked: the query that counts the
+      rows where the two shapes disagree returns zero;
+   3. code that reads the new shape and still writes both, so a rollback to
+      step 1 reads data that is current;
+   4. code that no longer touches the old shape;
+   5. *contract* - once every running instance and the rollback target are at
+      step 4, the migration that drops the old shape.
+
+   Rule 1 orders each change's migration before its code, which is why the drop
+   cannot travel with step 4. A `NOT NULL` on an existing column takes three of
+   them: code that never writes a null, the nulls fixed by hand and counted to
+   zero, then the migration that sets it - which scans the table, so on a large
+   one it is applied by hand ahead of the deployment, as rule 3 allows. A new
+   column that must be `NOT NULL` is added with a default, or nullable and
+   constrained later: the previous version's inserts do not know it exists.
 
 ---
 
@@ -262,5 +285,6 @@ the sentence describe the behaviour.
 6. Convention over configuration: structure and names fully predictable - imitate
    the canonical example.
 7. Tests seed through the app, wait for asynchrony and control their randomness.
-8. Schema first, code second; DDL only, and idempotent.
+8. Schema first, code second; DDL only, and idempotent; a breaking change
+   expands, then contracts.
 9. Simplicity and surgical changes: the best code is the code you do not write.
