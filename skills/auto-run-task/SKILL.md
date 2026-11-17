@@ -2,7 +2,7 @@
 name: auto-run-task
 description: Use to run a whole roadmap phase end to end with nobody watching - from the phase line to a pushed branch, an open pull request and a green CI, deciding the ambiguities itself and recording every decision it took. Use it when the human hands over a phase and leaves, or says "run phase N", "do it autonomously", "without asking me". Use run-task instead whenever the human wants to see the spec and the task list before code exists.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # auto-run-task
@@ -344,10 +344,17 @@ Then:
      pull request made it `owner`, with the reason `--landing` gave.
    - **`agent`: land it.** The owner has moved their review point after the
      merge, standing, and this is that decision being carried out - not one this
-     run takes. Run `scripts/harness/land <pr> [<owner>/<repo>#<n>]` in the
-     background once CI has been dealt with. This repository's line governs the
-     companion too, so pass one only if this run opened it. When `land` stops,
-     nothing was merged:
+     run takes. Run `scripts/harness/land <pr> [<owner>/<repo>#<n>]` once CI has
+     been dealt with, and stay with it: the run ends when `land` does, not when
+     it starts. Run it in the background only if your agent wakes you when a
+     background command ends; otherwise run it in the foreground - it takes
+     minutes and ends on its own. If your tool cuts a foreground command off
+     before it ends, run `land` again: it reads and pins everything afresh and
+     merges nothing it has not checked. A run that ends its turn while `land` is still
+     running hands its outcome to nobody: the red check or the conflict below is
+     never handled, and the pull request sits open with nothing said.
+     This repository's line governs the companion too, so
+     pass one only if this run opened it. When `land` stops, nothing was merged:
      - a red check goes back to step 3 and **spends that job's attempts there** -
        a job that already used its two fixes gets no third through `land`; a
        flake re-run is still free;
@@ -397,6 +404,10 @@ It carries:
   classification is said out loud to somebody who can object to it; here the log is
   the only place it is ever checked.
 - **Deferred.** What was left for a later phase, and why.
+- **Findings not fixed.** Every review finding you disputed or deferred, with the
+  evidence or the reason, as `run-task` stage 6 asks you to answer it. Nobody
+  objected to them while you worked; the reviewer of the pull request is the
+  first who can.
 - **Not covered.** What the tests and the runtime verification do not prove, and
   whether the runtime verification ran at all - which surface it exercised, or why
   the change had none. With nobody watching, a step quietly skipped reads exactly
@@ -420,7 +431,12 @@ Unsupervised, do the best available version and **say which one it was**:
 - otherwise in-session, reading the change cold from `git diff` rather than from
   your memory of writing it, which is the bias the fresh session existed to break.
 
-Either way the findings are fixed and stage 5 runs again, and the review event that
+A subagent that timed out, failed or came back without a verdict did not review
+anything. Run it again once, or fall back to the in-session pass and say so; never
+record counts it did not produce.
+
+Either way the findings are answered as `run-task` stage 6 says - fixed, disputed or
+deferred - and stage 5 runs again, and the review event that
 skill ends on is recorded either way too - and so is its report, in the change,
 because the session that applies the fixes may not be this one.
 

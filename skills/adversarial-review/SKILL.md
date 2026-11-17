@@ -2,7 +2,7 @@
 name: adversarial-review
 description: Use after an implementation passes its own tests and verification, before committing or archiving a change - an independent red-team pass that assumes the work is wrong and tries to break it. Also use when the user asks for a devil's advocate, red-team or independent review.
 metadata:
-  version: "1.5.0"
+  version: "1.6.0"
 ---
 
 # adversarial-review
@@ -227,6 +227,14 @@ with a reason**. Do not raise again what it already raised: a finding the fix di
 not resolve is *still open*, not new, and one dismissed with a reason stays
 dismissed unless the diff contradicts the reason.
 
+The previous report also carries the author's answers under its findings - fixed,
+disputed, deferred. Read its findings first, as above, and the answers only after
+the round's diff, so that they do not frame it. They are claims to check against
+the diff, not closures: dismiss a disputed or deferred finding when its evidence or
+its reason holds, saying so - judging an argument the author made is not the
+dropping that stage 4 restricts - and keep it open when it does not. A deferred
+finding that blocks is still open, whatever the answer says.
+
 **Name the class, not only the instance.** When a finding is one case of a
 pattern - a missing bound, an unchecked error, the same assumption in three
 callers - say the pattern and list every instance in the change, so one round fixes
@@ -306,6 +314,13 @@ number is a review nobody can act on. Without a run context the command writes
 nothing and exits 0, so it is safe to run anywhere. Run it again after the fixes,
 adding `unresolved=<n>`, because the review the human reads is the one that ran
 last.
+
+`unresolved` is what the round that ran last still holds open: the blocking and
+should-fix findings it did not close as resolved or dismissed with a reason -
+those the author disputed or deferred, until a round accepts the reason, included.
+Nits and pre-existing findings never count. Closing a finding is this review's
+call: a reason the author wrote is an argument for the next round, never a
+dismissal.
 
 Once the change has a pull request, its verdict also goes **on the commit**:
 `scripts/harness/land --review <pr> blocking=<n> unresolved=<n>`, the same counts,
