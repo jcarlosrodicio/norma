@@ -228,7 +228,9 @@ it - is `owner`. Changing it is the owner's decision, merged like any other chan
   pull request in another repository, if there is one. An agent never runs it, and
   its hand-over ends with that command ready to paste.
 - **`Landing: agent`** - the owner's standing decision that the agent which opened a pull
-  request lands it with that same command, in the background, once it is open.
+  request lands it with that same command once it is open, and stays with it until
+  it exits - in the background only where the agent is woken when it ends, because
+  a turn that ends while `land` runs hands its outcome to nobody.
   When `land` stops, nothing is merged: a red CI is classified and handled as
   `auto-run-task` says, a conflict is resolved by bringing the base branch into the
   branch, running the gate again and pushing, and then `land` runs again. Two

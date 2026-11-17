@@ -1239,6 +1239,8 @@ with_land() {
 # clone would have it - unless BRANCH_ONLY is set, which leaves it in the working
 # tree the way a branch that edited it would. --no-verify: no hook is installed
 # here, and one inherited from the machine's git config is not what is under test.
+# GH_TOKEN and GITHUB_TOKEN are emptied: a token in the environment that runs the
+# suite would change which account land asks for.
 landing() {
   if [ -z "${BRANCH_ONLY:-}" ]; then
     git add scripts/harness/config.sh && git commit -qm config --no-verify --allow-empty
@@ -1247,7 +1249,7 @@ landing() {
   fi
   : > "$R/gh.log"; rm -f "$R/gh.log.n" "$R/gh.log.updated" "$R/gh.log.tried" "$R/gh.log.reads" "$R/gh.log.moved"
   set +e
-  OUT=$(env GH_TOKEN= $LAND_ENV FAKE_LOG="$R/gh.log" PATH="$FAKE_BIN:$PATH" \
+  OUT=$(env GH_TOKEN= GITHUB_TOKEN= $LAND_ENV FAKE_LOG="$R/gh.log" PATH="$FAKE_BIN:$PATH" \
     sh scripts/harness/land "$@" 2>&1)
   RC=$?
   set -e
@@ -1819,7 +1821,7 @@ assert_eq "no gate to check the floor with is the owner's" "$RC" 1
 asking() {
   : > "$R/gh.log"; rm -f "$R/gh.log.moved"
   set +e
-  OUT=$(env GH_TOKEN= $LAND_ENV FAKE_LOG="$R/gh.log" PATH="$FAKE_BIN:$PATH" \
+  OUT=$(env GH_TOKEN= GITHUB_TOKEN= $LAND_ENV FAKE_LOG="$R/gh.log" PATH="$FAKE_BIN:$PATH" \
     sh scripts/harness/land --landing "$@" 2>"$R/ask.err"); RC=$?
   ERR=$(cat "$R/ask.err"); LOG=$(cat "$R/gh.log")
   set -e
@@ -2348,6 +2350,37 @@ assert_has "run-task hands over the decisions it took, least sure first" "$(cat 
 assert_has "auto-run-task logs the decisions nobody asked about" "$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")" "**Decisions nobody asked about.**"
 assert_has "run-task ends the loop on a third blocking round" "$(cat "$HOME_DIR/skills/run-task/SKILL.md")" "**The third round that still blocks ends the loop"
 assert_has "auto-run-task escalates it" "$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")" "A review whose third round still blocks is this reason too"
+# The reviewer keeps every finding it cannot refute, by design; an author who then
+# fixes everything grows the change one cheap-looking fix at a time. Each finding
+# ends in a state the next round judges, and the size of the change is watched.
+rt_rev=$(sed -n '/^## 6. Review/,/^## 7. Document/p' "$HOME_DIR/skills/run-task/SKILL.md")
+assert_has "run-task answers every finding: fixed" "$rt_rev" "- **Fixed**"
+assert_has "disputed, with evidence" "$rt_rev" "- **Disputed**"
+assert_has "or deferred, never a blocking one" "$rt_rev" "A blocking finding is never deferred"
+assert_has "and an answer is not a closure" "$rt_rev" "a finding you disputed or deferred is still open"
+assert_has "agreeing to end the loop is refused" "$rt_rev" "**Do not accept a finding to end the loop.**"
+assert_has "the size of the change is measured before and after" "$rt_rev" "git diff --shortstat"
+assert_has "and a change the fixes grew is cut first" "$rt_rev" "for what to cut"
+assert_has "the owner's findings are not the author's to defer" "$rt_rev" "Never defer one or set it aside on your own"
+assert_has "a review that did not run is no verdict" "$rt_rev" "is not a verdict"
+assert_has "adversarial-review says what unresolved counts" "$adv" "\`unresolved\` is what the round"
+assert_has "including what the author disputed or deferred" "$adv" "disputed or deferred, until a round"
+assert_has "and judges the author's answers rather than taking them" "$adv" "claims to check against"
+auto_rev=$(sed -n '/^## The review, with nobody to run it fresh/,/^## Reporting honestly/p' "$HOME_DIR/skills/auto-run-task/SKILL.md")
+assert_has "auto-run-task treats a review that failed as no review" "$auto_rev" "did not review"
+assert_has "and logs the findings it did not fix" "$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")" "**Findings not fixed.**"
+# land takes minutes. An agent whose turn ends while it runs in the background is
+# not woken when it fails, so the red check or the conflict it stops on is never
+# handled - the run ends when land does.
+auto_land=$(sed -n '/^4\. \*\*Land it or stop at it/,/^If there is no remote/p' "$HOME_DIR/skills/auto-run-task/SKILL.md")
+assert_has "auto-run-task stays with land until it exits" "$auto_land" "the run ends when \`land\` does"
+assert_has "in the background only where the agent is woken" "$auto_land" "background command ends"
+assert_has "run-task's hand-over says the same" \
+  "$(sed -n '/^## 9. Hand over/,/^## Reporting honestly/p' "$HOME_DIR/skills/run-task/SKILL.md")" "until it exits"
+assert_has "and so does the loop template" "$(cat "$HOME_DIR/templates/mandatory-steps.md")" "stays with it until"
+assert_has "only where the agent is woken" "$(cat "$HOME_DIR/templates/mandatory-steps.md")" "agent is woken"
+assert_has "and a second failed review stops the loop" "$rt_rev" "A second failure"
+assert_no "which no longer just sends it to the background" "$(cat "$HOME_DIR/templates/mandatory-steps.md")" "in the background, once it is open"
 # Unsupervised, the archive has to travel inside the pull request: there is no
 # second branch because there is nobody to remember it.
 auto=$(cat "$HOME_DIR/skills/auto-run-task/SKILL.md")

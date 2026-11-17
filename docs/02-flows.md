@@ -237,7 +237,12 @@ Three things bound it, and none of them may be softened:
   merge only where the project's `Landing:` line says `agent` - then through
   `scripts/harness/land`, and nowhere else. That pull request is the human's only
   review point, so removing it without the owner having said so would leave the
-  run reviewed by nobody. A red CI is not a finished run, and the failure is classified
+  run reviewed by nobody. Where it lands, the run ends when `land` exits, not when
+  it starts: an agent whose turn ends while `land` waits in the background is not
+  woken when it stops on a red check or a conflict, and nobody handles either.
+  The loop template says so for new installs; a project installed earlier, whose
+  step 9 sends `land` to the background unconditionally, edits its own copy.
+  A red CI is not a finished run, and the failure is classified
   before it is touched: caused by this change, fixed and pushed again, twice at
   most; a flake, re-run without spending either attempt; already red on the base
   branch, escalated rather than fixed, because that repair would smuggle work from

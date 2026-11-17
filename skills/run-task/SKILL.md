@@ -2,7 +2,7 @@
 name: run-task
 description: Use to run a complete implementation task end to end - a roadmap phase item, a feature, a fix or a refactor - from a vague request to code that is verified and waiting for human review. Invoke it whenever the user asks for work to be built rather than just discussed, and follow it in order without skipping stages. It stops three times for the human; use auto-run-task instead when they hand over a whole phase and want it delivered to a pull request without being asked anything.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # run-task
@@ -218,6 +218,9 @@ that skips this pays the same price for the same failure forever.
 Follow `.agents/skills/adversarial-review/SKILL.md`.
 
 Best run in a fresh session with a different model from the one that wrote the code.
+A review that timed out, failed or came back without a verdict is not a verdict:
+run it again, and never record or post counts it did not produce. A second failure
+stops the loop here - report that the review could not run.
 Architectural conformance is one of the review dimensions: a layer violation, a
 primitive where a typed value belongs, or an external shape leaking past its mapper
 is a finding with a file and a line, like any other.
@@ -236,8 +239,52 @@ here**: stop and hand the human the three reports. The approach is what needs a
 decision now, and only the human can take it. Pre-existing findings never block a
 round; they go in the report for somebody to pick up.
 
-Fix what it finds, then re-run stage 5. A finding you argue with instead of checking
-is a finding you did not understand yet.
+### Answering the findings
+
+The review keeps every finding it cannot refute - that is its job. Yours is to
+answer each one, and every finding ends in one of three states:
+
+- **Fixed** - with the smallest change that resolves it. Prefer deleting or
+  narrowing code to adding a guard, a helper, a cache or an option. Where the
+  finding is a defect in the behaviour this change is for and no test catches it,
+  add the one test that fails without the fix.
+- **Disputed** - you checked it, and it is wrong. Say why with evidence a reader
+  can check - a `file:line`, a test, a command's output - never with a restatement
+  of what you meant. A finding you argue with instead of checking is a finding you
+  did not understand yet.
+- **Deferred** - a real point outside what this change is for: another path, a
+  case nobody hit, a small cost. One line each, kept in the report as a follow-up.
+  A blocking finding is never deferred, and the severity is the review's - not
+  yours to lower by deferring.
+
+Write the answers under the findings in the review's report, wherever the project
+keeps it, as you go - never editing the findings themselves. The next round reads
+them there, and the session that answers is often not the one that reviewed.
+
+An answer is not a closure: closing a finding is the review's call. Until a round
+closes it, a finding you disputed or deferred is still open, and the counts you
+post with `land --review` are the ones that round produced - what `unresolved`
+counts is defined in `.agents/skills/adversarial-review/SKILL.md`.
+
+**Do not accept a finding to end the loop.** Agreeing with a wrong finding is how a
+change grows code nobody needed. Disagree with evidence, and let the next round
+judge it.
+
+**Watch the size.** Note the size of the change before the first review and again
+after each round of fixes - `git diff --shortstat` against the base, plus the new
+files it does not count until they are added - and put both in the report. If the
+fixes grew the change, look first for what to cut: a review loop grows a change
+one cheap-looking fix at a time, and the change you deliver should still be the
+one you planned.
+
+Findings the **owner** gave you in this conversation are not the review's: they are
+the human's decision, and they are not in the review's counts. Fix them; where you
+believe one is wrong, tell the owner with your evidence and leave the decision to
+them. Never defer one or set it aside on your own. Unsupervised there is nobody to
+tell: whether to apply it changes what gets built, which is the first reason
+`auto-run-task` stops on.
+
+After the fixes, re-run stage 5.
 
 **Re-run the runtime verification too, not only the gate**, whenever a fix changed
 behaviour rather than shape. The gate re-runs because the hook forces it; nothing
@@ -347,7 +394,8 @@ leaves the pull request open, with `scripts/harness/land <pr> [<owner>/<repo>#<n
 ready to paste, or `land --owner <pr> ...` when the line said `agent` and the change
 made it the owner's. `--owner` is never yours to pass unless the user told you, in
 this conversation, to land that pull request. `agent` lands it
-with that command, following `auto-run-task` stage 9 step 4 for everything else:
+with that command, staying with it until it exits, and follows `auto-run-task`
+stage 9 step 4 for everything else:
 the companion only if this task opened it, a red check or a conflict handled, two
 attempts at the same failure, and a give-up reported with its output. If the user
 said in this conversation to leave it open, it stays open whatever the line says;
