@@ -1239,6 +1239,8 @@ with_land() {
 # clone would have it - unless BRANCH_ONLY is set, which leaves it in the working
 # tree the way a branch that edited it would. --no-verify: no hook is installed
 # here, and one inherited from the machine's git config is not what is under test.
+# GH_TOKEN and GITHUB_TOKEN are emptied: a token in the environment that runs the
+# suite would change which account land asks for.
 landing() {
   if [ -z "${BRANCH_ONLY:-}" ]; then
     git add scripts/harness/config.sh && git commit -qm config --no-verify --allow-empty
@@ -1247,7 +1249,7 @@ landing() {
   fi
   : > "$R/gh.log"; rm -f "$R/gh.log.n" "$R/gh.log.updated" "$R/gh.log.tried" "$R/gh.log.reads" "$R/gh.log.moved"
   set +e
-  OUT=$(env GH_TOKEN= $LAND_ENV FAKE_LOG="$R/gh.log" PATH="$FAKE_BIN:$PATH" \
+  OUT=$(env GH_TOKEN= GITHUB_TOKEN= $LAND_ENV FAKE_LOG="$R/gh.log" PATH="$FAKE_BIN:$PATH" \
     sh scripts/harness/land "$@" 2>&1)
   RC=$?
   set -e
@@ -1819,7 +1821,7 @@ assert_eq "no gate to check the floor with is the owner's" "$RC" 1
 asking() {
   : > "$R/gh.log"; rm -f "$R/gh.log.moved"
   set +e
-  OUT=$(env GH_TOKEN= $LAND_ENV FAKE_LOG="$R/gh.log" PATH="$FAKE_BIN:$PATH" \
+  OUT=$(env GH_TOKEN= GITHUB_TOKEN= $LAND_ENV FAKE_LOG="$R/gh.log" PATH="$FAKE_BIN:$PATH" \
     sh scripts/harness/land --landing "$@" 2>"$R/ask.err"); RC=$?
   ERR=$(cat "$R/ask.err"); LOG=$(cat "$R/gh.log")
   set -e
