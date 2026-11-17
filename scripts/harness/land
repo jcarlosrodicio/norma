@@ -30,6 +30,11 @@
 # byte the one the norma installed here vendors there - leaves scripts/harness/
 # out of it.
 #
+# The owner can also take one pull request back by hand: a comment or review whose
+# first line starts "Owner review", from the repository's own people, makes it the
+# owner's whatever its verdict - read before the wait and again right before the
+# merge. A comment never grants a merge; only --owner does.
+#
 # A review's verdict lives on one commit: `--review` posts it as the
 # commit status norma/review on the pull request's head - success when nothing
 # blocks and nothing is unresolved, failure otherwise - and only from a checkout at
@@ -301,10 +306,30 @@ vendored_upgrade() {
   done
 }
 
+# The owner steps into a pull request with a comment or a review whose first line
+# that is not blank starts "Owner review" - in any case, after any markup: bold, a
+# heading, a bullet. Any
+# verdict holds it, ACCEPT included: a comment can take a merge away from an agent,
+# never grant one, and only --owner releases it. Only the repository's own people
+# count, and every page is read; a page that cannot be read makes the pull request
+# the owner's, since nobody can say what was on it.
+OWNER_REVIEW_JQ='.[] | select(.author_association == "OWNER" or .author_association == "MEMBER" or .author_association == "COLLABORATOR") | [(.body // "") | splits("\n") | sub("^[^A-Za-z0-9]+"; "") | select(length > 0)] | .[0] // empty'
+owner_review() {
+  firsts=$(gh api --paginate "repos/$2/issues/$1/comments?per_page=100" --jq "$OWNER_REVIEW_JQ" 2>/dev/null) \
+    || { echo "its comments could not be read"; return; }
+  more=$(gh api --paginate "repos/$2/pulls/$1/reviews?per_page=100" --jq "$OWNER_REVIEW_JQ" 2>/dev/null) \
+    || { echo "its reviews could not be read"; return; }
+  if printf '%s\n%s\n' "$firsts" "$more" | grep -iq '^owner review'; then
+    echo "an Owner review is on it"
+  fi
+}
+
 # Why the pull request at head $1 is the owner's to land under Landing: agent -
-# nothing when it is not: its paths, then its floor.
+# nothing when it is not: an Owner review, its paths, then its floor.
 owner_reason() {
   case "$1" in ''|*[!0-9a-f]*) echo "its head commit could not be read"; return ;; esac
+  r=$(owner_review "$PR" "$REPO")
+  [ -z "$r" ] || { echo "$r"; return; }
   # The floor guard below and the CI land waits for are that branch's own, so a
   # branch free to change them could make itself green: .github/workflows/ stays
   # the owner's unless all hands it over, and scripts/harness/ unless the change
@@ -380,8 +405,10 @@ if [ -n "$CO_PR" ]; then CO_HEAD=$(head_of "$CO_PR" "$CO_REPO") || exit 1; fi
 # The companion is held to the harness's own paths: its repository's list and floor
 # are not readable from here, and a workflow lands in a documentation site too.
 CHECKED=""
+AGENT_LANDS=""
 if [ -z "$AS_OWNER" ] && [ "$(landing_line)" = agent ]; then
   CHECKED=1
+  AGENT_LANDS=1
   reason=$(owner_reason "$HEAD")
   now=$(head_of "$PR" "$REPO") || exit 1
   [ "$now" = "$HEAD" ] || fail "$REPO#$PR moved while its files were read - nothing merged; run land again"
@@ -581,6 +608,12 @@ while :; do
     fi
   fi
   wait_for_ci
+  # The owner may have stepped in while CI ran: read again, right before the merge.
+  # What lands in the seconds between this read and the merge is not seen.
+  if [ -n "$AGENT_LANDS" ]; then
+    r=$(owner_review "$PR" "$REPO")
+    [ -z "$r" ] || fail "$REPO#$PR is the owner's to land: $r - nothing merged. The owner lands it with scripts/harness/land --owner $PR${CO_PR:+ $CO_REPO#$CO_PR}"
+  fi
   if merge_pinned "$PR" "$REPO" "$HEAD" "$HARNESS_LAND_METHOD"; then break; fi
   behind || fail "GitHub refused to merge $REPO#$PR - nothing merged"
 done
