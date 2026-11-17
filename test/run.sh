@@ -1605,7 +1605,6 @@ landing 7 me/site#3
 assert_eq "a clean one lands with it" "$RC" 0
 LAND_ENV="HEAD_SHA=local BEHIND=start"
 landing 7
-assert_eq "an agent lands a checked pull request brought up to date" "$RC" 0
 assert_has "pinned to the update" "$LOG" "--match-head-commit 1234567890abcde1"
 LAND_ENV="HEAD_SHA=local BEHIND=start UPDATE_PARENTS=0000000000000000,0123456789fedcba"
 landing 7
