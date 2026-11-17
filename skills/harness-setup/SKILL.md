@@ -2,7 +2,7 @@
 name: harness-setup
 description: Use to install or finish setting up the task harness in a repository - it detects the stack, interviews the human for every decision the installer cannot infer, and writes the gate config, the mandatory loop, the architecture adoption map and the index. Use it on a repository with no harness, and on one where docs/harness still contains TODO(harness) markers.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # harness-setup
@@ -120,7 +120,10 @@ depend only on domain and ports?" gets a decision.
    authentication, infrastructure, CI configured outside `.github/workflows/`,
    the settings of an agent the harness does not name - and write them, in
    GitHub's path syntax, into `HARNESS_LAND_OWNER_PATHS` in `config.sh`. None is a valid answer; the harness's
-   paths and the floor guard still apply.
+   paths and the floor guard still apply. Tell the owner, too, that they can take
+   any one pull request back by commenting on it with a first line that starts
+   `Owner review`: `land` then refuses it to an agent whatever the verdict, and
+   only `land --owner` lands it.
 8. For `land`, whichever the answer: if the CI workflow has a `paths-ignore`, the
    same paths go into `HARNESS_LAND_NO_CI` in `config.sh` - in GitHub's syntax, as
    the workflow writes them - or a pull request touching only those waits for

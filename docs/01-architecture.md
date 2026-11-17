@@ -375,6 +375,7 @@ request. Some are the owner's whatever the line says, because of what they chang
 | a file matching `HARNESS_LAND_OWNER_PATHS` in `config.sh` - read from the default branch, in GitHub's path syntax, no `!` | what this project considers too sensitive to land unattended - migrations, payments, authentication. It adds to the list above and cannot remove from it |
 | `verify --floor` reporting findings, or unable to check | a skip, a suppression, a deleted test, assertions removed, `config.sh` touched: the cheapest roads to green. Measured on 2026-10-07, three of 28 merged pull requests in three consumers would have gone to the owner, every one with something real to look at |
 | a file list, a file count, a head or a floor that cannot be read; more than the 3000 files GitHub lists; a head that moved while its files were read | a doubt, and every doubt falls on the side nobody granted |
+| a comment or a review from the repository's own people whose first line starts `Owner review`, whatever its verdict; comments or reviews that cannot be read | the owner stepping in by hand, the way they already did. A comment can take the merge away from an agent, never grant one - see below |
 | a companion touching the harness's own paths | its repository's list and floor cannot be read from here, but a workflow lands in a documentation site too. `land` refuses both before either merges |
 
 `land --landing <pr>` prints `owner` for such a pull request, with the reason on
@@ -447,6 +448,55 @@ Decisions inside it:
   to date during the wait is not checked again - the update merges the base, whose
   files are not the change's - but its new head must have the checked head as its
   first parent, or it is a push nobody checked and `land` refuses.
+
+#### The owner's word, on one pull request
+
+The owner and the agents usually write with one GitHub account, so the owner
+cannot use GitHub's "Request changes" - nobody can on their own pull request - and
+a comment's author says nothing about who wrote it. The owner already had a habit
+that does: a top-level comment whose first line reads `**Owner review — VERDICT
+...**`. Under `Landing: agent`, a comment or a review body whose first line that
+is not blank starts `Owner review` makes the pull request the
+owner's: `--landing <pr>` prints `owner`, and `land` refuses it with nothing
+merged and the `--owner` command. What it guarantees, and where it stops:
+
+- **Any verdict holds, and only `--owner` releases it.** `ACCEPT` included: a
+  comment can take a merge away from an agent, never grant one. An owner who has
+  read it and wants it merged lands it, or tells the agent to for that pull
+  request - which is what `--owner` already means.
+- **The first line, from the repository's people.** Blank lines are skipped, and
+  so is whatever precedes the first letter or digit - bold, a heading, a bullet,
+  a quote mark, an invisible space - and the case is ignored, because a typo must
+  not let an agent merge what the owner held. A `Re:`, a mention further down or
+  an agent's own header about the owner's review holds nothing - measured on
+  2026-11-17 against the eleven first lines mentioning the owner on sixteen of the
+  consumers' pull requests, the owner's three matched and the agents' eight did
+  not. Only `OWNER`, `MEMBER` and `COLLABORATOR` count, so a stranger on a
+  public repository cannot stop a merge. Inline review comments are not read: they
+  are about a line, not about the merge.
+- **Every page.** Comments and reviews are read with `--paginate`, a hundred at a
+  time; a pull request is never judged on its first page.
+- **A read that fails is the owner's.** Comments or reviews that cannot be read -
+  a network error, a 5xx, a rate limit - refuse with nothing merged and say
+  which: nobody can say what was on them.
+- **Read before the wait and again right before each merge.** One posted while CI
+  ran, or while `land` brought the branch up to date, stops the merge. One posted
+  in the seconds between the last read and `gh pr merge` is not seen: GitHub has
+  nothing to pin a merge to a set of comments, as `--match-head-commit` pins it to
+  a head. The window is two API calls long.
+- **Comments as they are now.** An Owner review edited so its first line no
+  longer starts that way, or deleted, no longer holds - and with one account an
+  agent could do either. `land` cannot tell, and reading the edit history would be
+  a second reader and a rule about which version counts. What stands in the way is
+  a rule, not a check: the skills forbid an agent to begin a comment with `Owner
+  review` or to edit or delete a comment it did not write, and have it open every
+  comment it posts with a line saying an agent wrote it. An agent that breaks the
+  rule gets past the hold, as one passing `--owner` would.
+- **The main pull request only, under `Landing: agent` only.** The companion's
+  comments are not read; it is held to its own repository's process, as for the
+  review verdict. Under `Landing: owner`, and with `--owner`, every landing is
+  already the owner's, and nothing is read.
+
 #### A review's verdict, on one commit
 
 The adversarial review ends in a report and a run event, and neither is something
@@ -600,6 +650,10 @@ cannot close: a pull request's CI tests the merge with the base as it was, and
 `--match-head-commit` pins the head, not the base - if the base branch moves
 during the wait, the merged result is one no check ran on. The CI on the base
 branch after the merge is the backstop for that, as it is for any merge.
+Measured on 2026-11-17 over 316 merged pull requests on the consumers: the base
+moved during the wait in 20, touching files the pull request also touched in 14,
+and none left the base branch red. A second CI run on every landing would pay for
+a case that has not happened.
 
 ### `profiles/*.sh` - stack adapters
 

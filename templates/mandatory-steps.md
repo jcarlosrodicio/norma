@@ -243,7 +243,9 @@ it - is `owner`. Changing it is the owner's decision, merged like any other chan
   an agent is told or may reach (`.agents/`, `.claude/`, any `AGENTS.md` or
   `CLAUDE.md`, `.mcp.json` and the other agents' settings) or a path in
   `HARNESS_LAND_OWNER_PATHS`, or whose floor
-  guard finds the bar lowered. `land --landing <pr>` says so, `land` refuses it,
+  guard finds the bar lowered. The owner takes any one back by commenting on it
+  with a first line that starts `Owner review`, whatever the verdict - a comment
+  never grants a merge. `land --landing <pr>` says so, `land` refuses it,
   and the owner lands it with `scripts/harness/land --owner <pr>`. With
   `HARNESS_LAND_FIXED_PATHS=agent` in `scripts/harness/config.sh` the owner hands
   the harness's paths and the agents' files to the agent too, but for

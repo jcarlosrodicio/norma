@@ -143,6 +143,10 @@ Do everything that does not depend on the answer **first**. Then:
   line: it is the owner's grant, and `land --landing` reads it from the default
   branch precisely so that a run cannot grant itself the merge. Never pass
   `land --owner`: it is the owner's flag, for a pull request the change made theirs.
+- Never begin a comment with `Owner review`, and never edit or delete a comment
+  you did not write: that line is how the owner takes a pull request back, and
+  `land` reads comments as they are now. Every comment you post opens with the
+  attribution line in `.agents/skills/commit/SKILL.md`.
 - Never deploy, publish a package, run a migration against a production store, or
   create, modify or rotate a credential, a secret or a CI variable.
 - Never write the real `.env`, or any local-only file the repository ships an
@@ -244,7 +248,8 @@ Then:
    asking. A reviewer must be able to read that list and stop at the first one
    they disagree with.
 
-   **Say in the body that the run was unsupervised**, in the first line. A pull
+   **Say in the body that the run was unsupervised**, in the first line; the
+   plain sentences on the problem that `commit` asks for come right after it. A pull
    request that looks like any other hides the one fact a reviewer needs to
    calibrate how hard to look: that nothing in it was agreed with a human before
    it was written.
@@ -331,7 +336,9 @@ Then:
    or may reach - `.agents/`, `.claude/`, `AGENTS.md`, `CLAUDE.md`, MCP servers -
    unless `HARNESS_LAND_FIXED_PATHS=agent` hands them over, `scripts/harness/` and `.github/workflows/` aside (`all` hands the workflows over too, and a norma upgrade identical to the installed norma is never held for `scripts/harness/`), or a path in `HARNESS_LAND_OWNER_PATHS`, or whose floor guard finds the bar lowered - or
    cannot check it, which is why the checkout matters - is `owner`, with the reason
-   on stderr. Every other case is `owner` too.
+   on stderr. So is one with a comment or review from the owner whose first line
+   starts `Owner review`, whatever its verdict; `land` reads them again right
+   before it merges. Every other case is `owner` too.
 
    - **`owner` - which is anything `--landing` does not print as `agent`: stop
      at the open pull request.** Do not merge
@@ -359,9 +366,13 @@ Then:
        a job that already used its two fixes gets no third through `land`; a
        flake re-run is still free;
      - a conflict is its own failure, with its own two attempts: bring the base
-       branch into this one, run the gate again, push, and run `land` again.
+       branch into this one, run the gate again, push, and run `land` again;
+     - a pull request `land` says is the owner's - an `Owner review` posted while
+       it waited, say - is not a failure to fix: stop at the open pull request as
+       under `owner` above, with its reason and `land --owner <pr> ...` ready to
+       paste. Never pass `--owner`, and never touch the comment that held it.
 
-     When either runs out, stop at the open pull request: that is escalation
+     When either of the first two runs out, stop at the open pull request: that is escalation
      reason 6, reported as such with the output, in the report and in the
      autonomy log. If the human said, in this conversation, to leave this run's
      pull request open, it is `owner` for this run whatever the line says - a
