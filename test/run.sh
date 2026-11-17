@@ -2451,6 +2451,17 @@ guide=$(cat "$HOME_DIR/skills/architecture-guidelines/SKILL.md")
 assert_has "a regression test is seen failing once" "$guide" "**See it fail once.**"
 assert_has "checking the revert actually took" "$guide" "the red counts equal the green"
 assert_has "and the shapes of false confidence are named" "$guide" "**The mock does the work.**"
+# Asking well: a guess is said to be one, a question carries a proposed answer,
+# and a nod to a summary is not agreement with the guess inside it.
+enrich=$(cat "$HOME_DIR/skills/enrich-task/SKILL.md")
+assert_has "enrich-task lists its assumptions by where they came from" "$enrich" "least sure first"
+assert_has "asks each question with the answer it would take" "$enrich" "each with the answer you"
+assert_has "and every guess is asked, never carried on unasked" "$enrich" "Every assumption marked as a guess is"
+assert_has "and does not take a nod for an answer" "$enrich" "ask about the least sure assumption"
+startp=$(cat "$HOME_DIR/skills/start-project/SKILL.md")
+assert_has "start-project marks its guesses when it plays back" "$startp" "so their eye goes to the guesses"
+assert_has "plays back what is out" "$startp" "the way out, and what is out"
+assert_has "and passes no checkpoint on a vague yes" "$startp" "**A vague yes is not a yes.**"
 # Rule 5 keeps code from reaching a schema that does not exist yet; the converse
 # - a migration removing what running code still reads - is split in two.
 backend=$(cat "$HOME_DIR/skills/architecture-guidelines/references/backend.md")
