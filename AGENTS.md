@@ -37,6 +37,7 @@ profiles/*.sh      prefab config.sh per stack: flutter, node, pnpm-turbo, python
 skills/            the canonical skill library, vendored into projects as real dirs
 templates/         the documents a project owns after the first write
 test/run.sh        the whole test suite, one place
+site/              the landing page on GitHub Pages, the README demo (demo.tape) and the social preview
 VERSION            the vendored-content version, stamped into each project
 ```
 

@@ -2,20 +2,41 @@
 
 <p align="center">
   <a href="https://github.com/jcarlosrodicio/norma/actions/workflows/ci.yml"><img src="https://github.com/jcarlosrodicio/norma/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/jcarlosrodicio/norma/releases/latest"><img src="https://img.shields.io/github/v/release/jcarlosrodicio/norma?sort=semver" alt="Latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/jcarlosrodicio/norma" alt="License"></a>
   <a href="https://github.com/sponsors/jcarlosrodicio"><img src="https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-ea4aaa?logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub"></a>
 </p>
 
-**One task loop, one verification gate, one skill library - for every coding agent,
-enforced by git.**
+**Your agent says the tests passed. Git checks.**
 
-norma installs and maintains a task harness in a repository. Whatever agent is
-driving - Claude Code, Codex, OpenCode, Cursor or the next one - it follows the same
-procedure, read **by file path** from the repository, and it cannot commit until the
-same gate has passed. The enforcement lives in a git hook, not in any one agent's
-hook system, so switching agents changes nothing.
+norma installs one task loop, one verification gate and one skill library in a
+repository. Whatever agent is driving - Claude Code, Codex, OpenCode, Cursor or the
+next one - it follows the same procedure, read **by file path** from the repository,
+and it cannot commit until the same gate has passed. The enforcement lives in a git
+hook, not in any one agent's hook system, so switching agents changes nothing.
 
-**MIT · POSIX sh · Agent-agnostic · No runtime dependencies**
+**MIT · POSIX sh · Agent-agnostic · No runtime dependencies** ·
+[jcarlosrodicio.github.io/norma](https://jcarlosrodicio.github.io/norma/)
+
+<p align="center">
+  <img src="site/demo.gif" width="800" alt="A file is edited and committed; the hook answers 'harness: commit blocked - staged files changed after the last verification'. The gate runs and passes, and the same commit goes through.">
+</p>
+
+<p align="center"><sub>Real output, recorded from <a href="site/demo.tape"><code>site/demo.tape</code></a>: the code changed after
+the last verification, so git refuses the commit until the gate runs again.</sub></p>
+
+## Try it in a minute
+
+```sh
+brew install jcarlosrodicio/tap/norma   # or the install script, below
+cd your-project && norma install        # vendors the gate, the hook and the skills
+norma doctor                            # tells you what is left to decide
+```
+
+Then ask your agent to follow `.agents/skills/harness-setup/SKILL.md` (in Claude
+Code, `/harness-setup`): it reads the repository and interviews you for the few
+things the installer cannot infer. [Installation](#installation) has the details
+and the other two ways in.
 
 > [!NOTE]
 > norma is not an agent, an orchestrator or a hosted service. It is the set of
@@ -60,6 +81,15 @@ norma is that process extracted once, made portable, and made binding:
 | Sixteen stack profiles | A starting `config.sh` for Node, pnpm/Turbo, Next, Flutter, Swift, Go, Rust, Maven, Gradle, Python, Django, Laravel, Rails, Phoenix, .NET and Terraform |
 | Safe upgrades | `norma upgrade` replaces only what the harness owns and reports local edits instead of clobbering them |
 
+## How it compares
+
+| If you already use | What it does | What norma adds |
+|---|---|---|
+| `AGENTS.md` / `CLAUDE.md` rules | Tells the agent what to do | A hook that refuses the commit when it was not done |
+| An agent's own hooks (Claude Code hooks and the like) | Binds that one agent | The same rule for every agent and for humans, because it lives in git |
+| `pre-commit`, husky, lefthook | Runs linters on staged files at commit time | A gate the agent runs as a step, that names what it tested and stamps it; the hook only checks the stamp. Your existing linters go inside the gate |
+| CI alone | Catches it after the push | Refuses it before the commit, with the same gate running in CI behind it |
+
 ## Who this is for
 
 - You use more than one coding agent, or expect to, and want them to work the same way.
@@ -98,7 +128,7 @@ gate in CI to close the one hole the hook cannot, `git commit --no-verify`.
 Every refusal and the reason it exists are listed in
 [`docs/02-flows.md`](docs/02-flows.md).
 
-## Quick start
+## Installation
 
 ### Requirements
 
@@ -124,14 +154,14 @@ curl -fsSL https://raw.githubusercontent.com/jcarlosrodicio/norma/master/install
 ```
 
 It clones the latest release into `~/.local/share/norma` and links `norma` from
-`~/.local/bin`. `NORMA_VERSION=0.21.0` pins a release, and `NORMA_HOME` and
+`~/.local/bin`. `NORMA_VERSION=0.28.0` pins a release, and `NORMA_HOME` and
 `NORMA_BIN_DIR` move either location. Run it again to move to another release. It
 refuses rather than overwrite a `norma` that is already there.
 
 Or by hand, from a release tag:
 
 ```sh
-git clone --branch 0.21.0 https://github.com/jcarlosrodicio/norma.git ~/.local/share/norma
+git clone --branch 0.28.0 https://github.com/jcarlosrodicio/norma.git ~/.local/share/norma
 ln -s ~/.local/share/norma/bin/norma ~/.local/bin/norma
 ```
 
@@ -152,12 +182,8 @@ Then ask your agent to follow `.agents/skills/harness-setup/SKILL.md` (in Claude
 `/harness-setup`) to fill in the decisions `install` cannot infer. From then on, any
 change starts with `.agents/skills/run-task/SKILL.md`.
 
-### Or start a project that does not exist yet
-
-```sh
-norma start my-project     # creates the directory and leaves the note
-cd my-project              # open your agent here and say what you want to build
-```
+For a project that does not exist yet, `norma start my-project` is the entry point
+instead - see [Starting from nothing](#starting-from-nothing-norma-start).
 
 ### Stack profiles
 
@@ -408,7 +434,7 @@ reports on them:
 test/run.sh
 ```
 
-485 tests over the gate's real behaviour - its refusals above all - over the run
+Over a thousand tests over the gate's real behaviour - its refusals above all - over the run
 context and what the gate records through it, over every
 profile and the detection that picks one, over the shape of the skill library, and
 over `install`, `upgrade` and `doctor`, each in a throwaway git repository with a

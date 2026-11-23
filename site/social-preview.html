@@ -1,0 +1,87 @@
+<!doctype html>
+<!-- Source of social-preview.png, the repository's GitHub social preview.
+     Regenerate (1280x640) with any Chromium:
+       chrome --headless=new --hide-scrollbars --window-size=1280,640 \
+         --virtual-time-budget=4000 --screenshot=site/social-preview.png site/social-preview.html
+     then upload it in Settings > General > Social preview. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>norma social preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&family=Fragment+Mono&display=block" rel="stylesheet">
+<style>
+:root {
+  --paper: oklch(0.955 0.012 80);
+  --ink: oklch(0.22 0.012 70);
+  --ink-2: oklch(0.42 0.014 70);
+  --rule: oklch(0.80 0.018 75);
+  --stamp: oklch(0.56 0.19 33);
+  --term: oklch(0.21 0.008 70);
+  --term-ink: oklch(0.92 0.012 80);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 1280px; height: 640px; overflow: hidden; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Archivo", sans-serif;
+  padding: 44px 64px 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 14px;
+  border-bottom: 3px solid var(--ink);
+  font-size: 20px;
+}
+.mark { font-weight: 800; font-variation-settings: "wdth" 125; letter-spacing: 0.05em; font-size: 26px; }
+header span:last-child { color: var(--ink-2); }
+main { display: grid; grid-template-columns: 1fr 470px; gap: 48px; align-items: center; }
+h1 {
+  margin: 0;
+  font-weight: 800;
+  font-variation-settings: "wdth" 80;
+  font-size: 92px;
+  line-height: 0.94;
+  letter-spacing: -0.025em;
+}
+h1 em { font-style: normal; color: var(--stamp); }
+pre {
+  margin: 0;
+  padding: 26px 28px;
+  background: var(--term);
+  color: var(--term-ink);
+  font: 19px/1.6 "Fragment Mono", monospace;
+}
+pre b { color: oklch(0.72 0.17 35); font-weight: 400; }
+pre i { font-style: normal; color: oklch(0.68 0.014 78); }
+footer {
+  display: flex;
+  gap: 28px;
+  padding: 18px 0 30px;
+  border-top: 1px solid var(--rule);
+  font-size: 21px;
+  color: var(--ink-2);
+}
+footer strong { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+<header><span class="mark">NORMA</span><span>A harness for agent-driven change</span></header>
+<main>
+  <h1>Your agent says the tests passed. <em>Git checks.</em></h1>
+<pre><i>$</i> git commit -m "feat: greet"
+<b>harness: commit blocked</b>
+Staged files changed after
+the last verification.
+<i>$</i> scripts/harness/verify greet
+3 tests passed
+<i>$</i> git commit -m "feat: greet"
+[add-greeting 2fa1905] feat: greet</pre>
+</main>
+<footer><strong>One loop · one gate · one skill library</strong><span>Claude Code, Codex, OpenCode, Cursor</span><span>POSIX sh · MIT</span></footer>
+</body>
+</html>
