@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>norma · your agent says the tests passed, git checks</title>
+<meta name="description" content="norma installs one task loop, one verification gate and one skill library in a repository, the same for every coding agent, and enforces them with a git hook. POSIX sh, MIT, no dependencies.">
+<meta property="og:title" content="norma · your agent says the tests passed, git checks">
+<meta property="og:description" content="One task loop, one verification gate, one skill library for every coding agent. Enforced by git. POSIX sh, no dependencies.">
+<meta property="og:image" content="https://jcarlosrodicio.github.io/norma/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:url" content="https://jcarlosrodicio.github.io/norma/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23f3eee4'/%3E%3Cpath d='M9 24V8h3l8 11V8h3v16h-3L12 13v11z' fill='%231f1c18'/%3E%3Crect x='6' y='27' width='20' height='2' fill='%23d9472b'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,300..800;1,100,400&family=Fragment+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: oklch(0.955 0.012 80);
+  --paper-2: oklch(0.925 0.016 80);
+  --ink: oklch(0.22 0.012 70);
+  --ink-2: oklch(0.42 0.014 70);
+  --rule: oklch(0.80 0.018 75);
+  --rule-strong: oklch(0.30 0.012 70);
+  --stamp: oklch(0.56 0.19 33);
+  --term: oklch(0.21 0.008 70);
+  --term-ink: oklch(0.92 0.012 80);
+
+  --sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --mono: "Fragment Mono", ui-monospace, Menlo, monospace;
+
+  --gutter: clamp(16px, 4vw, 48px);
+  --margin-col: clamp(0px, 14vw, 180px);
+  --measure: 68ch;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: oklch(0.19 0.008 70);
+    --paper-2: oklch(0.23 0.010 70);
+    --ink: oklch(0.92 0.012 80);
+    --ink-2: oklch(0.72 0.014 78);
+    --rule: oklch(0.34 0.010 70);
+    --rule-strong: oklch(0.80 0.012 80);
+    --stamp: oklch(0.70 0.17 35);
+    --term: oklch(0.15 0.006 70);
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 17px/1.6 var(--sans);
+  font-variation-settings: "wdth" 100;
+  text-rendering: optimizeLegibility;
+}
+a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+a:hover { color: var(--stamp); }
+code, kbd, pre { font-family: var(--mono); font-size: 0.9em; }
+:focus-visible { outline: 2px solid var(--stamp); outline-offset: 2px; }
+
+/* The sheet: a document header, then clauses on a visible grid. */
+.sheet { max-width: 1240px; margin: 0 auto; padding: 0 var(--gutter); }
+
+.masthead {
+  display: grid;
+  grid-template-columns: var(--margin-col) 1fr auto;
+  align-items: baseline;
+  gap: 0 24px;
+  padding: 20px 0 14px;
+  border-bottom: 2px solid var(--rule-strong);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+.masthead .mark {
+  font-weight: 800;
+  font-variation-settings: "wdth" 125;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.masthead nav { display: flex; gap: 20px; justify-self: end; }
+.masthead nav a { text-decoration: none; }
+.masthead nav a:hover { text-decoration: underline; }
+.masthead .doc { color: var(--ink-2); }
+
+.clause {
+  display: grid;
+  grid-template-columns: var(--margin-col) minmax(0, 1fr);
+  gap: 0 24px;
+  padding: clamp(48px, 8vw, 96px) 0;
+  border-bottom: 1px solid var(--rule);
+}
+.clause > .num {
+  font-family: var(--sans);
+  font-variation-settings: "wdth" 125;
+  font-weight: 300;
+  font-size: clamp(28px, 3.4vw, 44px);
+  line-height: 1;
+  color: var(--ink-2);
+  padding-top: 6px;
+}
+.clause h2 {
+  margin: 0 0 20px;
+  font-size: clamp(26px, 3vw, 36px);
+  line-height: 1.1;
+  font-weight: 700;
+  font-variation-settings: "wdth" 88;
+  letter-spacing: -0.01em;
+  max-width: 24ch;
+}
+.clause p { max-width: var(--measure); margin: 0 0 16px; }
+.lede { font-size: 19px; color: var(--ink-2); }
+
+/* §0 - the claim */
+.claim { padding-top: clamp(40px, 7vw, 88px); }
+.claim h1 {
+  margin: 0 0 28px;
+  font-weight: 800;
+  font-variation-settings: "wdth" 80;
+  font-size: clamp(44px, 8.4vw, 116px);
+  line-height: 0.95;
+  letter-spacing: -0.025em;
+  max-width: 13ch;
+}
+.claim h1 em {
+  font-style: normal;
+  color: var(--stamp);
+}
+.claim .lede { max-width: 58ch; margin-bottom: 32px; }
+
+.install {
+  display: flex;
+  align-items: stretch;
+  max-width: 560px;
+  border: 1px solid var(--rule-strong);
+  background: var(--paper-2);
+}
+.install code {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 16px;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+.install code::before { content: "$ "; color: var(--ink-2); }
+.copy {
+  font: 600 12px/1 var(--sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 0;
+  border-left: 1px solid var(--rule-strong);
+  background: transparent;
+  color: var(--ink);
+  padding: 0 18px;
+  cursor: pointer;
+}
+.copy:hover { background: var(--ink); color: var(--paper); }
+.install-alt { margin-top: 12px; font-size: 14px; color: var(--ink-2); }
+
+.agents {
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.agents li:first-child { color: var(--ink); font-weight: 600; }
+
+/* Figures, captioned like a standard's */
+figure { margin: clamp(40px, 6vw, 72px) 0 0; max-width: 980px; }
+figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--term);
+  border: 1px solid var(--rule-strong);
+}
+figcaption {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--ink-2);
+  max-width: var(--measure);
+}
+figcaption b { color: var(--ink); font-weight: 700; white-space: nowrap; }
+
+/* §1 - drift, set as a numbered list of symptoms */
+.symptoms {
+  list-style: none;
+  margin: 8px 0 28px;
+  padding: 0;
+  max-width: var(--measure);
+  counter-reset: s;
+}
+.symptoms li {
+  counter-increment: s;
+  display: grid;
+  grid-template-columns: 3.2em minmax(0, 1fr);
+  padding: 12px 0;
+  border-top: 1px solid var(--rule);
+}
+.symptoms li::before {
+  content: "1." counter(s);
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--ink-2);
+  padding-top: 2px;
+}
+
+/* §2 - the loop as a drawn track with three human stops */
+.loop {
+  list-style: none;
+  margin: 32px 0 12px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  border-top: 2px solid var(--rule-strong);
+}
+.loop li {
+  position: relative;
+  padding: 18px 8px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.loop li::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  background: var(--paper);
+  border: 2px solid var(--rule-strong);
+  border-radius: 50%;
+}
+.loop li span {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-2);
+}
+.loop li.stop::before { background: var(--stamp); border-color: var(--stamp); border-radius: 0; transform: rotate(45deg); }
+.loop li.stop span { color: var(--stamp); }
+.loop li.gate { color: var(--stamp); }
+.legend { font-size: 14px; color: var(--ink-2); max-width: var(--measure); }
+.legend i { display: inline-block; width: 9px; height: 9px; background: var(--stamp); transform: rotate(45deg); margin-right: 6px; }
+
+.two-modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0 48px;
+  margin-top: 40px;
+  max-width: 980px;
+}
+.two-modes div { border-top: 1px solid var(--rule-strong); padding-top: 14px; }
+.two-modes h3 { margin: 0 0 6px; font-size: 16px; font-weight: 700; }
+.two-modes h3 code { font-weight: 400; }
+.two-modes p { font-size: 15px; color: var(--ink-2); margin: 0; }
+
+/* §3 - refusals: the register */
+.register { width: 100%; max-width: 980px; border-collapse: collapse; margin-top: 12px; font-size: 15px; }
+.register caption {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 28px 0 10px;
+  color: var(--ink-2);
+}
+.register th, .register td { text-align: left; vertical-align: top; padding: 12px 16px 12px 0; border-top: 1px solid var(--rule); }
+.register thead th {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  border-top: 2px solid var(--rule-strong);
+}
+.register td:first-child { font-family: var(--mono); font-size: 13px; color: var(--stamp); white-space: nowrap; width: 4.5em; }
+.register td:nth-child(2) { font-weight: 600; width: 34%; }
+.register td:nth-child(3) { color: var(--ink-2); }
+
+.aside {
+  margin-top: 32px;
+  max-width: var(--measure);
+  padding: 16px 18px;
+  background: var(--paper-2);
+  font-size: 15px;
+}
+
+/* §4 - ownership */
+.owners { display: grid; grid-template-columns: 1fr 1fr; max-width: 980px; margin-top: 12px; border-top: 2px solid var(--rule-strong); }
+.owners > div { padding: 16px 24px 0 0; }
+.owners > div + div { border-left: 1px solid var(--rule); padding-left: 24px; }
+.owners h3 { margin: 0 0 10px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 700; }
+.owners ul { list-style: none; padding: 0; margin: 0; }
+.owners li { padding: 6px 0; border-top: 1px solid var(--rule); font-family: var(--mono); font-size: 13.5px; overflow-wrap: anywhere; }
+.owners li small { display: block; font-family: var(--sans); font-size: 13px; color: var(--ink-2); }
+
+/* §5 - steps */
+.steps { list-style: none; padding: 0; margin: 16px 0 0; max-width: 820px; counter-reset: st; }
+.steps li { counter-increment: st; display: grid; grid-template-columns: 3.2em minmax(0, 1fr); padding: 18px 0; border-top: 1px solid var(--rule); }
+.steps li::before { content: "5." counter(st); font-family: var(--mono); font-size: 14px; color: var(--ink-2); padding-top: 3px; }
+.steps p { margin: 0 0 10px; }
+.steps pre {
+  margin: 0;
+  padding: 14px 16px;
+  background: var(--term);
+  color: var(--term-ink);
+  overflow-x: auto;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.steps pre .c { color: oklch(0.68 0.014 78); }
+
+.scope {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0 48px;
+  margin-top: 48px;
+  max-width: 980px;
+}
+.scope h3 { margin: 0 0 8px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; }
+.scope ul { margin: 0; padding-left: 1.1em; font-size: 15px; color: var(--ink-2); }
+.scope li { margin-bottom: 6px; }
+
+.colophon {
+  display: grid;
+  grid-template-columns: var(--margin-col) 1fr auto;
+  gap: 8px 24px;
+  padding: 28px 0 48px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.colophon p { margin: 0; max-width: 60ch; }
+.colophon nav { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+
+@media (max-width: 860px) {
+  .loop { grid-template-columns: 1fr; border-top: 0; border-left: 2px solid var(--rule-strong); margin-left: 6px; }
+  .loop li { padding: 0 0 14px 22px; }
+  .loop li::before { top: 4px; left: -8px; }
+  .loop li span { display: inline; margin-left: 8px; }
+}
+@media (max-width: 720px) {
+  :root { --margin-col: 0px; }
+  .masthead, .clause, .colophon { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .masthead .doc { display: none; }
+  .masthead nav { justify-self: start; margin-top: 4px; }
+  .clause > .num { font-size: 15px; font-variation-settings: "wdth" 100; font-weight: 600; padding: 0 0 10px; color: var(--stamp); }
+  .owners { grid-template-columns: 1fr; }
+  .owners > div + div { border-left: 0; padding-left: 0; margin-top: 20px; }
+  .register thead { display: none; }
+  .register tr { display: grid; grid-template-columns: 4em 1fr; border-top: 1px solid var(--rule); padding: 10px 0; }
+  .register td { border: 0; padding: 2px 0; width: auto !important; }
+  .register td:nth-child(3) { grid-column: 2; }
+  figcaption { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .lede { font-size: 17px; }
+  .install code { font-size: 13px; padding: 12px; }
+  .steps li, .symptoms li { grid-template-columns: 2.6em minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .copy { transition: background 160ms cubic-bezier(0.22, 1, 0.36, 1), color 160ms cubic-bezier(0.22, 1, 0.36, 1); }
+}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+<header class="masthead">
+  <span class="mark">norma</span>
+  <span class="doc">A harness for agent-driven change · rev. 0.28.0 · MIT</span>
+  <nav aria-label="Primary">
+    <a href="#install">Install</a>
+    <a href="https://github.com/jcarlosrodicio/norma/tree/master/docs">Docs</a>
+    <a href="https://github.com/jcarlosrodicio/norma">GitHub</a>
+  </nav>
+</header>
+
+<main>
+
+<section class="clause claim" aria-labelledby="claim">
+  <div class="num" aria-hidden="true">§0</div>
+  <div>
+    <h1 id="claim">Your agent says the tests passed. <em>Git checks.</em></h1>
+    <p class="lede">norma installs one task loop, one verification gate and one skill library in your repository. Every coding agent follows the same procedure, read from plain files, and none of them can commit until the same gate has passed. The rule lives in a git hook, so switching agents changes nothing.</p>
+    <div class="install">
+      <code id="brew">brew install jcarlosrodicio/tap/norma</code>
+      <button class="copy" type="button" data-copy="brew">Copy</button>
+    </div>
+    <p class="install-alt">No Homebrew? <a href="#install">The install script needs only git.</a> Then <code>norma install</code> in any repository.</p>
+    <ul class="agents" aria-label="Works with">
+      <li>Works with</li><li>Claude Code</li><li>Codex</li><li>OpenCode</li><li>Cursor</li><li>whatever comes next</li>
+    </ul>
+
+    <figure>
+      <img src="demo.gif" width="1200" height="680" alt="A terminal. A file is edited and committed; the hook answers 'harness: commit blocked, staged files changed after the last verification'. The gate runs and passes, and the same commit goes through.">
+      <figcaption><b>Fig. 1</b><span>Real output. The code changed after the last verification, so the stamp no longer covers it and git refuses the commit. The gate runs, writes a fresh stamp, and the same commit is accepted.</span></figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="clause" aria-labelledby="drift">
+  <div class="num" aria-hidden="true">§1</div>
+  <div>
+    <h2 id="drift">Process in an agent-driven repository grows by accident</h2>
+    <ol class="symptoms">
+      <li>A prompt here, a rule file there, a slash command only one agent understands.</li>
+      <li>“Run the tests” is an instruction, not a check. It is followed when remembered.</li>
+      <li>Each agent gets its own procedure, so the result depends on who was driving.</li>
+      <li>The same gate is rebuilt by hand in every repository, and the copies drift apart.</li>
+    </ol>
+    <p>norma is that process written once, made portable and made binding. A step that was skipped shows up as a refused commit, not as a review comment three days later.</p>
+  </div>
+</section>
+
+<section class="clause" aria-labelledby="loop">
+  <div class="num" aria-hidden="true">§2</div>
+  <div>
+    <h2 id="loop">One loop for every change</h2>
+    <p>Each stage is a document in <code>.agents/skills/</code>, referenced by path. An agent that knows nothing about skills can still follow it; Claude Code also gets them as slash commands.</p>
+    <ol class="loop">
+      <li>orient</li>
+      <li class="stop">enrich<span>stop</span></li>
+      <li>branch</li>
+      <li class="stop">plan<span>stop</span></li>
+      <li>implement</li>
+      <li class="gate">verify<span>gate</span></li>
+      <li>review</li>
+      <li>document</li>
+      <li>close</li>
+      <li class="stop">deliver<span>stop</span></li>
+    </ol>
+    <p class="legend"><i aria-hidden="true"></i>A human decides: after the spec, after the plan, before delivery.</p>
+    <div class="two-modes">
+      <div>
+        <h3><code>run-task</code>, supervised</h3>
+        <p>From a vague request to verified code waiting for review. It stops three times, and you see the spec and the task list before any code exists.</p>
+      </div>
+      <div>
+        <h3><code>auto-run-task</code>, unattended</h3>
+        <p>Hand over a roadmap phase and leave. Each stop becomes a decision it writes down, and the run ends at an open pull request with green CI. Never a merge, a deploy or a publish.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="clause" aria-labelledby="refusals">
+  <div class="num" aria-hidden="true">§3</div>
+  <div>
+    <h2 id="refusals">What gets refused, and why</h2>
+    <p>The gate runs the checks your project declares in <code>config.sh</code> and writes a stamp of what it verified. The hook reads the stamp. Every refusal exists because something once got through without it.</p>
+    <table class="register">
+      <caption>The hook, at <code>git commit</code></caption>
+      <thead><tr><th scope="col">No.</th><th scope="col">Refused when</th><th scope="col">Because</th></tr></thead>
+      <tbody>
+        <tr><td>H-1</td><td>You are on the default branch</td><td>Work belongs on a branch; the project's convention names it.</td></tr>
+        <tr><td>H-2</td><td>There is no stamp</td><td>Nothing was verified.</td></tr>
+        <tr><td>H-3</td><td>A staged file is newer than the stamp</td><td>The code was edited after it was verified. The refusal prints the previous selection, ready to paste.</td></tr>
+        <tr><td>H-4</td><td>Code is staged against a docs-only stamp</td><td>A docs-only run vouches for no test at all.</td></tr>
+      </tbody>
+    </table>
+    <table class="register">
+      <caption>The gate, at <code>scripts/harness/verify</code></caption>
+      <thead><tr><th scope="col">No.</th><th scope="col">Refused when</th><th scope="col">Because</th></tr></thead>
+      <tbody>
+        <tr><td>G-1</td><td>No test target is named</td><td>A reviewer must be able to judge whether the subset was the right one.</td></tr>
+        <tr><td>G-2</td><td><code>--docs-only</code> with code in the change</td><td>The mode is for documentation. It must not become a way past the tests.</td></tr>
+        <tr><td>G-3</td><td><code>config.sh</code> is missing or incomplete</td><td>A gate that silently runs nothing is worse than no gate.</td></tr>
+      </tbody>
+    </table>
+    <p class="aside">The one hole a hook cannot close is <code>git commit --no-verify</code>. Run the same gate in CI and that hole closes too. The full list, with the run context and the land script, is in <a href="https://github.com/jcarlosrodicio/norma/blob/master/docs/02-flows.md#every-refusal-and-why-it-exists">docs/02-flows.md</a>.</p>
+  </div>
+</section>
+
+<section class="clause" aria-labelledby="owners">
+  <div class="num" aria-hidden="true">§4</div>
+  <div>
+    <h2 id="owners">Upgrades never touch your decisions</h2>
+    <p>The gate is byte-identical in every project; everything stack-specific lives in one file the project owns. <code>norma upgrade</code> replaces only the left column and reports local edits instead of overwriting them.</p>
+    <div class="owners">
+      <div>
+        <h3>norma owns, replaced on upgrade</h3>
+        <ul>
+          <li>scripts/harness/verify<small>the gate</small></li>
+          <li>.githooks/pre-commit<small>the hook</small></li>
+          <li>scripts/harness/run, land</li>
+          <li>.agents/skills/&lt;vendored&gt;<small>copied, not linked, so they survive a clone</small></li>
+          <li>AGENTS.md, between its markers</li>
+        </ul>
+      </div>
+      <div>
+        <h3>You own, never touched</h3>
+        <ul>
+          <li>scripts/harness/config.sh<small>your checks and test commands</small></li>
+          <li>docs/harness/mandatory-steps.md</li>
+          <li>docs/harness/architecture-rules.md</li>
+          <li>openspec/config.yaml</li>
+          <li>AGENTS.md, everything outside the markers</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="clause" id="install" aria-labelledby="install-h">
+  <div class="num" aria-hidden="true">§5</div>
+  <div>
+    <h2 id="install-h">Install</h2>
+    <p>You need git and a POSIX <code>sh</code>. Nothing else to install, upgrade or run the gate. The full loop also uses <a href="https://github.com/Fission-AI/OpenSpec">OpenSpec</a> for its plan and apply stages.</p>
+    <ol class="steps">
+      <li><div>
+        <p>Install the CLI, with Homebrew on macOS or Linux, or with the script, which clones the latest release.</p>
+<pre><code>brew install jcarlosrodicio/tap/norma
+<span class="c"># or</span>
+curl -fsSL https://raw.githubusercontent.com/jcarlosrodicio/norma/master/install.sh | sh</code></pre>
+      </div></li>
+      <li><div>
+        <p>Add the harness to a repository. It detects the stack from its manifest; sixteen profiles ship, from Node and Flutter to Rails and Terraform.</p>
+<pre><code>cd your-project
+norma install --dry-run   <span class="c"># read the plan first</span>
+norma install
+norma doctor              <span class="c"># what is still missing</span></code></pre>
+      </div></li>
+      <li><div>
+        <p>Let your agent finish it. <code>harness-setup</code> reads the repository, interviews you for what the installer cannot infer, and fills in the config. From then on every change starts with <code>run-task</code>.</p>
+<pre><code><span class="c"># any agent, by path</span>
+.agents/skills/harness-setup/SKILL.md
+<span class="c"># in Claude Code</span>
+/harness-setup</code></pre>
+      </div></li>
+    </ol>
+
+    <div class="scope">
+      <div>
+        <h3>For you if</h3>
+        <ul>
+          <li>you use more than one coding agent and want them to work the same way;</li>
+          <li>you want “the tests passed” to be something git checks;</li>
+          <li>you keep copying the same process between repositories.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Not for you if</h3>
+        <ul>
+          <li>you want an agent runtime, an orchestrator or a hosted platform;</li>
+          <li>you want changes merged with no human review;</li>
+          <li>your checks cannot run from a shell. Native Windows is not supported.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="colophon">
+  <span></span>
+  <p>norma is POSIX sh, MIT licensed and tested by its own gate. It is not affiliated with Anthropic, OpenAI, OpenSpec or any agent vendor it works with.</p>
+  <nav aria-label="Footer">
+    <a href="https://github.com/jcarlosrodicio/norma">Source</a>
+    <a href="https://github.com/jcarlosrodicio/norma/releases">Releases</a>
+    <a href="https://github.com/jcarlosrodicio/norma/issues">Issues</a>
+  </nav>
+</footer>
+
+</div>
+<script>
+document.querySelectorAll("[data-copy]").forEach(function (b) {
+  if (!navigator.clipboard) { b.hidden = true; return; }
+  b.addEventListener("click", function () {
+    var t = document.getElementById(b.dataset.copy).textContent;
+    navigator.clipboard.writeText(t).then(function () {
+      b.textContent = "Copied";
+      setTimeout(function () { b.textContent = "Copy"; }, 1600);
+    });
+  });
+});
+</script>
+</body>
+</html>
